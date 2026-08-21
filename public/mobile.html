@@ -2,8 +2,8 @@
 <html lang="no">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Spiller - Hybrid Poker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Poker Spiller</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -12,159 +12,253 @@
       text-align: center;
       margin: 0;
       padding: 15px;
+      user-select: none; /* Forhindrer at tekst merkes når man holder inne */
+      -webkit-user-select: none;
     }
 
-    .status-bar {
-      background-color: #333;
+    .top-bar {
+      background: #222;
       padding: 12px;
-      border-radius: 8px;
+      border-radius: 10px;
+      margin-bottom: 15px;
+      font-size: 1.1rem;
       font-weight: bold;
-      margin-bottom: 20px;
     }
 
-    .role-bar {
-      background-color: #ff5722;
+    .role-badge {
+      display: inline-block;
+      background: #ff5722;
       color: white;
-      padding: 10px;
-      border-radius: 8px;
+      padding: 4px 12px;
+      border-radius: 15px;
       font-weight: bold;
       margin-bottom: 15px;
     }
 
-    .cards-area {
-      border: 2px dashed #2e7d32;
-      background-color: #1b4d2e;
-      border-radius: 12px;
-      padding: 20px 10px;
-      min-height: 120px;
+    /* Container for kort på mobil */
+    .cards-container {
       display: flex;
       justify-content: center;
+      gap: 10px;
+      background: #1b4d2e;
+      border: 2px dashed #4caf50;
+      border-radius: 15px;
+      padding: 20px 10px;
+      min-height: 120px;
+      margin-bottom: 20px;
       align-items: center;
-      gap: 8px;
-      margin-bottom: 25px;
     }
 
-    /* Stiling for kort */
+    /* Kort-styling */
     .card {
       display: inline-flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       background-color: #ffffff;
-      border-radius: 8px;
-      width: 55px;
-      height: 80px;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.5);
-      font-weight: bold;
-    }
-    .card.red { color: #d9534f; }
-    .card.black { color: #222222; }
-    .card-val { font-size: 1.3rem; line-height: 1; }
-    .card-suit { font-size: 1.5rem; line-height: 1; }
-
-    .btn-fold {
-      background-color: #e57373;
-      color: white;
-      border: none;
-      width: 100%;
-      padding: 15px;
-      font-size: 1.2rem;
       border-radius: 10px;
+      width: 65px;
+      height: 95px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
       font-weight: bold;
       cursor: pointer;
+      transition: transform 0.1s ease;
     }
 
-    .login-container {
+    /* Skjult kort (baksiden) */
+    .card.hidden-card {
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+      border: 2px solid #ffffff;
+      color: #ffffff;
+    }
+    .card.hidden-card .eye-icon {
+      font-size: 1.8rem;
+      opacity: 0.8;
+    }
+
+    /* Åpnet kort */
+    .card.red { color: #d9534f; }
+    .card.black { color: #222222; }
+    .card-val { font-size: 1.5rem; line-height: 1; }
+    .card-suit { font-size: 1.8rem; line-height: 1; }
+
+    /* Knapper */
+    .btn-fold {
+      width: 100%;
+      padding: 18px;
+      font-size: 1.3rem;
+      font-weight: bold;
+      background-color: #e53935;
+      color: white;
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 4px 10px rgba(229, 57, 53, 0.4);
+      cursor: pointer;
+    }
+    .btn-fold:disabled {
+      background-color: #555;
+      box-shadow: none;
+    }
+
+    .join-box {
       margin-top: 50px;
     }
     input[type="text"] {
-      padding: 12px;
-      font-size: 1rem;
-      border-radius: 6px;
-      border: none;
       width: 80%;
-      max-width: 250px;
-      margin-bottom: 10px;
+      padding: 12px;
+      font-size: 1.1rem;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      margin-bottom: 15px;
+      text-align: center;
     }
     .btn-join {
+      padding: 12px 30px;
+      font-size: 1.1rem;
       background-color: #4caf50;
       color: white;
       border: none;
-      padding: 12px 25px;
-      font-size: 1rem;
-      border-radius: 6px;
-      cursor: pointer;
+      border-radius: 8px;
       font-weight: bold;
+    }
+
+    .instruction-text {
+      font-size: 0.85rem;
+      color: #aaa;
+      margin-bottom: 10px;
     }
   </style>
 </head>
 <body>
 
-  <div id="login-screen" class="login-container">
-    <h2>Velkommen til Pokertilbehøret</h2>
-    <input type="text" id="player-name" placeholder="Skriv ditt navn..." />
+  <!-- Innloggingsskjerm -->
+  <div id="login-screen" class="join-box">
+    <h2>Velkommen til Pokerbordet</h2>
+    <p>Skriv inn navnet ditt for å koble til:</p>
+    <input type="text" id="player-name" placeholder="Ditt navn" maxlength="15" />
     <br>
     <button class="btn-join" onclick="joinGame()">Koble til</button>
   </div>
 
+  <!-- Spillergrensesnitt -->
   <div id="game-screen" style="display: none;">
-    <div id="status-bar" class="status-bar">VENTER...</div>
-    <div id="role-bar" class="role-bar" style="display: none;"></div>
+    <div class="top-bar">
+      Fase: <span id="phase-label">VENTING</span>
+    </div>
 
-    <div id="my-cards" class="cards-area"></div>
+    <div id="role-label" class="role-badge" style="display: none;"></div>
 
-    <button class="btn-fold" onclick="fold()">Fold (Kast deg)</button>
+    <div class="instruction-text">💡 Trykk/hold på et kort for å se verdien</div>
+
+    <div id="my-cards" class="cards-container"></div>
+
+    <button id="btn-fold" class="btn-fold" onclick="foldHand()">Fold (Kast deg)</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
-
-    function formatCard(cardCode) {
-      if (!cardCode) return '';
-      const value = cardCode.slice(0, -1).toUpperCase();
-      const suitChar = cardCode.slice(-1).toLowerCase();
-      
-      const suits = {
-        'h': { symbol: '♥', color: 'red' },
-        'd': { symbol: '♦', color: 'red' },
-        'c': { symbol: '♣', color: 'black' },
-        's': { symbol: '♠', color: 'black' }
-      };
-      
-      const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
-      return `<div class="card ${suit.color}"><span class="card-val">${value}</span><span class="card-suit">${suit.symbol}</span></div>`;
-    }
+    let myCardsData = [];
+    // Holder styr på hvilke kort som er avdekket (true/false per kort-indeks)
+    let revealedCards = [];
 
     function joinGame() {
       const name = document.getElementById('player-name').value.trim();
-      if (name) {
-        socket.emit('join_game', name);
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('game-screen').style.display = 'block';
-      }
+      if (!name) return alert('Vennligst skriv inn et navn!');
+
+      socket.emit('join_game', name);
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('game-screen').style.display = 'block';
     }
 
-    function fold() {
+    function foldHand() {
       socket.emit('player_fold');
     }
 
-    socket.on('player_state', (data) => {
-      document.getElementById('status-bar').innerText = `Fase: ${data.phase}`;
-      
-      const roleBar = document.getElementById('role-bar');
-      if (data.role) {
-        roleBar.innerText = `DU ER ${data.role}`;
-        roleBar.style.display = 'block';
-      } else {
-        roleBar.style.display = 'none';
+    function toggleCard(index) {
+      revealedCards[index] = !revealedCards[index];
+      renderCards();
+    }
+
+    function renderCards() {
+      const container = document.getElementById('my-cards');
+      if (!myCardsData || myCardsData.length === 0) {
+        container.innerHTML = '<span style="color:#aaa;">Ingen kort utdelt ennå</span>';
+        return;
       }
 
-      const cardsContainer = document.getElementById('my-cards');
-      if (data.cards && data.cards.length > 0) {
-        cardsContainer.innerHTML = data.cards.map(c => formatCard(c)).join('');
+      container.innerHTML = myCardsData.map((cardCode, index) => {
+        const isRevealed = revealedCards[index];
+
+        if (!isRevealed) {
+          // Skjult kort-baksiden
+          return `
+            <div class="card hidden-card" 
+                 onmousedown="toggleCard(${index})" 
+                 onmouseup="toggleCard(${index})"
+                 ontouchstart="toggleCard(${index})" 
+                 ontouchend="toggleCard(${index})">
+              <span class="eye-icon">👁️</span>
+              <span style="font-size: 0.65rem; margin-top: 5px; opacity: 0.8;">VIS</span>
+            </div>
+          `;
+        }
+
+        // Åpent kort
+        let value = cardCode.slice(0, -1).toUpperCase();
+        if (value === 'T') value = '10';
+        const suitChar = cardCode.slice(-1).toLowerCase();
+
+        const suits = {
+          'h': { symbol: '♥', color: 'red' },
+          'd': { symbol: '♦', color: 'red' },
+          'c': { symbol: '♣', color: 'black' },
+          's': { symbol: '♠', color: 'black' }
+        };
+
+        const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
+
+        return `
+          <div class="card ${suit.color}" 
+               onmousedown="toggleCard(${index})" 
+               onmouseup="toggleCard(${index})"
+               ontouchstart="toggleCard(${index})" 
+               ontouchend="toggleCard(${index})">
+            <span class="card-val">${value}</span>
+            <span class="card-suit">${suit.symbol}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    socket.on('player_state', (state) => {
+      document.getElementById('phase-label').innerText = state.phase;
+
+      // Roller (SB / BB)
+      const roleBadge = document.getElementById('role-label');
+      if (state.role) {
+        roleBadge.innerText = `DU ER ${state.role}`;
+        roleBadge.style.display = 'inline-block';
       } else {
-        cardsContainer.innerHTML = '<span style="color: #aaa;">Ingen kort utdelt ennå</span>';
+        roleBadge.style.display = 'none';
+      }
+
+      // Oppdater kort og tilbakestill skjuling hvis ny hånd
+      if (JSON.stringify(state.cards) !== JSON.stringify(myCardsData)) {
+        myCardsData = state.cards || [];
+        revealedCards = new Array(myCardsData.length).fill(false);
+      }
+
+      renderCards();
+
+      // Fold-knapp tilstand
+      const foldBtn = document.getElementById('btn-fold');
+      if (state.folded) {
+        foldBtn.disabled = true;
+        foldBtn.innerText = 'Du har foldet';
+      } else {
+        foldBtn.disabled = false;
+        foldBtn.innerText = 'Fold (Kast deg)';
       }
     });
   </script>
