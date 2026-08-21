@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pokerbordet (iPad)</title>
-  <!-- QR Code-bibliotek -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     body {
@@ -15,8 +14,24 @@
       margin: 0;
       padding: 20px;
     }
-    h1 { margin-bottom: 20px; }
-    
+
+    .winner-banner {
+      background: linear-gradient(45deg, #ff9800, #f44336);
+      color: white;
+      padding: 15px;
+      font-size: 1.5rem;
+      font-weight: bold;
+      border-radius: 12px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+      animation: pulse 1.5s infinite alternate;
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(0.98); }
+      100% { transform: scale(1.02); }
+    }
+
     .main-layout {
       display: flex;
       justify-content: center;
@@ -31,12 +46,11 @@
       border: 10px solid #5c3a21;
       background-color: #2e7d32;
       border-radius: 80px;
-      padding: 30px;
+      padding: 25px;
       min-height: 400px;
       box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
     }
 
-    /* QR-kode boks i sidepanelet */
     .qr-box {
       background-color: rgba(0, 0, 0, 0.6);
       border: 2px solid #ffffff;
@@ -45,28 +59,16 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
-    }
-    .qr-box p {
-      margin: 0 0 10px 0;
-      font-size: 0.9rem;
-      font-weight: bold;
-    }
-    #qrcode img {
-      border-radius: 8px;
-      padding: 5px;
-      background: white;
     }
 
     .cards-container {
       display: flex;
       justify-content: center;
-      gap: 10px;
+      gap: 8px;
       min-height: 90px;
       margin: 20px 0;
     }
 
-    /* Stiling for kort */
     .card {
       display: inline-flex;
       flex-direction: column;
@@ -74,30 +76,30 @@
       justify-content: center;
       background-color: #ffffff;
       border-radius: 8px;
-      width: 60px;
-      height: 85px;
+      width: 55px;
+      height: 78px;
       box-shadow: 0 4px 8px rgba(0,0,0,0.4);
       font-weight: bold;
     }
     .card.red { color: #d9534f; }
     .card.black { color: #222222; }
-    .card-val { font-size: 1.4rem; line-height: 1; }
-    .card-suit { font-size: 1.6rem; line-height: 1; }
+    .card-val { font-size: 1.3rem; line-height: 1; }
+    .card-suit { font-size: 1.5rem; line-height: 1; }
 
     .players-container {
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
       gap: 15px;
-      margin-top: 30px;
+      margin-top: 20px;
     }
 
     .player-card {
-      background: rgba(0,0,0,0.6);
+      background: rgba(0,0,0,0.7);
       border: 2px solid #fff;
       border-radius: 12px;
       padding: 10px 15px;
-      min-width: 120px;
+      min-width: 130px;
     }
 
     .badge {
@@ -135,18 +137,19 @@
 
   <h1>Pokerbordet</h1>
 
+  <div id="winner-banner" class="winner-banner" style="display: none;"></div>
+
   <div class="main-layout">
     <div class="poker-table">
-      <h2 id="game-info">Modus: TEXAS HOLD'EM | Fase: VENTING</h2>
+      <h2 id="game-info">Modus: OMAHA | Fase: VENTING</h2>
       
       <div id="board-cards" class="cards-container"></div>
 
       <div id="players-list" class="players-container"></div>
     </div>
 
-    <!-- QR boks for mobil-oppkobling -->
     <div class="qr-box">
-      <p>Skann for å bli med:</p>
+      <p style="margin: 0 0 10px 0; font-size: 0.9rem; font-weight: bold;">Skann for å bli med:</p>
       <div id="qrcode"></div>
     </div>
   </div>
@@ -162,7 +165,6 @@
   <script>
     const socket = io();
 
-    // Generer automatisk QR-kode basert på gjeldende domene
     const mobileUrl = window.location.origin + '/mobile.html';
     new QRCode(document.getElementById("qrcode"), {
       text: mobileUrl,
@@ -172,7 +174,8 @@
 
     function formatCard(cardCode) {
       if (!cardCode) return '';
-      const value = cardCode.slice(0, -1).toUpperCase();
+      let value = cardCode.slice(0, -1).toUpperCase();
+      if (value === 'T') value = '10';
       const suitChar = cardCode.slice(-1).toLowerCase();
       
       const suits = {
@@ -186,26 +189,27 @@
       return `<div class="card ${suit.color}"><span class="card-val">${value}</span><span class="card-suit">${suit.symbol}</span></div>`;
     }
 
-    function setMode(mode) {
-      socket.emit('set_game_mode', mode);
-    }
-
-    function startNewHand() {
-      socket.emit('start_new_hand');
-    }
-
-    function nextPhase() {
-      socket.emit('next_phase');
-    }
+    function setMode(mode) { socket.emit('set_game_mode', mode); }
+    function startNewHand() { socket.emit('start_new_hand'); }
+    function nextPhase() { socket.emit('next_phase'); }
 
     socket.on('state_update', (state) => {
       document.getElementById('game-info').innerText = `Modus: ${state.gameMode} | Fase: ${state.phase}`;
       
-      // Vis felleskort
+      // Vinner-banner
+      const banner = document.getElementById('winner-banner');
+      if (state.winnerInfo) {
+        banner.innerHTML = `🏆 VINNER: ${state.winnerInfo.winnerName} (${state.winnerInfo.descr})`;
+        banner.style.display = 'block';
+      } else {
+        banner.style.display = 'none';
+      }
+
+      // Felleskort
       const boardContainer = document.getElementById('board-cards');
       boardContainer.innerHTML = state.board.map(c => formatCard(c)).join('');
 
-      // Vis spillere
+      // Spillere (og deres kort hvis Showdown)
       const playersContainer = document.getElementById('players-list');
       playersContainer.innerHTML = state.players.map(p => `
         <div class="player-card">
@@ -215,6 +219,11 @@
           <div style="font-size: 0.8rem; margin-top: 5px;">
             ${p.folded ? '🔴 FOLDET' : '🟢 INNE'}
           </div>
+          ${p.cards && p.cards.length > 0 ? `
+            <div style="margin-top: 8px; display: flex; gap: 4px; justify-content: center;">
+              ${p.cards.map(c => formatCard(c)).join('')}
+            </div>
+          ` : ''}
         </div>
       `).join('');
     });
