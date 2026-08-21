@@ -69,7 +69,6 @@
       align-items: center;
     }
 
-    /* Større felleskort på bordet */
     .cards-container {
       display: flex;
       justify-content: center;
@@ -145,6 +144,7 @@
       font-weight: bold;
     }
     .btn-mode { background-color: #ffffff; color: #333; }
+    .btn-change-mode { background-color: #78909c; color: white; }
     .btn-action { background-color: #4caf50; color: white; }
     .btn-next { background-color: #2196f3; color: white; }
   </style>
@@ -157,7 +157,7 @@
 
   <div class="main-layout">
     <div class="poker-table">
-      <h2 id="game-info" style="margin-top: 0; font-size: 1.3rem;">Modus: OMAHA | Fase: VENTING</h2>
+      <h2 id="game-info" style="margin-top: 0; font-size: 1.3rem;">Velg spilletype nederst for å starte</h2>
       
       <div id="board-cards" class="cards-container"></div>
 
@@ -171,10 +171,18 @@
   </div>
 
   <div class="controls">
-    <button class="btn-mode" onclick="setMode('TEXAS')">Texas Hold'em</button>
-    <button class="btn-mode" onclick="setMode('OMAHA')">Omaha</button>
-    <button class="btn-action" onclick="startNewHand()">Start Ny Hånd</button>
-    <button id="btn-next-phase" class="btn-next" onclick="nextPhase()">Åpne Flopp</button>
+    <!-- Vises kun før spilletype er valgt -->
+    <div id="mode-selection" style="display: flex; gap: 12px;">
+      <button class="btn-mode" onclick="setMode('TEXAS')">Velg Texas Hold'em</button>
+      <button class="btn-mode" onclick="setMode('OMAHA')">Velg Omaha</button>
+    </div>
+
+    <!-- Vises når spilletype er valgt -->
+    <div id="game-controls" style="display: none; gap: 12px;">
+      <button class="btn-change-mode" onclick="resetMode()">Bytt Spilletype</button>
+      <button class="btn-action" onclick="startNewHand()">Start Ny Hånd</button>
+      <button id="btn-next-phase" class="btn-next" onclick="nextPhase()">Åpne Flopp</button>
+    </div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -205,12 +213,33 @@
       return `<div class="card ${suit.color}"><span class="card-val">${value}</span><span class="card-suit">${suit.symbol}</span></div>`;
     }
 
-    function setMode(mode) { socket.emit('set_game_mode', mode); }
+    function setMode(mode) {
+      socket.emit('set_game_mode', mode);
+    }
+
+    function resetMode() {
+      socket.emit('set_game_mode', null);
+    }
+
     function startNewHand() { socket.emit('start_new_hand'); }
     function nextPhase() { socket.emit('next_phase'); }
 
     socket.on('state_update', (state) => {
-      document.getElementById('game-info').innerText = `Modus: ${state.gameMode} | Fase: ${state.phase}`;
+      const modeSelection = document.getElementById('mode-selection');
+      const gameControls = document.getElementById('game-controls');
+      const gameInfo = document.getElementById('game-info');
+
+      if (!state.gameMode) {
+        // Ingen spilletype valgt ennå
+        modeSelection.style.display = 'flex';
+        gameControls.style.display = 'none';
+        gameInfo.innerText = 'Velg spilletype for å begynne';
+      } else {
+        // Spilletype er valgt
+        modeSelection.style.display = 'none';
+        gameControls.style.display = 'flex';
+        gameInfo.innerText = `Modus: ${state.gameMode} | Fase: ${state.phase}`;
+      }
       
       const nextBtn = document.getElementById('btn-next-phase');
       if (state.phase === 'PREFLOP') {

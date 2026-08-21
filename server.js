@@ -93,7 +93,7 @@ function evaluatePlayerHand(playerCards, boardCards, gameMode) {
 }
 
 let gameState = {
-  gameMode: 'OMAHA',
+  gameMode: null, // Starter uten valgt modus
   phase: 'VENTING',
   board: [],
   deck: [],
@@ -118,12 +118,17 @@ io.on('connection', (socket) => {
 
   socket.on('set_game_mode', (mode) => {
     gameState.gameMode = mode;
+    if (!mode) {
+      gameState.phase = 'VENTING';
+      gameState.board = [];
+      gameState.winnerInfo = null;
+    }
     updateAll();
   });
 
   socket.on('start_new_hand', () => {
     const playerList = Object.values(players);
-    if (playerList.length === 0) return;
+    if (playerList.length === 0 || !gameState.gameMode) return;
 
     gameState.deck = createDeck();
     gameState.board = [];
