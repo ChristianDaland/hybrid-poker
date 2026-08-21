@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pokerbordet (iPad)</title>
+  <title>Løland Gård Poker</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
     * { box-sizing: border-box; }
@@ -151,7 +151,7 @@
 </head>
 <body>
 
-  <h1>Pokerbordet</h1>
+  <h1>Løland Gård Poker</h1>
 
   <div id="winner-banner" class="winner-banner" style="display: none;"></div>
 
@@ -171,13 +171,11 @@
   </div>
 
   <div class="controls">
-    <!-- Vises kun før spilletype er valgt -->
     <div id="mode-selection" style="display: flex; gap: 12px;">
       <button class="btn-mode" onclick="setMode('TEXAS')">Velg Texas Hold'em</button>
       <button class="btn-mode" onclick="setMode('OMAHA')">Velg Omaha</button>
     </div>
 
-    <!-- Vises når spilletype er valgt -->
     <div id="game-controls" style="display: none; gap: 12px;">
       <button class="btn-change-mode" onclick="resetMode()">Bytt Spilletype</button>
       <button class="btn-action" onclick="startNewHand()">Start Ny Hånd</button>
@@ -230,12 +228,10 @@
       const gameInfo = document.getElementById('game-info');
 
       if (!state.gameMode) {
-        // Ingen spilletype valgt ennå
         modeSelection.style.display = 'flex';
         gameControls.style.display = 'none';
         gameInfo.innerText = 'Velg spilletype for å begynne';
       } else {
-        // Spilletype er valgt
         modeSelection.style.display = 'none';
         gameControls.style.display = 'flex';
         gameInfo.innerText = `Modus: ${state.gameMode} | Fase: ${state.phase}`;
