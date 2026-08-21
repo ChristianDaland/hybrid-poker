@@ -12,7 +12,7 @@
       text-align: center;
       margin: 0;
       padding: 15px;
-      user-select: none; /* Forhindrer tekstmerking når man holder inne */
+      user-select: none;
       -webkit-user-select: none;
     }
 
@@ -29,13 +29,13 @@
       display: inline-block;
       background: #ff5722;
       color: white;
-      padding: 4px 12px;
-      border-radius: 15px;
+      padding: 6px 16px;
+      border-radius: 20px;
       font-weight: bold;
+      font-size: 1.1rem;
       margin-bottom: 15px;
     }
 
-    /* Grønt interaktivt felt som dekker kortområdet */
     .cards-container {
       display: flex;
       justify-content: center;
@@ -55,7 +55,6 @@
       background: #25663d;
     }
 
-    /* Kort-styling */
     .card {
       display: inline-flex;
       flex-direction: column;
@@ -67,10 +66,9 @@
       height: 95px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.5);
       font-weight: bold;
-      pointer-events: none; /* Lar klikk/touch gå direkte til beholderen */
+      pointer-events: none;
     }
 
-    /* Skjult kort (baksiden) */
     .card.hidden-card {
       background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
       border: 2px solid #ffffff;
@@ -81,13 +79,11 @@
       opacity: 0.8;
     }
 
-    /* Åpnet kort */
     .card.red { color: #d9534f; }
     .card.black { color: #222222; }
     .card-val { font-size: 1.5rem; line-height: 1; }
     .card-suit { font-size: 1.8rem; line-height: 1; }
 
-    /* Knapper */
     .btn-fold {
       width: 100%;
       padding: 18px;
@@ -136,7 +132,6 @@
 </head>
 <body>
 
-  <!-- Innloggingsskjerm -->
   <div id="login-screen" class="join-box">
     <h2>Velkommen til Pokerbordet</h2>
     <p>Skriv inn navnet ditt for å koble til:</p>
@@ -145,17 +140,16 @@
     <button class="btn-join" onclick="joinGame()">Koble til</button>
   </div>
 
-  <!-- Spillergrensesnitt -->
   <div id="game-screen" style="display: none;">
     <div class="top-bar">
       Fase: <span id="phase-label">VENTING</span>
     </div>
 
+    <!-- Viser kun rollenavnet direkte, eks: "Lilleblind" -->
     <div id="role-label" class="role-badge" style="display: none;"></div>
 
     <div class="instruction-text">💡 Trykk og hold på feltet under for å se kortene dine</div>
 
-    <!-- Hele feltet tar imot trykk/touch for å vise/skjule alle kort samtidig -->
     <div id="my-cards" class="cards-container"
          onmousedown="showAllCards()" 
          onmouseup="hideAllCards()"
@@ -206,7 +200,6 @@
 
       container.innerHTML = myCardsData.map((cardCode) => {
         if (!isShowingCards) {
-          // Baksiden av kortet når man IKKE holder inne
           return `
             <div class="card hidden-card">
               <span class="eye-icon">👁️</span>
@@ -215,7 +208,6 @@
           `;
         }
 
-        // Viser kortet når man HOLDER INNE
         let value = cardCode.slice(0, -1).toUpperCase();
         if (value === 'T') value = '10';
         const suitChar = cardCode.slice(-1).toLowerCase();
@@ -241,20 +233,18 @@
     socket.on('player_state', (state) => {
       document.getElementById('phase-label').innerText = state.phase;
 
-      // Roller (SB / BB)
+      // Viser kun rollenavnet direkte (f.eks "Lilleblind") uten "DU ER"
       const roleBadge = document.getElementById('role-label');
       if (state.role) {
-        roleBadge.innerText = `DU ER ${state.role}`;
+        roleBadge.innerText = state.role;
         roleBadge.style.display = 'inline-block';
       } else {
         roleBadge.style.display = 'none';
       }
 
-      // Oppdater kortdata
       myCardsData = state.cards || [];
       renderCards();
 
-      // Fold-knapp tilstand
       const foldBtn = document.getElementById('btn-fold');
       if (state.folded) {
         foldBtn.disabled = true;

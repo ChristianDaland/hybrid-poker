@@ -6,9 +6,7 @@
   <title>Pokerbordet (iPad)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       font-family: Arial, sans-serif;
@@ -16,7 +14,7 @@
       color: white;
       text-align: center;
       margin: 0;
-      padding: 10px 15px 70px 15px; /* Ekstra bunn-margin for å gi plass til fastknappene */
+      padding: 10px 15px 70px 15px;
     }
 
     h1 {
@@ -27,11 +25,11 @@
     .winner-banner {
       background: linear-gradient(45deg, #ff9800, #f44336);
       color: white;
-      padding: 10px 15px;
-      font-size: 1.3rem;
+      padding: 12px 18px;
+      font-size: 1.4rem;
       font-weight: bold;
       border-radius: 12px;
-      margin: 0 auto 10px auto;
+      margin: 0 auto 12px auto;
       max-width: 900px;
       box-shadow: 0 4px 15px rgba(0,0,0,0.5);
       animation: pulse 1.5s infinite alternate;
@@ -109,7 +107,7 @@
       border: 2px solid #fff;
       border-radius: 12px;
       padding: 8px 12px;
-      min-width: 120px;
+      min-width: 130px;
     }
 
     .badge {
@@ -117,13 +115,12 @@
       background: #ff5722;
       color: white;
       font-size: 0.75rem;
-      padding: 2px 6px;
+      padding: 2px 8px;
       border-radius: 10px;
-      margin-top: 3px;
+      margin-top: 4px;
       font-weight: bold;
     }
 
-    /* Fastlåst kontrollinje nederst på skjermen */
     .controls {
       position: fixed;
       bottom: 0;
@@ -176,7 +173,7 @@
     <button class="btn-mode" onclick="setMode('TEXAS')">Texas Hold'em</button>
     <button class="btn-mode" onclick="setMode('OMAHA')">Omaha</button>
     <button class="btn-action" onclick="startNewHand()">Start Ny Hånd</button>
-    <button class="btn-next" onclick="nextPhase()">Neste Fase</button>
+    <button id="btn-next-phase" class="btn-next" onclick="nextPhase()">Åpne Flopp</button>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -214,6 +211,22 @@
     socket.on('state_update', (state) => {
       document.getElementById('game-info').innerText = `Modus: ${state.gameMode} | Fase: ${state.phase}`;
       
+      // Dynamisk knappetekst for Neste Fase
+      const nextBtn = document.getElementById('btn-next-phase');
+      if (state.phase === 'PREFLOP') {
+        nextBtn.innerText = 'Åpne Flopp';
+      } else if (state.phase === 'FLOP') {
+        nextBtn.innerText = 'Åpne Turn';
+      } else if (state.phase === 'TURN') {
+        nextBtn.innerText = 'Åpne River';
+      } else if (state.phase === 'RIVER') {
+        nextBtn.innerText = 'Vis Vinner (Showdown)';
+      } else if (state.phase === 'SHOWDOWN') {
+        nextBtn.innerText = 'Runde Ferdig';
+      } else {
+        nextBtn.innerText = 'Neste Fase';
+      }
+
       // Vinner-banner
       const banner = document.getElementById('winner-banner');
       if (state.winnerInfo) {
@@ -227,7 +240,7 @@
       const boardContainer = document.getElementById('board-cards');
       boardContainer.innerHTML = state.board.map(c => formatCard(c)).join('');
 
-      // Spillere (og deres kort hvis Showdown)
+      // Spillere
       const playersContainer = document.getElementById('players-list');
       playersContainer.innerHTML = state.players.map(p => `
         <div class="player-card">

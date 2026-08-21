@@ -16,7 +16,7 @@ function createDeck() {
   const deck = [];
   for (let s of SUITS) {
     for (let v of VALUES) {
-      deck.push((v === '10' ? 'T' : v) + s);
+      deck.push(v + s);
     }
   }
   return shuffle(deck);
@@ -31,13 +31,37 @@ function shuffle(array) {
   return deck;
 }
 
-// Konverterer kort til pokersolver-format (f.eks. 'Tc' -> 'Tc')
 function formatForSolver(card) {
-  if (card.startsWith('10')) return 'T' + card.slice(-1);
   return card;
 }
 
-// Evaluere beste hånd
+// Oversetter engelske pokersolver-beskrivelser til pen norsk tekst med tall og farger
+function translateHandDescription(descr) {
+  let text = descr;
+
+  // Erstatt kortverdier (T -> 10)
+  text = text.replace(/\bT\b/g, '10');
+
+  // Oversett håndtyper
+  text = text.replace(/Straight Flush/g, 'Straight Flush');
+  text = text.replace(/Four of a Kind/g, 'Fire like');
+  text = text.replace(/Full House/g, 'Fullt Hus');
+  text = text.replace(/Flush/g, 'Flush');
+  text = text.replace(/Straight/g, 'Straight');
+  text = text.replace(/Three of a Kind/g, 'Tre like');
+  text = text.replace(/Two Pair/g, 'To Par');
+  text = text.replace(/Pair/g, 'Ett Par');
+  text = text.replace(/High Card/g, 'Høyt Kort');
+
+  // Oversett kortfarger hvis de nevnes i beskrivelsen
+  text = text.replace(/Spades/g, 'Spar');
+  text = text.replace(/Hearts/g, 'Hjerter');
+  text = text.replace(/Diamonds/g, 'Ruter');
+  text = text.replace(/Clubs/g, 'Kløver');
+
+  return text;
+}
+
 function evaluatePlayerHand(playerCards, boardCards, gameMode) {
   const formattedBoard = boardCards.map(formatForSolver);
   const formattedPlayer = playerCards.map(formatForSolver);
@@ -46,7 +70,6 @@ function evaluatePlayerHand(playerCards, boardCards, gameMode) {
     const allCards = [...formattedPlayer, ...formattedBoard];
     return Hand.solve(allCards);
   } else {
-    // OMAHA: Må bruke NØYAKTIG 2 kort fra hånd og NØYAKTIG 3 kort fra bord
     let bestHand = null;
     for (let i = 0; i < formattedPlayer.length; i++) {
       for (let j = i + 1; j < formattedPlayer.length; j++) {
@@ -110,7 +133,15 @@ io.on('connection', (socket) => {
     playerList.forEach((p, idx) => {
       p.folded = false;
       p.cards = [];
-      p.role = playerList.length >= 2 ? (idx === 0 ? 'SB' : idx === 1 ? 'BB' : '') : 'BB';
+      
+      // Roller med fulle navn
+      if (playerList.length === 2) {
+        p.role = idx === 0 ? 'Lilleblind' : 'Storeblind';
+      } else if (playerList.length > 2) {
+        p.role = idx === 0 ? 'Dealer' : idx === 1 ? 'Lilleblind' : idx === 2 ? 'Storeblind' : '';
+      } else {
+        p.role = 'Storeblind';
+      }
       
       const cardCount = gameState.gameMode === 'OMAHA' ? 4 : 2;
       for (let i = 0; i < cardCount; i++) {
@@ -124,12 +155,11 @@ io.on('connection', (socket) => {
   socket.on('next_phase', () => {
     const activePlayers = Object.values(players).filter(p => !p.folded);
 
-    // Hvis kun én spiller er igjen (alle andre har foldet)
-    if (activePlayers.length === 1) {
+    if (activePlayers.length === 1 && gameState.phase !== 'VENTING') {
       gameState.phase = 'SHOWDOWN';
       gameState.winnerInfo = {
         winnerName: activePlayers[0].name,
-        descr: 'Alle andre foldet!'
+        descr: 'Alle andre kastet seg'
       };
       updateAll();
       return;
@@ -147,7 +177,6 @@ io.on('connection', (socket) => {
     } else if (gameState.phase === 'RIVER' || gameState.phase === 'SHOWDOWN') {
       gameState.phase = 'SHOWDOWN';
       
-      // Beregn vinner
       const solvedHands = activePlayers.map(p => ({
         player: p,
         solved: evaluatePlayerHand(p.cards, gameState.board, gameState.gameMode)
@@ -158,11 +187,11 @@ io.on('connection', (socket) => {
       
       const winners = solvedHands.filter(sh => winningHands.includes(sh.solved));
       const winnerNames = winners.map(w => w.player.name).join(' & ');
-      const handDescr = winners[0].solved.descr; // F.eks. "Two Pair, Nines and Eights"
+      const rawDescr = winners[0].solved.descr;
 
       gameState.winnerInfo = {
         winnerName: winnerNames,
-        descr: handDescr
+        descr: translateHandDescription(rawDescr)
       };
     }
     updateAll();
@@ -172,13 +201,12 @@ io.on('connection', (socket) => {
     if (players[socket.id]) {
       players[socket.id].folded = true;
       
-      // Sjekk om det kun er én aktiv spiller igjen etter fold
       const activePlayers = Object.values(players).filter(p => !p.folded);
       if (activePlayers.length === 1 && gameState.phase !== 'VENTING') {
         gameState.phase = 'SHOWDOWN';
         gameState.winnerInfo = {
           winnerName: activePlayers[0].name,
-          descr: 'Alle andre foldet!'
+          descr: 'Alle andre kastet seg'
         };
       }
       updateAll();
@@ -204,7 +232,6 @@ function updateAll() {
       seat: p.seat,
       role: p.role,
       folded: p.folded,
-      // Avslør kortene på iPad kun i SHOWDOWN
       cards: gameState.phase === 'SHOWDOWN' && !p.folded ? p.cards : []
     }))
   });
