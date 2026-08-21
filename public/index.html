@@ -2,59 +2,222 @@
 <html lang="no">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Pokerbordet (iPad)</title>
+  <!-- QR Code-bibliotek -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <style>
-    body { font-family: sans-serif; background: #0b6623; color: white; text-align: center; margin: 0; padding: 20px; }
-    .table { border: 8px solid #5c4033; border-radius: 50px; padding: 30px; max-width: 900px; margin: auto; background: #0e802c; }
-    .community-cards { display: flex; justify-content: center; gap: 10px; min-height: 70px; margin: 20px 0; }
-    .card { background: white; color: black; font-size: 2rem; padding: 10px 15px; border-radius: 6px; font-weight: bold; }
-    .players-list { display: flex; justify-content: center; flex-wrap: wrap; gap: 15px; }
-    .player-card { background: rgba(0,0,0,0.6); border: 2px solid #fff; border-radius: 12px; padding: 15px; min-width: 130px; cursor: pointer; }
-    .player-card.is-out { opacity: 0.35; background: rgba(100, 0, 0, 0.4); border-color: #ff4d4d; }
-    .role-badge { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; font-weight: bold; margin-top: 5px; }
-    .role-DEALER { background: #ffd700; color: #000; }
-    .role-SB { background: #1e90ff; color: #fff; }
-    .role-BB { background: #ff4500; color: #fff; }
-    button { padding: 10px 20px; font-size: 1rem; margin: 5px; cursor: pointer; }
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #1b4d2e;
+      color: white;
+      text-align: center;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 { margin-bottom: 20px; }
+    
+    .main-layout {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 20px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .poker-table {
+      flex: 1;
+      border: 10px solid #5c3a21;
+      background-color: #2e7d32;
+      border-radius: 80px;
+      padding: 30px;
+      min-height: 400px;
+      box-shadow: inset 0 0 50px rgba(0,0,0,0.5);
+    }
+
+    /* QR-kode boks i sidepanelet */
+    .qr-box {
+      background-color: rgba(0, 0, 0, 0.6);
+      border: 2px solid #ffffff;
+      border-radius: 16px;
+      padding: 15px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .qr-box p {
+      margin: 0 0 10px 0;
+      font-size: 0.9rem;
+      font-weight: bold;
+    }
+    #qrcode img {
+      border-radius: 8px;
+      padding: 5px;
+      background: white;
+    }
+
+    .cards-container {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      min-height: 90px;
+      margin: 20px 0;
+    }
+
+    /* Stiling for kort */
+    .card {
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: #ffffff;
+      border-radius: 8px;
+      width: 60px;
+      height: 85px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.4);
+      font-weight: bold;
+    }
+    .card.red { color: #d9534f; }
+    .card.black { color: #222222; }
+    .card-val { font-size: 1.4rem; line-height: 1; }
+    .card-suit { font-size: 1.6rem; line-height: 1; }
+
+    .players-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 15px;
+      margin-top: 30px;
+    }
+
+    .player-card {
+      background: rgba(0,0,0,0.6);
+      border: 2px solid #fff;
+      border-radius: 12px;
+      padding: 10px 15px;
+      min-width: 120px;
+    }
+
+    .badge {
+      display: inline-block;
+      background: #ff5722;
+      color: white;
+      font-size: 0.8rem;
+      padding: 2px 6px;
+      border-radius: 10px;
+      margin-top: 4px;
+      font-weight: bold;
+    }
+
+    .controls {
+      margin-top: 25px;
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    .btn-mode { background-color: #ffffff; color: #333; }
+    .btn-action { background-color: #4caf50; color: white; }
+    .btn-next { background-color: #2196f3; color: white; }
   </style>
 </head>
 <body>
+
   <h1>Pokerbordet</h1>
-  <div class="table">
-    <h2 id="phase-title">Lobby</h2>
-    <div class="community-cards" id="community-cards"></div>
-    <div class="players-list" id="players-list"></div>
+
+  <div class="main-layout">
+    <div class="poker-table">
+      <h2 id="game-info">Modus: TEXAS HOLD'EM | Fase: VENTING</h2>
+      
+      <div id="board-cards" class="cards-container"></div>
+
+      <div id="players-list" class="players-container"></div>
+    </div>
+
+    <!-- QR boks for mobil-oppkobling -->
+    <div class="qr-box">
+      <p>Skann for å bli med:</p>
+      <div id="qrcode"></div>
+    </div>
   </div>
-  <div id="showdown-box" style="font-size: 1.5rem; color: yellow; margin-top: 15px;"></div>
-  <div style="margin-top:20px;">
-    <button onclick="setMode('TEXAS')">Texas Hold'em</button>
-    <button onclick="setMode('OMAHA')">Omaha</button>
-    <button onclick="startHand()" style="background:#5cb85c; color:white;">Start Ny Hånd</button>
-    <button onclick="nextPhase()" style="background:#0275d8; color:white;">Neste Fase</button>
+
+  <div class="controls">
+    <button class="btn-mode" onclick="setMode('TEXAS')">Texas Hold'em</button>
+    <button class="btn-mode" onclick="setMode('OMAHA')">Omaha</button>
+    <button class="btn-action" onclick="startNewHand()">Start Ny Hånd</button>
+    <button class="btn-next" onclick="nextPhase()">Neste Fase</button>
   </div>
+
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
-    socket.on('update_table', (data) => {
-      document.getElementById('phase-title').innerText = `Modus: ${data.gameMode} | Fase: ${data.gameState}`;
-      document.getElementById('community-cards').innerHTML = data.communityCards.map(c => `<div class="card">${c}</div>`).join('');
-      document.getElementById('players-list').innerHTML = data.players.map(p => `
-        <div class="player-card ${p.isOut ? 'is-out' : ''}" onclick="toggleOut('${p.id}')">
-          <div><b>${p.name}</b></div>
-          <div>Plass ${p.seatNumber}</div>
-          ${p.role ? `<div class="role-badge role-${p.role}">${p.role}</div>` : ''}
-          <div>${p.isFolded ? '❌ Folded' : ''}</div>
-          <div style="font-size:0.75rem; margin-top:5px;">${p.isOut ? '🔴 UTE' : '🟢 INNE'}</div>
+
+    // Generer automatisk QR-kode basert på gjeldende domene
+    const mobileUrl = window.location.origin + '/mobile.html';
+    new QRCode(document.getElementById("qrcode"), {
+      text: mobileUrl,
+      width: 110,
+      height: 110
+    });
+
+    function formatCard(cardCode) {
+      if (!cardCode) return '';
+      const value = cardCode.slice(0, -1).toUpperCase();
+      const suitChar = cardCode.slice(-1).toLowerCase();
+      
+      const suits = {
+        'h': { symbol: '♥', color: 'red' },
+        'd': { symbol: '♦', color: 'red' },
+        'c': { symbol: '♣', color: 'black' },
+        's': { symbol: '♠', color: 'black' }
+      };
+      
+      const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
+      return `<div class="card ${suit.color}"><span class="card-val">${value}</span><span class="card-suit">${suit.symbol}</span></div>`;
+    }
+
+    function setMode(mode) {
+      socket.emit('set_game_mode', mode);
+    }
+
+    function startNewHand() {
+      socket.emit('start_new_hand');
+    }
+
+    function nextPhase() {
+      socket.emit('next_phase');
+    }
+
+    socket.on('state_update', (state) => {
+      document.getElementById('game-info').innerText = `Modus: ${state.gameMode} | Fase: ${state.phase}`;
+      
+      // Vis felleskort
+      const boardContainer = document.getElementById('board-cards');
+      boardContainer.innerHTML = state.board.map(c => formatCard(c)).join('');
+
+      // Vis spillere
+      const playersContainer = document.getElementById('players-list');
+      playersContainer.innerHTML = state.players.map(p => `
+        <div class="player-card">
+          <div><strong>${p.name}</strong></div>
+          <div style="font-size: 0.85rem; color: #ccc;">Plass ${p.seat}</div>
+          ${p.role ? `<span class="badge">${p.role}</span>` : ''}
+          <div style="font-size: 0.8rem; margin-top: 5px;">
+            ${p.folded ? '🔴 FOLDET' : '🟢 INNE'}
+          </div>
         </div>
       `).join('');
     });
-    socket.on('showdown_results', (res) => {
-      document.getElementById('showdown-box').innerHTML = `🏆 <b>VINNER: ${res.winnerName}</b> (${res.winningHandDesc})`;
-    });
-    function setMode(m) { socket.emit('set_game_mode', m); }
-    function startHand() { document.getElementById('showdown-box').innerHTML = ''; socket.emit('start_new_hand'); }
-    function nextPhase() { socket.emit('next_phase'); }
-    function toggleOut(id) { socket.emit('toggle_player_out', id); }
   </script>
 </body>
 </html>
