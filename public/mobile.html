@@ -12,7 +12,7 @@
       text-align: center;
       margin: 0;
       padding: 15px;
-      user-select: none; /* Forhindrer at tekst merkes når man holder inne */
+      user-select: none; /* Forhindrer tekstmerking når man holder inne */
       -webkit-user-select: none;
     }
 
@@ -35,7 +35,7 @@
       margin-bottom: 15px;
     }
 
-    /* Container for kort på mobil */
+    /* Grønt interaktivt felt som dekker kortområdet */
     .cards-container {
       display: flex;
       justify-content: center;
@@ -44,9 +44,15 @@
       border: 2px dashed #4caf50;
       border-radius: 15px;
       padding: 20px 10px;
-      min-height: 120px;
+      min-height: 110px;
       margin-bottom: 20px;
       align-items: center;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .cards-container:active {
+      background: #25663d;
     }
 
     /* Kort-styling */
@@ -61,8 +67,7 @@
       height: 95px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.5);
       font-weight: bold;
-      cursor: pointer;
-      transition: transform 0.1s ease;
+      pointer-events: none; /* Lar klikk/touch gå direkte til beholderen */
     }
 
     /* Skjult kort (baksiden) */
@@ -148,9 +153,17 @@
 
     <div id="role-label" class="role-badge" style="display: none;"></div>
 
-    <div class="instruction-text">💡 Trykk/hold på et kort for å se verdien</div>
+    <div class="instruction-text">💡 Trykk og hold på feltet under for å se kortene dine</div>
 
-    <div id="my-cards" class="cards-container"></div>
+    <!-- Hele feltet tar imot trykk/touch for å vise/skjule alle kort samtidig -->
+    <div id="my-cards" class="cards-container"
+         onmousedown="showAllCards()" 
+         onmouseup="hideAllCards()"
+         onmouseleave="hideAllCards()"
+         ontouchstart="showAllCards()" 
+         ontouchend="hideAllCards()"
+         ontouchcancel="hideAllCards()">
+    </div>
 
     <button id="btn-fold" class="btn-fold" onclick="foldHand()">Fold (Kast deg)</button>
   </div>
@@ -159,8 +172,7 @@
   <script>
     const socket = io();
     let myCardsData = [];
-    // Holder styr på hvilke kort som er avdekket (true/false per kort-indeks)
-    let revealedCards = [];
+    let isShowingCards = false;
 
     function joinGame() {
       const name = document.getElementById('player-name').value.trim();
@@ -175,8 +187,13 @@
       socket.emit('player_fold');
     }
 
-    function toggleCard(index) {
-      revealedCards[index] = !revealedCards[index];
+    function showAllCards() {
+      isShowingCards = true;
+      renderCards();
+    }
+
+    function hideAllCards() {
+      isShowingCards = false;
       renderCards();
     }
 
@@ -187,24 +204,18 @@
         return;
       }
 
-      container.innerHTML = myCardsData.map((cardCode, index) => {
-        const isRevealed = revealedCards[index];
-
-        if (!isRevealed) {
-          // Skjult kort-baksiden
+      container.innerHTML = myCardsData.map((cardCode) => {
+        if (!isShowingCards) {
+          // Baksiden av kortet når man IKKE holder inne
           return `
-            <div class="card hidden-card" 
-                 onmousedown="toggleCard(${index})" 
-                 onmouseup="toggleCard(${index})"
-                 ontouchstart="toggleCard(${index})" 
-                 ontouchend="toggleCard(${index})">
+            <div class="card hidden-card">
               <span class="eye-icon">👁️</span>
               <span style="font-size: 0.65rem; margin-top: 5px; opacity: 0.8;">VIS</span>
             </div>
           `;
         }
 
-        // Åpent kort
+        // Viser kortet når man HOLDER INNE
         let value = cardCode.slice(0, -1).toUpperCase();
         if (value === 'T') value = '10';
         const suitChar = cardCode.slice(-1).toLowerCase();
@@ -219,11 +230,7 @@
         const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
 
         return `
-          <div class="card ${suit.color}" 
-               onmousedown="toggleCard(${index})" 
-               onmouseup="toggleCard(${index})"
-               ontouchstart="toggleCard(${index})" 
-               ontouchend="toggleCard(${index})">
+          <div class="card ${suit.color}">
             <span class="card-val">${value}</span>
             <span class="card-suit">${suit.symbol}</span>
           </div>
@@ -243,12 +250,8 @@
         roleBadge.style.display = 'none';
       }
 
-      // Oppdater kort og tilbakestill skjuling hvis ny hånd
-      if (JSON.stringify(state.cards) !== JSON.stringify(myCardsData)) {
-        myCardsData = state.cards || [];
-        revealedCards = new Array(myCardsData.length).fill(false);
-      }
-
+      // Oppdater kortdata
+      myCardsData = state.cards || [];
       renderCards();
 
       // Fold-knapp tilstand
