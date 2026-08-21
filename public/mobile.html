@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Poker Mobil</title>
+  <style>
+    body { font-family: sans-serif; background: #1e1e1e; color: white; text-align: center; margin: 0; padding: 20px; user-select: none; }
+    .role-banner { padding: 12px; border-radius: 8px; font-weight: bold; font-size: 1.1rem; margin-bottom: 15px; text-transform: uppercase; }
+    .bg-DEALER { background: #ffd700; color: #000; }
+    .bg-SB { background: #1e90ff; color: #fff; }
+    .bg-BB { background: #ff4500; color: #fff; }
+    .bg-NONE { background: #333; color: #ccc; }
+    #peek-area { width: 100%; height: 220px; background: #2a2a2a; border: 3px dashed #666; border-radius: 15px; display: flex; justify-content: center; align-items: center; margin: 20px 0; touch-action: none; }
+    #peek-area.active { background: #0f380f; border-color: #2e8b57; }
+    .card-display { display: none; gap: 8px; font-size: 1.8rem; }
+    #peek-area.active .card-display { display: flex; }
+    #peek-area.active .instruction { display: none; }
+    .card { background: white; color: black; padding: 10px; border-radius: 6px; font-weight: bold; }
+    .btn-fold { background: #d9534f; color: white; border: none; padding: 15px; font-size: 1.2rem; border-radius: 10px; width: 100%; }
+  </style>
+</head>
+<body>
+  <div id="join-section">
+    <h2>Bli med i spillet</h2>
+    <input type="text" id="username" placeholder="Ditt navn" style="padding:10px;">
+    <button onclick="join()" style="padding:10px 20px;">Bli med</button>
+  </div>
+  <div id="game-section" style="display:none;">
+    <div id="role-banner" class="role-banner bg-NONE">Venter...</div>
+    <div id="peek-area">
+      <div class="instruction">👉 <b>HOLD FINGEREN HER</b><br>for å se kortene</div>
+      <div class="card-display" id="cards-container"></div>
+    </div>
+    <button class="btn-fold" onclick="fold()">Fold (Kast deg)</button>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    function join() {
+      socket.emit('join_game', document.getElementById('username').value);
+      document.getElementById('join-section').style.display = 'none';
+      document.getElementById('game-section').style.display = 'block';
+    }
+    socket.on('your_cards', (data) => {
+      document.getElementById('cards-container').innerHTML = data.cards.map(c => `<div class="card">${c}</div>`).join('');
+      const banner = document.getElementById('role-banner');
+      banner.className = `role-banner bg-${data.role || 'NONE'}`;
+      banner.innerText = data.role ? `Du er ${data.role}` : 'Spiller';
+    });
+    const peekArea = document.getElementById('peek-area');
+    const show = () => peekArea.classList.add('active');
+    const hide = () => peekArea.classList.remove('active');
+    peekArea.addEventListener('touchstart', (e) => { e.preventDefault(); show(); });
+    peekArea.addEventListener('touchend', hide);
+    peekArea.addEventListener('mousedown', show);
+    peekArea.addEventListener('mouseup', hide);
+    function fold() { socket.emit('fold'); }
+    socket.on('folded', () => { document.getElementById('role-banner').innerText = "Du har kastet deg"; });
+  </script>
+</body>
+</html>

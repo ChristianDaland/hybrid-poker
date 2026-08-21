@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <title>Pokerbordet (iPad)</title>
+  <style>
+    body { font-family: sans-serif; background: #0b6623; color: white; text-align: center; margin: 0; padding: 20px; }
+    .table { border: 8px solid #5c4033; border-radius: 50px; padding: 30px; max-width: 900px; margin: auto; background: #0e802c; }
+    .community-cards { display: flex; justify-content: center; gap: 10px; min-height: 70px; margin: 20px 0; }
+    .card { background: white; color: black; font-size: 2rem; padding: 10px 15px; border-radius: 6px; font-weight: bold; }
+    .players-list { display: flex; justify-content: center; flex-wrap: wrap; gap: 15px; }
+    .player-card { background: rgba(0,0,0,0.6); border: 2px solid #fff; border-radius: 12px; padding: 15px; min-width: 130px; cursor: pointer; }
+    .player-card.is-out { opacity: 0.35; background: rgba(100, 0, 0, 0.4); border-color: #ff4d4d; }
+    .role-badge { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 0.8rem; font-weight: bold; margin-top: 5px; }
+    .role-DEALER { background: #ffd700; color: #000; }
+    .role-SB { background: #1e90ff; color: #fff; }
+    .role-BB { background: #ff4500; color: #fff; }
+    button { padding: 10px 20px; font-size: 1rem; margin: 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>Pokerbordet</h1>
+  <div class="table">
+    <h2 id="phase-title">Lobby</h2>
+    <div class="community-cards" id="community-cards"></div>
+    <div class="players-list" id="players-list"></div>
+  </div>
+  <div id="showdown-box" style="font-size: 1.5rem; color: yellow; margin-top: 15px;"></div>
+  <div style="margin-top:20px;">
+    <button onclick="setMode('TEXAS')">Texas Hold'em</button>
+    <button onclick="setMode('OMAHA')">Omaha</button>
+    <button onclick="startHand()" style="background:#5cb85c; color:white;">Start Ny Hånd</button>
+    <button onclick="nextPhase()" style="background:#0275d8; color:white;">Neste Fase</button>
+  </div>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+    socket.on('update_table', (data) => {
+      document.getElementById('phase-title').innerText = `Modus: ${data.gameMode} | Fase: ${data.gameState}`;
+      document.getElementById('community-cards').innerHTML = data.communityCards.map(c => `<div class="card">${c}</div>`).join('');
+      document.getElementById('players-list').innerHTML = data.players.map(p => `
+        <div class="player-card ${p.isOut ? 'is-out' : ''}" onclick="toggleOut('${p.id}')">
+          <div><b>${p.name}</b></div>
+          <div>Plass ${p.seatNumber}</div>
+          ${p.role ? `<div class="role-badge role-${p.role}">${p.role}</div>` : ''}
+          <div>${p.isFolded ? '❌ Folded' : ''}</div>
+          <div style="font-size:0.75rem; margin-top:5px;">${p.isOut ? '🔴 UTE' : '🟢 INNE'}</div>
+        </div>
+      `).join('');
+    });
+    socket.on('showdown_results', (res) => {
+      document.getElementById('showdown-box').innerHTML = `🏆 <b>VINNER: ${res.winnerName}</b> (${res.winningHandDesc})`;
+    });
+    function setMode(m) { socket.emit('set_game_mode', m); }
+    function startHand() { document.getElementById('showdown-box').innerHTML = ''; socket.emit('start_new_hand'); }
+    function nextPhase() { socket.emit('next_phase'); }
+    function toggleOut(id) { socket.emit('toggle_player_out', id); }
+  </script>
+</body>
+</html>
