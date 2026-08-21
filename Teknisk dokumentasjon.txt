@@ -1,0 +1,45 @@
+Teknisk Dokumentasjon
+1. Systemarkitektur & Oversikt
+Løland Gård Poker er en sanntids, nettbasert pokerapplikasjon bygget på Node.js og WebSocket-kommunikasjon. Systemet er optimalisert for lokalbruk med én sentral skjerm (iPad/Nettbrett) og multiple klientskjermer (Mobiltelefoner).
+
+Backend-rammeverk: Node.js med Express.
+
+Sanntidskommunikasjon: Socket.IO.
+
+Regel- og evalueringsmotor: pokersolver (Node.js modul).
+
+Frontend: Ren HTML5, CSS3 og klient-side JavaScript (ingen tunge rammeverk nødvendig).
+
+Hosting: Kompatibel med Render, Heroku eller lokal Node-server.
+
+2. Komponentstruktur
+A. Server (server.js)
+Tilstandsstyring (gameState): Holder oversikt over nåværende spilletype (TEXAS, OMAHA eller null), spillfase (VENTING, PREFLOP, FLOP, TURN, RIVER, SHOWDOWN), felleskort (board), stokket kortstokk (deck) og vinnerinformasjon (winnerInfo).
+
+Spillerhåndtering (players): Lagrer hver spillers unike socket.id, navn, plassering, utdelte kort, fold-status og blind-rolle (Dealer, Lilleblind, Storeblind).
+
+Evaluering & Oversettelse:
+
+Bruker pokersolver for å beregne beste 5-korts kombinasjon.
+
+Omaha-logikk: Evalueringen itererer over alle kombinasjoner av eksakt 2 private kort og 3 felleskort for å tilfredsstille offisielle Omaha-regler.
+
+Oversettelsesmotor: Konverterer engelske hand-rankings (f.eks. "Two Pair, 7's") til norsk tekst med riktig kortverdi-formatering ("To Par, 7-ere").
+
+B. Hovedskjerm / iPad (public/index.html)
+Visningsskjerm for hele bordet.
+
+Dynamiske kontrollknapper: Viser kun valg for spilletype når ingen modus er valgt. Viser "Bytt Spilletype", "Start Ny Hånd" og "Neste Fase" under aktivt spill.
+
+QR-kodegenerering: Dynamisk generering av tilkoblings-QR via qrcode.js basert på serverens gjeldende URL (window.location.origin).
+
+Sanntidsoppdatering: Lytter til state_update fra serveren og tegner felleskort, tilkoblede spillere og vinnerbanner.
+
+C. Spillerklient / Mobil (public/mobile.html)
+Brukergrensesnitt for individuelle spillere.
+
+Layout og sikkerhet: Fold-knapp plassert øverst i hjørnet for å forhindre feiltrykk.
+
+Kort-innsyn (Hold-to-reveal): Kortene gjengis kun i Klartekst/HTML når brukeren utløser touchstart / mousedown på kortbeholderen. Ved touchend / mouseup fjernes kortverdiene umiddelbart fra DOM-strukturen for å forhindre visuell lekkasje.
+
+3. Dataflyt & Sockets (API)Event (Socket)RetningBeskrivelsejoin_gameKlient $\rightarrow$ ServerRegistrerer ny spiller med navn og tildeler plass.set_game_modeKlient $\rightarrow$ ServerSetter spilletype (TEXAS, OMAHA eller null).start_new_handKlient $\rightarrow$ ServerGenererer ny kortstokk, tildeler roller, deler ut kort og setter fase til PREFLOP.next_phaseKlient $\rightarrow$ ServerProgresjon i spillet (Preflop $\rightarrow$ Flop $\rightarrow$ Turn $\rightarrow$ River $\rightarrow$ Showdown).player_foldKlient $\rightarrow$ ServerMarkerer at en spiller har kastet seg.state_updateServer $\rightarrow$ iPadSender komplett offentlig tilstand (felleskort, spillere, fase, vinner).player_stateServer $\rightarrow$ MobilSender privat tilstand til spesifikk klient (egne kort, fold-status).

@@ -1,0 +1,33 @@
+Dokument 1: Spilleveiledning for Nye Spillere
+Velkommen til Løland Gård Poker!
+
+Dette er et hybrid pokersystem designet for sømløs spilling rundt bordet. iPad-en fungerer som selve kortbordet (felleskort, status og vinnerhånd), mens mobiltelefonene fungerer som spillernes private kort og kontrollpanel.
+
+1. Slik kobler du deg til spillet
+Åpne kameraet på mobiltelefonen din.
+
+Skann QR-koden som vises øverst til høyre på iPad-skjermen.
+
+Skriv inn navnet ditt i feltet som dukker opp på mobilen, og trykk Koble til.
+
+Du er nå med i spillet og får tildelt et plassnummer på bordet!
+
+2. Spillets forløp
+Start av ny hånd: Når spillet settes i gang på iPad-en, får alle spillere tildelt sine private kort på mobilen (2 kort i Texas Hold'em, 4 kort i Omaha).
+
+Se egne kort: Kortene på mobilen er skjult som standard for å hindre at naboen ser dem. For å se kortene dine må du trykke og holde inne det grønne feltet på mobilskjermen. Så snart du slipper fingeren, blir kortene skjult igjen.
+
+Fold (Kaste seg): Hvis du har dårlige kort og ønsker å kaste deg, trykker du på den røde Fold (Kast)-knappen øverst på mobilskjermen.
+
+3. Fasene i en hånd
+iPad-en styrer fremdriften i runden:
+
+Preflop: Alle har fått sine private kort utdelt på mobilen.
+
+Flop: 3 felleskort legges ut midt på iPad-bordet.
+
+Turn: Det 4. felleskortet legges ut.
+
+River: Det 5. og siste felleskortet legges ut.
+
+Showdown: Hånden er ferdig. Systemet regner automatisk ut hvem som har den beste kombinasjonen, avslører vinnerens kort på iPad-skjermen og viser vinnernavnet samt håndtypen (f.eks. To Par eller Fullt Hus).
