@@ -14,7 +14,7 @@
       color: white;
       text-align: center;
       margin: 0;
-      padding: 10px 15px 80px 15px;
+      padding: 10px 15px 90px 15px;
     }
 
     h1 {
@@ -121,7 +121,6 @@
       font-weight: bold;
     }
 
-    /* Oppdatert kontrollfelt-layout */
     .controls {
       position: fixed;
       bottom: 0;
@@ -166,17 +165,20 @@
     .btn-change-mode { background-color: #607d8b; color: white; }
     .btn-action { background-color: #4caf50; color: white; }
 
-    /* Fremhevet og større hovedknapp */
+    /* Ekstra bred handlingsknapp */
     .btn-next-large {
       background: linear-gradient(135deg, #1e88e5, #1565c0);
       color: white;
-      font-size: 1.25rem;
-      padding: 14px 28px;
+      font-size: 1.35rem;
+      padding: 14px 60px;
+      min-width: 320px;
       border-radius: 12px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      letter-spacing: 0.5px;
     }
     .btn-next-large:hover:not(:disabled) {
-      transform: scale(1.03);
+      transform: scale(1.02);
+      background: linear-gradient(135deg, #2196f3, #1e88e5);
     }
   </style>
 </head>
@@ -201,7 +203,6 @@
   </div>
 
   <div class="controls">
-    <!-- Venstre side: Administrasjonsknapper -->
     <div class="controls-left">
       <div id="mode-selection" style="display: flex; gap: 10px;">
         <button class="btn-mode" onclick="setMode('TEXAS')">Texas Hold'em</button>
@@ -214,7 +215,6 @@
       </div>
     </div>
 
-    <!-- Høyre side: Hovedknapp for spillets fremdrift -->
     <div class="controls-right">
       <button id="btn-next-phase" class="btn-next-large" onclick="nextPhase()" style="display: none;">Åpne Flopp</button>
     </div>
@@ -273,7 +273,6 @@
         gameInfo.innerText = `Modus: ${state.gameMode} | Fase: ${state.phase}`;
       }
 
-      // Lås «Bytt Spilletype» og «Start Ny Hånd» så lenge en hånd pågår
       const isRoundActive = state.phase !== 'VENTING' && state.phase !== 'SHOWDOWN';
       changeModeBtn.disabled = isRoundActive;
       startHandBtn.disabled = isRoundActive;
