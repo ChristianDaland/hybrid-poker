@@ -92,7 +92,8 @@ let gameState = {
   phase: 'VENTING',
   board: [],
   deck: [],
-  winnerInfo: null
+  winnerInfo: null,
+  dealerIndex: 0 // Holder styr på hvem som har dealer-knappen
 };
 
 let players = {};
@@ -106,16 +107,30 @@ function startNewHandLogic() {
   gameState.phase = 'PREFLOP';
   gameState.winnerInfo = null;
 
+  // Ruller dealerknappen én plass frem for hver nye hånd
+  gameState.dealerIndex = (gameState.dealerIndex + 1) % playerList.length;
+
   playerList.forEach((p, idx) => {
     p.folded = false;
     p.cards = [];
     
+    // Beregn plassering i forhold til nåværende dealer
+    const relativePos = (idx - gameState.dealerIndex + playerList.length) % playerList.length;
+
     if (playerList.length === 2) {
-      p.role = idx === 0 ? 'Lilleblind' : 'Storeblind';
-    } else if (playerList.length > 2) {
-      p.role = idx === 0 ? 'Dealer' : idx === 1 ? 'Lilleblind' : idx === 2 ? 'Storeblind' : '';
+      // Heads-up poker (2 spillere): Dealer er Lilleblind, den andre er Storeblind
+      p.role = relativePos === 0 ? 'Lilleblind' : 'Storeblind';
     } else {
-      p.role = 'Storeblind';
+      // 3 eller flere spillere
+      if (relativePos === 0) {
+        p.role = 'Dealer';
+      } else if (relativePos === 1) {
+        p.role = 'Lilleblind';
+      } else if (relativePos === 2) {
+        p.role = 'Storeblind';
+      } else {
+        p.role = '';
+      }
     }
     
     const cardCount = gameState.gameMode === 'OMAHA' ? 4 : 2;
@@ -157,7 +172,6 @@ io.on('connection', (socket) => {
   socket.on('next_phase', () => {
     const activePlayers = Object.values(players).filter(p => !p.folded);
 
-    // Hvis runden er over ( enten FINISHED eller SHOWDOWN), starter vi ny hånd direkte ved klikk
     if (gameState.phase === 'FINISHED' || gameState.phase === 'SHOWDOWN') {
       startNewHandLogic();
       updateAll();
