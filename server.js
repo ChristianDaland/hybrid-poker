@@ -93,10 +93,11 @@ let gameState = {
   board: [],
   deck: [],
   winnerInfo: null,
-  dealerIndex: 0 // Holder styr på hvem som har dealer-knappen
+  dealerIndex: 0
 };
 
-let players = {};
+let players = {}; 
+const disconnectTimeouts = {};
 
 function startNewHandLogic() {
   const playerList = Object.values(players);
@@ -107,30 +108,21 @@ function startNewHandLogic() {
   gameState.phase = 'PREFLOP';
   gameState.winnerInfo = null;
 
-  // Ruller dealerknappen én plass frem for hver nye hånd
   gameState.dealerIndex = (gameState.dealerIndex + 1) % playerList.length;
 
   playerList.forEach((p, idx) => {
     p.folded = false;
     p.cards = [];
     
-    // Beregn plassering i forhold til nåværende dealer
     const relativePos = (idx - gameState.dealerIndex + playerList.length) % playerList.length;
 
     if (playerList.length === 2) {
-      // Heads-up poker (2 spillere): Dealer er Lilleblind, den andre er Storeblind
       p.role = relativePos === 0 ? 'Lilleblind' : 'Storeblind';
     } else {
-      // 3 eller flere spillere
-      if (relativePos === 0) {
-        p.role = 'Dealer';
-      } else if (relativePos === 1) {
-        p.role = 'Lilleblind';
-      } else if (relativePos === 2) {
-        p.role = 'Storeblind';
-      } else {
-        p.role = '';
-      }
+      if (relativePos === 0) p.role = 'Dealer';
+      else if (relativePos === 1) p.role = 'Lilleblind';
+      else if (relativePos === 2) p.role = 'Storeblind';
+      else p.role = '';
     }
     
     const cardCount = gameState.gameMode === 'OMAHA' ? 4 : 2;
@@ -142,15 +134,43 @@ function startNewHandLogic() {
 
 io.on('connection', (socket) => {
   socket.on('join_game', (name) => {
-    const seatNumber = Object.keys(players).length + 1;
-    players[socket.id] = {
-      id: socket.id,
-      name: name,
-      seat: seatNumber,
-      cards: [],
-      folded: false,
-      role: ''
-    };
+    const cleanName = name ? name.trim() : 'Spiller';
+    
+    // Sjekk om dette navnet allerede eksisterer i spillet (f.eks. etter mistet dekning/samtale)
+    let existingPlayerKey = Object.keys(players).find(
+      key => players[key].name.toLowerCase() === cleanName.toLowerCase()
+    );
+
+    if (existingPlayerKey) {
+      // Overtak den eksisterende plassen med den nye socket.id-en
+      const playerData = players[existingPlayerKey];
+      delete players[existingPlayerKey];
+      
+      // Avbryt sletting dersom det var en timeout på gang
+      if (disconnectTimeouts[existingPlayerKey]) {
+        clearTimeout(disconnectTimeouts[existingPlayerKey]);
+        delete disconnectTimeouts[existingPlayerKey];
+      }
+
+      playerData.id = socket.id;
+      playerData.connected = true;
+      players[socket.id] = playerData;
+
+      console.log(`Spiller ${cleanName} koblet seg til på nytt!`);
+    } else {
+      // Ny spiller kaster seg inn i rommet
+      const seatNumber = Object.keys(players).length + 1;
+      players[socket.id] = {
+        id: socket.id,
+        name: cleanName,
+        seat: seatNumber,
+        cards: [],
+        folded: false,
+        role: '',
+        connected: true
+      };
+    }
+
     updateAll();
   });
 
@@ -211,7 +231,7 @@ io.on('connection', (socket) => {
       
       const winners = solvedHands.filter(sh => winningHands.includes(sh.solved));
       const winnerNames = winners.map(w => w.player.name).join(' & ');
-      const rawDescr = winners[0].solved.descr;
+      const rawDescr = winners[0] ? winners[0].solved.descr : 'Ukjent hånd';
 
       gameState.winnerInfo = {
         winnerName: winnerNames,
@@ -240,8 +260,19 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnect', () => {
-    delete players[socket.id];
-    updateAll();
+    if (players[socket.id]) {
+      players[socket.id].connected = false;
+      const disconnectedId = socket.id;
+
+      // Gi spilleren 45 sekunders nådeperiode til å koble seg til på nytt før de slettes
+      disconnectTimeouts[disconnectedId] = setTimeout(() => {
+        delete players[disconnectedId];
+        delete disconnectTimeouts[disconnectedId];
+        updateAll();
+      }, 45000);
+
+      updateAll();
+    }
   });
 });
 
@@ -262,18 +293,21 @@ function updateAll() {
       seat: p.seat,
       role: p.role,
       folded: p.folded,
+      connected: p.connected,
       cards: showCardsOnScreen && !p.folded ? p.cards : []
     }))
   });
 
   playerList.forEach(p => {
-    io.to(p.id).emit('player_state', {
-      phase: gameState.phase,
-      cards: p.cards,
-      role: p.role,
-      folded: p.folded,
-      winnerInfo: gameState.winnerInfo
-    });
+    if (p.connected) {
+      io.to(p.id).emit('player_state', {
+        phase: gameState.phase,
+        cards: p.cards,
+        role: p.role,
+        folded: p.folded,
+        winnerInfo: gameState.winnerInfo
+      });
+    }
   });
 }
 
