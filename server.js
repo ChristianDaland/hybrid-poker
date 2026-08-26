@@ -35,14 +35,10 @@ function formatForSolver(card) {
   return card;
 }
 
-// Oversetter engelske pokersolver-beskrivelser til pen norsk tekst med tall og farger
 function translateHandDescription(descr) {
   let text = descr;
 
-  // Erstatt kortverdier (T -> 10)
   text = text.replace(/\bT\b/g, '10');
-
-  // Oversett håndtyper
   text = text.replace(/Straight Flush/g, 'Straight Flush');
   text = text.replace(/Four of a Kind/g, 'Fire like');
   text = text.replace(/Full House/g, 'Fullt Hus');
@@ -53,7 +49,6 @@ function translateHandDescription(descr) {
   text = text.replace(/Pair/g, 'Ett Par');
   text = text.replace(/High Card/g, 'Høyt Kort');
 
-  // Oversett kortfarger hvis de nevnes i beskrivelsen
   text = text.replace(/Spades/g, 'Spar');
   text = text.replace(/Hearts/g, 'Hjerter');
   text = text.replace(/Diamonds/g, 'Ruter');
@@ -93,7 +88,7 @@ function evaluatePlayerHand(playerCards, boardCards, gameMode) {
 }
 
 let gameState = {
-  gameMode: null, // Starter uten valgt modus
+  gameMode: null,
   phase: 'VENTING',
   board: [],
   deck: [],
@@ -101,6 +96,34 @@ let gameState = {
 };
 
 let players = {};
+
+function startNewHandLogic() {
+  const playerList = Object.values(players);
+  if (playerList.length === 0 || !gameState.gameMode) return;
+
+  gameState.deck = createDeck();
+  gameState.board = [];
+  gameState.phase = 'PREFLOP';
+  gameState.winnerInfo = null;
+
+  playerList.forEach((p, idx) => {
+    p.folded = false;
+    p.cards = [];
+    
+    if (playerList.length === 2) {
+      p.role = idx === 0 ? 'Lilleblind' : 'Storeblind';
+    } else if (playerList.length > 2) {
+      p.role = idx === 0 ? 'Dealer' : idx === 1 ? 'Lilleblind' : idx === 2 ? 'Storeblind' : '';
+    } else {
+      p.role = 'Storeblind';
+    }
+    
+    const cardCount = gameState.gameMode === 'OMAHA' ? 4 : 2;
+    for (let i = 0; i < cardCount; i++) {
+      p.cards.push(gameState.deck.pop());
+    }
+  });
+}
 
 io.on('connection', (socket) => {
   socket.on('join_game', (name) => {
@@ -127,40 +150,20 @@ io.on('connection', (socket) => {
   });
 
   socket.on('start_new_hand', () => {
-    const playerList = Object.values(players);
-    if (playerList.length === 0 || !gameState.gameMode) return;
-
-    gameState.deck = createDeck();
-    gameState.board = [];
-    gameState.phase = 'PREFLOP';
-    gameState.winnerInfo = null;
-
-    playerList.forEach((p, idx) => {
-      p.folded = false;
-      p.cards = [];
-      
-      // Roller med fulle navn
-      if (playerList.length === 2) {
-        p.role = idx === 0 ? 'Lilleblind' : 'Storeblind';
-      } else if (playerList.length > 2) {
-        p.role = idx === 0 ? 'Dealer' : idx === 1 ? 'Lilleblind' : idx === 2 ? 'Storeblind' : '';
-      } else {
-        p.role = 'Storeblind';
-      }
-      
-      const cardCount = gameState.gameMode === 'OMAHA' ? 4 : 2;
-      for (let i = 0; i < cardCount; i++) {
-        p.cards.push(gameState.deck.pop());
-      }
-    });
-
+    startNewHandLogic();
     updateAll();
   });
 
   socket.on('next_phase', () => {
     const activePlayers = Object.values(players).filter(p => !p.folded);
 
-    // Hvis kun 1 spiller står igjen når man trykker neste fase
+    // Hvis runden er over ( enten FINISHED eller SHOWDOWN), starter vi ny hånd direkte ved klikk
+    if (gameState.phase === 'FINISHED' || gameState.phase === 'SHOWDOWN') {
+      startNewHandLogic();
+      updateAll();
+      return;
+    }
+
     if (activePlayers.length === 1 && gameState.phase !== 'VENTING') {
       gameState.phase = 'FINISHED';
       gameState.winnerInfo = {
@@ -181,7 +184,7 @@ io.on('connection', (socket) => {
     } else if (gameState.phase === 'TURN') {
       gameState.phase = 'RIVER';
       gameState.board.push(gameState.deck.pop());
-    } else if (gameState.phase === 'RIVER' || gameState.phase === 'SHOWDOWN') {
+    } else if (gameState.phase === 'RIVER') {
       gameState.phase = 'SHOWDOWN';
       
       const solvedHands = activePlayers.map(p => ({
@@ -231,7 +234,6 @@ io.on('connection', (socket) => {
 function updateAll() {
   const playerList = Object.values(players);
 
-  // Kort på storskjerm VISES KUN dersom det er ekte SHOWDOWN og IKKE en vinn på fold
   const showCardsOnScreen = gameState.phase === 'SHOWDOWN' && 
                             gameState.winnerInfo && 
                             !gameState.winnerInfo.foldedWin;
