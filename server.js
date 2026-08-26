@@ -66,6 +66,7 @@ function evaluatePlayerHand(playerCards, boardCards, gameMode) {
     return Hand.solve(allCards);
   } else {
     let bestHand = null;
+    // Omaha: MÅ bruke nøyaktig 2 kort fra hånd og 3 fra bordet
     for (let i = 0; i < formattedPlayer.length; i++) {
       for (let j = i + 1; j < formattedPlayer.length; j++) {
         const hand2 = [formattedPlayer[i], formattedPlayer[j]];
@@ -75,8 +76,15 @@ function evaluatePlayerHand(playerCards, boardCards, gameMode) {
             for (let b3 = b2 + 1; b3 < formattedBoard.length; b3++) {
               const board3 = [formattedBoard[b1], formattedBoard[b2], formattedBoard[b3]];
               const combo = Hand.solve([...hand2, ...board3]);
-              if (!bestHand || combo.rank > bestHand.rank || (combo.rank === bestHand.rank && combo.compare(bestHand) > 0)) {
+              
+              if (!bestHand) {
                 bestHand = combo;
+              } else {
+                // Bruk Hand.winners til å alltid velge den strengt sterkeste hånden
+                const winner = Hand.winners([bestHand, combo]);
+                if (winner.includes(combo) && !winner.includes(bestHand)) {
+                  bestHand = combo;
+                }
               }
             }
           }
@@ -96,7 +104,7 @@ let gameState = {
   dealerIndex: 0
 };
 
-let players = {}; 
+let players = {};
 const disconnectTimeouts = {};
 
 function startNewHandLogic() {
@@ -136,17 +144,14 @@ io.on('connection', (socket) => {
   socket.on('join_game', (name) => {
     const cleanName = name ? name.trim() : 'Spiller';
     
-    // Sjekk om dette navnet allerede eksisterer i spillet (f.eks. etter mistet dekning/samtale)
     let existingPlayerKey = Object.keys(players).find(
       key => players[key].name.toLowerCase() === cleanName.toLowerCase()
     );
 
     if (existingPlayerKey) {
-      // Overtak den eksisterende plassen med den nye socket.id-en
       const playerData = players[existingPlayerKey];
       delete players[existingPlayerKey];
       
-      // Avbryt sletting dersom det var en timeout på gang
       if (disconnectTimeouts[existingPlayerKey]) {
         clearTimeout(disconnectTimeouts[existingPlayerKey]);
         delete disconnectTimeouts[existingPlayerKey];
@@ -155,10 +160,7 @@ io.on('connection', (socket) => {
       playerData.id = socket.id;
       playerData.connected = true;
       players[socket.id] = playerData;
-
-      console.log(`Spiller ${cleanName} koblet seg til på nytt!`);
     } else {
-      // Ny spiller kaster seg inn i rommet
       const seatNumber = Object.keys(players).length + 1;
       players[socket.id] = {
         id: socket.id,
@@ -230,11 +232,19 @@ io.on('connection', (socket) => {
       const winningHands = Hand.winners(handsOnly);
       
       const winners = solvedHands.filter(sh => winningHands.includes(sh.solved));
-      const winnerNames = winners.map(w => w.player.name).join(' & ');
+      
+      let winnerText = '';
+      if (winners.length > 1) {
+        const names = winners.map(w => w.player.name).join(' & ');
+        winnerText = `UAVGJOERT / DELING: ${names}`;
+      } else {
+        winnerText = winners[0].player.name;
+      }
+
       const rawDescr = winners[0] ? winners[0].solved.descr : 'Ukjent hånd';
 
       gameState.winnerInfo = {
-        winnerName: winnerNames,
+        winnerName: winnerText,
         descr: translateHandDescription(rawDescr),
         foldedWin: false
       };
@@ -264,7 +274,6 @@ io.on('connection', (socket) => {
       players[socket.id].connected = false;
       const disconnectedId = socket.id;
 
-      // Gi spilleren 45 sekunders nådeperiode til å koble seg til på nytt før de slettes
       disconnectTimeouts[disconnectedId] = setTimeout(() => {
         delete players[disconnectedId];
         delete disconnectTimeouts[disconnectedId];
