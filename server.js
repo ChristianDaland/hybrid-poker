@@ -160,11 +160,13 @@ io.on('connection', (socket) => {
   socket.on('next_phase', () => {
     const activePlayers = Object.values(players).filter(p => !p.folded);
 
+    // Hvis kun 1 spiller står igjen når man trykker neste fase
     if (activePlayers.length === 1 && gameState.phase !== 'VENTING') {
-      gameState.phase = 'SHOWDOWN';
+      gameState.phase = 'FINISHED';
       gameState.winnerInfo = {
         winnerName: activePlayers[0].name,
-        descr: 'Alle andre kastet seg'
+        descr: 'Alle andre kastet seg',
+        foldedWin: true
       };
       updateAll();
       return;
@@ -196,7 +198,8 @@ io.on('connection', (socket) => {
 
       gameState.winnerInfo = {
         winnerName: winnerNames,
-        descr: translateHandDescription(rawDescr)
+        descr: translateHandDescription(rawDescr),
+        foldedWin: false
       };
     }
     updateAll();
@@ -208,10 +211,11 @@ io.on('connection', (socket) => {
       
       const activePlayers = Object.values(players).filter(p => !p.folded);
       if (activePlayers.length === 1 && gameState.phase !== 'VENTING') {
-        gameState.phase = 'SHOWDOWN';
+        gameState.phase = 'FINISHED';
         gameState.winnerInfo = {
           winnerName: activePlayers[0].name,
-          descr: 'Alle andre kastet seg'
+          descr: 'Alle andre kastet seg',
+          foldedWin: true
         };
       }
       updateAll();
@@ -227,6 +231,11 @@ io.on('connection', (socket) => {
 function updateAll() {
   const playerList = Object.values(players);
 
+  // Kort på storskjerm VISES KUN dersom det er ekte SHOWDOWN og IKKE en vinn på fold
+  const showCardsOnScreen = gameState.phase === 'SHOWDOWN' && 
+                            gameState.winnerInfo && 
+                            !gameState.winnerInfo.foldedWin;
+
   io.emit('state_update', {
     gameMode: gameState.gameMode,
     phase: gameState.phase,
@@ -237,7 +246,7 @@ function updateAll() {
       seat: p.seat,
       role: p.role,
       folded: p.folded,
-      cards: gameState.phase === 'SHOWDOWN' && !p.folded ? p.cards : []
+      cards: showCardsOnScreen && !p.folded ? p.cards : []
     }))
   });
 
