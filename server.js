@@ -66,7 +66,6 @@ function evaluatePlayerHand(playerCards, boardCards, gameMode) {
     return Hand.solve(allCards);
   } else {
     let bestHand = null;
-    // Omaha: MÅ bruke nøyaktig 2 kort fra hånd og 3 fra bordet
     for (let i = 0; i < formattedPlayer.length; i++) {
       for (let j = i + 1; j < formattedPlayer.length; j++) {
         const hand2 = [formattedPlayer[i], formattedPlayer[j]];
@@ -80,7 +79,6 @@ function evaluatePlayerHand(playerCards, boardCards, gameMode) {
               if (!bestHand) {
                 bestHand = combo;
               } else {
-                // Bruk Hand.winners til å alltid velge den strengt sterkeste hånden
                 const winner = Hand.winners([bestHand, combo]);
                 if (winner.includes(combo) && !winner.includes(bestHand)) {
                   bestHand = combo;
@@ -106,6 +104,23 @@ let gameState = {
 
 let players = {};
 const disconnectTimeouts = {};
+
+// Hjælpefunksjon for å stokke om rekkefølgen på spillerne i `players`-objektet
+function randomizePlayerSeats() {
+  const playerArray = Object.values(players);
+  if (playerArray.length <= 1) return;
+
+  const shuffled = shuffle(playerArray);
+  const newPlayersObj = {};
+
+  shuffled.forEach((p, index) => {
+    p.seat = index + 1;
+    newPlayersObj[p.id] = p;
+  });
+
+  players = newPlayersObj;
+  gameState.dealerIndex = 0; // Nullstill dealerknapp til første plass
+}
 
 function startNewHandLogic() {
   const playerList = Object.values(players);
@@ -182,6 +197,9 @@ io.on('connection', (socket) => {
       gameState.phase = 'VENTING';
       gameState.board = [];
       gameState.winnerInfo = null;
+    } else {
+      // Stokker plassene til alle spillere når en spilletype velges
+      randomizePlayerSeats();
     }
     updateAll();
   });
