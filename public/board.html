@@ -29,6 +29,7 @@
       align-items: center;
       width: 95vw;
       max-width: 1400px;
+      perspective: 1000px; /* Gir 3D-dybde til utdelingsanimasjonen */
     }
 
     /* Ekte kort-design i ren HTML/CSS */
@@ -48,6 +49,22 @@
       user-select: none;
     }
 
+    /* Utdelingsanimasjon */
+    .card-animate {
+      animation: dealCard 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+    }
+
+    @keyframes dealCard {
+      0% {
+        opacity: 0;
+        transform: translateY(-50px) scale(0.7) rotateY(90deg);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1) rotateY(0deg);
+      }
+    }
+
     /* Farger */
     .card.red { color: #d32f2f; }
     .card.black { color: #111111; }
@@ -61,7 +78,7 @@
       line-height: 0.9;
     }
 
-    /* Hjørne nederst til høyre (snudd på hodet) */
+    /* Hjørne nederst til høyre (snudd på hodet for motspiller) */
     .card-corner-bottom {
       display: flex;
       flex-direction: column;
@@ -111,10 +128,14 @@
     const SUIT_SYMBOLS = { 's': '♠', 'h': '♥', 'd': '♦', 'c': '♣' };
     const VALUE_MAP = { 'T': '10', 'J': 'J', 'Q': 'Q', 'K': 'K', 'A': 'A' };
 
+    let previousBoardCount = 0;
+
     socket.on('state_update', (data) => {
+      const currentBoard = data.board || [];
       boardEl.innerHTML = '';
       
-      if (!data.board || data.board.length === 0) {
+      if (currentBoard.length === 0) {
+        previousBoardCount = 0;
         for (let i = 0; i < 5; i++) {
           const slot = document.createElement('div');
           slot.className = 'empty-slot';
@@ -123,7 +144,7 @@
         return;
       }
 
-      data.board.forEach(cardStr => {
+      currentBoard.forEach((cardStr, index) => {
         const valRaw = cardStr.slice(0, -1);
         const suitRaw = cardStr.slice(-1);
 
@@ -132,7 +153,17 @@
         const isRed = suitRaw === 'h' || suitRaw === 'd';
 
         const card = document.createElement('div');
-        card.className = `card ${isRed ? 'red' : 'black'}`;
+        
+        // Legg til animasjon kun på kort som nylig er lagt ut på bordet
+        const isNewCard = index >= previousBoardCount;
+        card.className = `card ${isRed ? 'red' : 'black'} ${isNewCard ? 'card-animate' : ''}`;
+        
+        // Liten forsinkelse per nye kort hvis Flop (3 kort samtidig) deles ut
+        if (isNewCard) {
+          const delay = (index - previousBoardCount) * 0.1;
+          card.style.animationDelay = `${delay}s`;
+        }
+
         card.innerHTML = `
           <div class="card-corner-top">
             <span class="corner-val">${val}</span>
@@ -146,6 +177,8 @@
         `;
         boardEl.appendChild(card);
       });
+
+      previousBoardCount = currentBoard.length;
     });
   </script>
 </body>
