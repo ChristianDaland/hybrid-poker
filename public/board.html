@@ -29,10 +29,10 @@
       align-items: center;
       width: 95vw;
       max-width: 1400px;
-      perspective: 1000px; /* Gir 3D-dybde til utdelingsanimasjonen */
+      perspective: 1000px;
     }
 
-    /* Ekte kort-design i ren HTML/CSS */
+    /* Ekte kort-design */
     .card {
       width: 17vw;
       height: 25vw;
@@ -40,16 +40,17 @@
       max-height: 310px;
       background: #ffffff;
       border-radius: 14px;
-      padding: 12px;
+      padding: 10px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
       box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
       border: 1px solid #ddd;
       user-select: none;
+      position: relative;
     }
 
-    /* Utdelingsanimasjon */
+    /* Animasjon ved utdeling */
     .card-animate {
       animation: dealCard 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
     }
@@ -69,7 +70,7 @@
     .card.red { color: #d32f2f; }
     .card.black { color: #111111; }
 
-    /* Hjørne øverst til venstre */
+    /* Hjørner */
     .card-corner-top {
       display: flex;
       flex-direction: column;
@@ -78,7 +79,6 @@
       line-height: 0.9;
     }
 
-    /* Hjørne nederst til høyre (snudd på hodet for motspiller) */
     .card-corner-bottom {
       display: flex;
       flex-direction: column;
@@ -98,14 +98,58 @@
       font-size: 2rem;
     }
 
-    /* Stort symbol i midten */
+    /* Midtområde for pips (symboler) */
     .card-center {
+      position: absolute;
+      top: 45px;
+      bottom: 45px;
+      left: 35px;
+      right: 35px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      align-items: center;
+      justify-items: center;
+      font-size: 1.8rem;
+    }
+
+    /* Spesifikk styling for ess */
+    .card-center.ace {
+      display: flex;
+      justify-content: center;
+      align-items: center;
       font-size: 4.5rem;
-      text-align: center;
+    }
+
+    /* Styling for Bildekort (J, Q, K) */
+    .card-center.face-card {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      border: 2px dashed rgba(0,0,0,0.15);
+      border-radius: 8px;
+      background: rgba(0,0,0,0.02);
+    }
+
+    .face-icon {
+      font-size: 3.8rem;
       line-height: 1;
     }
 
-    /* Plassholdere før kortene legges ut */
+    .face-label {
+      font-size: 0.9rem;
+      font-weight: bold;
+      letter-spacing: 1px;
+      margin-top: 4px;
+      opacity: 0.7;
+    }
+
+    /* Snus nederste halvdel av symbolene på tallkort */
+    .pip.rotate {
+      transform: rotate(180deg);
+    }
+
+    /* Plassholdere før Flop */
     .empty-slot {
       width: 17vw;
       height: 25vw;
@@ -127,6 +171,31 @@
 
     const SUIT_SYMBOLS = { 's': '♠', 'h': '♥', 'd': '♦', 'c': '♣' };
     const VALUE_MAP = { 'T': '10', 'J': 'J', 'Q': 'Q', 'K': 'K', 'A': 'A' };
+
+    // Posisjons-rutenett (3 kolonner x 5 rader) for tallene 2-10
+    const PIP_LAYOUTS = {
+      '2': [{ col: 2, row: 1 }, { col: 2, row: 5, rot: true }],
+      '3': [{ col: 2, row: 1 }, { col: 2, row: 3 }, { col: 2, row: 5, rot: true }],
+      '4': [{ col: 1, row: 1 }, { col: 3, row: 1 }, { col: 1, row: 5, rot: true }, { col: 3, row: 5, rot: true }],
+      '5': [{ col: 1, row: 1 }, { col: 3, row: 1 }, { col: 2, row: 3 }, { col: 1, row: 5, rot: true }, { col: 3, row: 5, rot: true }],
+      '6': [{ col: 1, row: 1 }, { col: 3, row: 1 }, { col: 1, row: 3 }, { col: 3, row: 3 }, { col: 1, row: 5, rot: true }, { col: 3, row: 5, rot: true }],
+      '7': [{ col: 1, row: 1 }, { col: 3, row: 1 }, { col: 2, row: 2 }, { col: 1, row: 3 }, { col: 3, row: 3 }, { col: 1, row: 5, rot: true }, { col: 3, row: 5, rot: true }],
+      '8': [{ col: 1, row: 1 }, { col: 3, row: 1 }, { col: 2, row: 2 }, { col: 1, row: 3 }, { col: 3, row: 3 }, { col: 2, row: 4, rot: true }, { col: 1, row: 5, rot: true }, { col: 3, row: 5, rot: true }],
+      '9': [{ col: 1, row: 1 }, { col: 3, row: 1 }, { col: 1, row: 2 }, { col: 3, row: 2 }, { col: 2, row: 3 }, { col: 1, row: 4, rot: true }, { col: 3, row: 4, rot: true }, { col: 1, row: 5, rot: true }, { col: 3, row: 5, rot: true }],
+      '10': [{ col: 1, row: 1 }, { col: 3, row: 1 }, { col: 2, row: 2 }, { col: 1, row: 2 }, { col: 3, row: 2 }, { col: 1, row: 4, rot: true }, { col: 3, row: 4, rot: true }, { col: 2, row: 4, rot: true }, { col: 1, row: 5, rot: true }, { col: 3, row: 5, rot: true }]
+    };
+
+    const FACE_ICONS = {
+      'J': '⚔️', // Knekt
+      'Q': '👑', // Dronning
+      'K': '♔'  // Konge
+    };
+
+    const FACE_NAMES = {
+      'J': 'KNEKT',
+      'Q': 'DRONNING',
+      'K': 'KONGE'
+    };
 
     let previousBoardCount = 0;
 
@@ -153,15 +222,29 @@
         const isRed = suitRaw === 'h' || suitRaw === 'd';
 
         const card = document.createElement('div');
-        
-        // Legg til animasjon kun på kort som nylig er lagt ut på bordet
         const isNewCard = index >= previousBoardCount;
         card.className = `card ${isRed ? 'red' : 'black'} ${isNewCard ? 'card-animate' : ''}`;
         
-        // Liten forsinkelse per nye kort hvis Flop (3 kort samtidig) deles ut
         if (isNewCard) {
           const delay = (index - previousBoardCount) * 0.1;
           card.style.animationDelay = `${delay}s`;
+        }
+
+        // Generer midtområdet
+        let centerHtml = '';
+        if (val === 'A') {
+          centerHtml = `<div class="card-center ace">${suit}</div>`;
+        } else if (['J', 'Q', 'K'].includes(val)) {
+          centerHtml = `
+            <div class="card-center face-card">
+              <span class="face-icon">${FACE_ICONS[val]}</span>
+              <span class="face-label">${FACE_NAMES[val]}</span>
+            </div>`;
+        } else if (PIP_LAYOUTS[val]) {
+          const pips = PIP_LAYOUTS[val].map(p => 
+            `<span class="pip ${p.rot ? 'rotate' : ''}" style="grid-column: ${p.col}; grid-row: ${p.row};">${suit}</span>`
+          ).join('');
+          centerHtml = `<div class="card-center">${pips}</div>`;
         }
 
         card.innerHTML = `
@@ -169,7 +252,7 @@
             <span class="corner-val">${val}</span>
             <span class="corner-suit">${suit}</span>
           </div>
-          <div class="card-center">${suit}</div>
+          ${centerHtml}
           <div class="card-corner-bottom">
             <span class="corner-val">${val}</span>
             <span class="corner-suit">${suit}</span>
