@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Løland Gård Poker - Bordkort</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: #0b4028; /* Mørkegrønn pokerfilt-bakgrunn */
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+
+    .board-container {
+      display: flex;
+      gap: 2vw;
+      justify-content: center;
+      align-items: center;
+      width: 95vw;
+      max-width: 1400px;
+    }
+
+    /* Kort-stiling med skygge og avrundede hjørner */
+    .card-img {
+      width: 17vw;
+      max-width: 220px;
+      height: auto;
+      border-radius: 12px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+      background-color: white;
+      transition: transform 0.2s ease;
+    }
+
+    /* Plassholdere før Flop/Turn/River */
+    .empty-slot {
+      width: 17vw;
+      max-width: 220px;
+      aspect-ratio: 2.5 / 3.5;
+      border: 3px dashed rgba(255, 255, 255, 0.25);
+      border-radius: 12px;
+      background-color: rgba(0, 0, 0, 0.1);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="board-container" id="board"></div>
+
+  <script>
+    const socket = io();
+    const boardEl = document.getElementById('board');
+
+    // Mappe våre internt brukte kortkoder til vektorkort (SVG)
+    // Eksempel: 'As' -> 'AH.svg' eller 'AS.svg'
+    const SUIT_MAP = { 's': 'S', 'h': 'H', 'd': 'D', 'c': 'C' };
+    const VALUE_MAP = { 
+      '2': '2', '3': '3', '4': '4', '5': '5', '6': '6', '7': '7', 
+      '8': '8', '9': '9', 'T': '10', 'J': 'J', 'Q': 'Q', 'K': 'K', 'A': 'A' 
+    };
+
+    function getCardSvgUrl(cardStr) {
+      const valRaw = cardStr.slice(0, -1);
+      const suitRaw = cardStr.slice(-1);
+
+      const val = VALUE_MAP[valRaw] || valRaw;
+      const suit = SUIT_MAP[suitRaw] || suitRaw;
+
+      // Henter standard publiserte poker-SVG kort med dobbeltsidig indeks (opp-ned)
+      return `https://jsdeck.github.io/cards/${val}${suit}.svg`;
+    }
+
+    socket.on('state_update', (data) => {
+      boardEl.innerHTML = '';
+      
+      if (!data.board || data.board.length === 0) {
+        // Viser 5 tomme rammer når ingen kort er lagt ut enda
+        for (let i = 0; i < 5; i++) {
+          const slot = document.createElement('div');
+          slot.className = 'empty-slot';
+          boardEl.appendChild(slot);
+        }
+        return;
+      }
+
+      data.board.forEach(cardStr => {
+        const img = document.createElement('img');
+        img.className = 'card-img';
+        img.src = getCardSvgUrl(cardStr);
+        img.alt = cardStr;
+        boardEl.appendChild(img);
+      });
+    });
+  </script>
+</body>
+</html>
