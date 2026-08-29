@@ -147,6 +147,7 @@
     .controls-left {
       display: flex;
       gap: 10px;
+      align-items: center;
     }
 
     button {
@@ -168,12 +169,14 @@
     .btn-mode { background-color: #ffffff; color: #333; }
     .btn-change-mode { background-color: #607d8b; color: white; }
     .btn-action { background-color: #4caf50; color: white; }
+    .btn-help { background-color: #009688; color: white; }
 
+    /* Knappen for å åpne eget bordvindu */
     .btn-open-board {
       background-color: #ff9800;
       color: white;
-      font-size: 0.9rem;
-      padding: 10px 12px;
+      font-size: 0.85rem;
+      padding: 10px 8px;
       width: 100%;
       border-radius: 10px;
       box-shadow: 0 3px 8px rgba(0,0,0,0.4);
@@ -182,25 +185,19 @@
       background-color: #f57c00;
     }
 
-    /* Ekstra høy handlingsknapp for dealeren */
+    /* Stor handlingsknapp for neste kort / runde */
     .btn-next-large {
       background: linear-gradient(135deg, #1e88e5, #1565c0);
       color: white;
-      font-size: 1.3rem;
-      padding: 16px;
+      font-size: 1.1rem;
+      padding: 14px 16px;
       width: 100%;
-      height: 120px; /* Dobbelt så høy */
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      border-radius: 16px;
-      box-shadow: 0 6px 16px rgba(0,0,0,0.5);
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
       letter-spacing: 0.5px;
-      line-height: 1.2;
     }
     .btn-next-large:hover:not(:disabled) {
-      transform: scale(1.03);
+      transform: scale(1.02);
       background: linear-gradient(135deg, #2196f3, #1e88e5);
     }
   </style>
@@ -220,13 +217,16 @@
     </div>
 
     <div class="sidebar-right">
+      <!-- 1. QR Kode -->
       <div class="qr-box">
         <p style="margin: 0 0 8px 0; font-size: 0.85rem; font-weight: bold;">Skann for å bli med:</p>
         <div id="qrcode"></div>
       </div>
 
+      <!-- 2. Knapp for å åpne nytt bordvindu -->
       <button class="btn-open-board" onclick="openBoardWindow()">🖥️ Åpne Bordvisning</button>
 
+      <!-- 3. Stor knapp for neste fase/kort -->
       <button id="btn-next-phase" class="btn-next-large" onclick="nextPhase()" style="display: none;">Åpne Flopp</button>
     </div>
   </div>
@@ -242,6 +242,9 @@
         <button id="btn-change-mode" class="btn-change-mode" onclick="resetMode()">Bytt Spilletype</button>
         <button id="btn-start-hand" class="btn-action" onclick="startNewHand()">Start Ny Hånd</button>
       </div>
+
+      <!-- Knapp for spilleveiledning -->
+      <button class="btn-help" onclick="openHelpWindow()">📖 Spilleveiledning</button>
     </div>
   </div>
 
@@ -282,6 +285,10 @@
       window.open('/board.html', 'PokerBoard', 'width=1200,height=800');
     }
 
+    function openHelpWindow() {
+      window.open('/veiledning.html', 'PokerVeiledning', 'width=750,height=800');
+    }
+
     socket.on('state_update', (state) => {
       const modeSelection = document.getElementById('mode-selection');
       const gameControls = document.getElementById('game-controls');
@@ -298,7 +305,7 @@
       } else {
         modeSelection.style.display = 'none';
         gameControls.style.display = 'flex';
-        nextBtn.style.display = 'flex';
+        nextBtn.style.display = 'block';
         gameInfo.innerText = `Modus: ${state.gameMode} | Fase: ${state.phase}`;
       }
 
