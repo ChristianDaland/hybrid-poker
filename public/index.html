@@ -150,6 +150,13 @@
       align-items: center;
     }
 
+    .version-tag {
+      font-size: 0.85rem;
+      color: #888888;
+      font-weight: bold;
+      user-select: none;
+    }
+
     button {
       padding: 10px 16px;
       font-size: 0.95rem;
@@ -244,12 +251,15 @@
 
       <div id="game-controls" style="display: none; gap: 10px;">
         <button id="btn-change-mode" class="btn-change-mode" onclick="resetMode()">Bytt Spilletype</button>
-        <button id="btn-start-hand" class="btn-action" onclick="startNewHand()">Start Ny Omgang</button>
+        <button id="btn-start-hand" class="btn-action" onclick="startNewHand()">Start Ny Hånd</button>
       </div>
 
       <!-- Knapp for spilleveiledning -->
       <button class="btn-help" onclick="openHelpWindow()">📖 Spilleveiledning</button>
     </div>
+
+    <!-- Versjonstekst nederst til høyre -->
+    <div class="version-tag">Versjon 2.10</div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -326,7 +336,7 @@
       } else if (state.phase === 'RIVER') {
         nextBtn.innerText = 'Vis Vinner (Showdown)';
       } else if (state.phase === 'SHOWDOWN') {
-        nextBtn.innerText = 'Runde Ferdig';
+        nextBtn.innerText = 'Ny Runde';
       } else {
         nextBtn.innerText = 'Neste Fase';
       }
