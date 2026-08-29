@@ -314,15 +314,15 @@
       startHandBtn.disabled = isRoundActive;
 
       if (state.phase === 'PREFLOP') {
-        nextBtn.innerText = 'Åpne Flopp';
+        nextBtn.innerText = 'Åpne Flopp           ';
       } else if (state.phase === 'FLOP') {
-        nextBtn.innerText = 'Åpne Turn';
+        nextBtn.innerText = 'Åpne Turn            ';
       } else if (state.phase === 'TURN') {
-        nextBtn.innerText = 'Åpne River';
+        nextBtn.innerText = 'Åpne River           ';
       } else if (state.phase === 'RIVER') {
         nextBtn.innerText = 'Vis Vinner (Showdown)';
       } else if (state.phase === 'SHOWDOWN') {
-        nextBtn.innerText = 'Ny runde';
+        nextBtn.innerText = 'Ny runde             ';
       } else {
         nextBtn.innerText = 'Neste Fase';
       }
