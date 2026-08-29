@@ -63,10 +63,12 @@
       transition: transform 0.15s ease-out;
     }
 
+    /* Fast bredde for 5 kort (5 * 140px + 4 * 20px gap = 780px) */
     .cards-container {
       display: flex;
-      justify-content: center;
+      justify-content: flex-start;
       gap: 20px;
+      width: 780px;
     }
 
     /* Animasjon når kun NYE kort legges ut */
@@ -95,6 +97,7 @@
       font-weight: bold;
       position: relative;
       backface-visibility: hidden;
+      flex-shrink: 0;
     }
 
     .card.animate-new {
@@ -275,7 +278,6 @@
       `;
     }
 
-    // Holder styr på hvilke kort som allerede er vist på bordet
     let currentBoardCards = [];
 
     socket.on('state_update', (state) => {
@@ -288,10 +290,8 @@
         return;
       }
 
-      // Bygg kun opp HTML for kortene
       let html = '';
       newBoard.forEach((cardCode, index) => {
-        // Kortet animeres KUN hvis det er helt nytt (dvs. indeksen er høyere enn tidligere antall kort)
         const isNew = index >= currentBoardCards.length;
         html += formatCard(cardCode, isNew);
       });
