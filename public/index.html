@@ -185,16 +185,20 @@
       background-color: #f57c00;
     }
 
-    /* Stor handlingsknapp for neste kort / runde */
+    /* Stor, høy handlingsknapp for dealer */
     .btn-next-large {
       background: linear-gradient(135deg, #1e88e5, #1565c0);
       color: white;
-      font-size: 1.1rem;
-      padding: 14px 16px;
+      font-size: 1.2rem;
+      height: 140px;
       width: 100%;
-      border-radius: 12px;
+      border-radius: 16px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.4);
       letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
     }
     .btn-next-large:hover:not(:disabled) {
       transform: scale(1.02);
@@ -226,7 +230,7 @@
       <!-- 2. Knapp for å åpne nytt bordvindu -->
       <button class="btn-open-board" onclick="openBoardWindow()">🖥️ Åpne Bordvisning</button>
 
-      <!-- 3. Stor knapp for neste fase/kort -->
+      <!-- 3. Stor, høy knapp for neste fase/kort -->
       <button id="btn-next-phase" class="btn-next-large" onclick="nextPhase()" style="display: none;">Åpne Flopp</button>
     </div>
   </div>
@@ -305,7 +309,7 @@
       } else {
         modeSelection.style.display = 'none';
         gameControls.style.display = 'flex';
-        nextBtn.style.display = 'block';
+        nextBtn.style.display = 'flex';
         gameInfo.innerText = `Modus: ${state.gameMode} | Fase: ${state.phase}`;
       }
 
@@ -314,15 +318,15 @@
       startHandBtn.disabled = isRoundActive;
 
       if (state.phase === 'PREFLOP') {
-        nextBtn.innerText = 'Åpne Flopp           ';
+        nextBtn.innerText = 'Åpne Flopp';
       } else if (state.phase === 'FLOP') {
-        nextBtn.innerText = 'Åpne Turn            ';
+        nextBtn.innerText = 'Åpne Turn';
       } else if (state.phase === 'TURN') {
-        nextBtn.innerText = 'Åpne River           ';
+        nextBtn.innerText = 'Åpne River';
       } else if (state.phase === 'RIVER') {
         nextBtn.innerText = 'Vis Vinner (Showdown)';
       } else if (state.phase === 'SHOWDOWN') {
-        nextBtn.innerText = 'Ny runde             ';
+        nextBtn.innerText = 'Runde Ferdig';
       } else {
         nextBtn.innerText = 'Neste Fase';
       }
