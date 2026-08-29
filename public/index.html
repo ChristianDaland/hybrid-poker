@@ -64,6 +64,7 @@
       flex-direction: column;
       align-items: center;
       gap: 12px;
+      width: 160px;
     }
 
     .qr-box {
@@ -168,12 +169,26 @@
     .btn-change-mode { background-color: #607d8b; color: white; }
     .btn-action { background-color: #4caf50; color: white; }
 
-    /* Ekstra bred handlingsknapp (plassert i sidebar under QR) */
+    /* Knappen for å åpne eget bordvindu */
+    .btn-open-board {
+      background-color: #ff9800;
+      color: white;
+      font-size: 0.9rem;
+      padding: 10px 12px;
+      width: 100%;
+      border-radius: 10px;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
+    }
+    .btn-open-board:hover {
+      background-color: #f57c00;
+    }
+
+    /* Stor handlingsknapp for neste kort / runde */
     .btn-next-large {
       background: linear-gradient(135deg, #1e88e5, #1565c0);
       color: white;
-      font-size: 1.15rem;
-      padding: 12px 20px;
+      font-size: 1.1rem;
+      padding: 14px 16px;
       width: 100%;
       border-radius: 12px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.4);
@@ -200,12 +215,16 @@
     </div>
 
     <div class="sidebar-right">
+      <!-- 1. QR Kode -->
       <div class="qr-box">
         <p style="margin: 0 0 8px 0; font-size: 0.85rem; font-weight: bold;">Skann for å bli med:</p>
         <div id="qrcode"></div>
       </div>
 
-      <!-- Plassert under QR-koden og over kontrollene/åpne kort -->
+      <!-- 2. Knapp for å åpne nytt bordvindu (plassert mellom QR og Neste Fase) -->
+      <button class="btn-open-board" onclick="openBoardWindow()">🖥️ Åpne Bordvisning</button>
+
+      <!-- 3. Stor knapp for neste fase/kort -->
       <button id="btn-next-phase" class="btn-next-large" onclick="nextPhase()" style="display: none;">Åpne Flopp</button>
     </div>
   </div>
@@ -256,6 +275,10 @@
     function resetMode() { socket.emit('set_game_mode', null); }
     function startNewHand() { socket.emit('start_new_hand'); }
     function nextPhase() { socket.emit('next_phase'); }
+
+    function openBoardWindow() {
+      window.open('/board.html', 'PokerBoard', 'width=1200,height=800');
+    }
 
     socket.on('state_update', (state) => {
       const modeSelection = document.getElementById('mode-selection');
