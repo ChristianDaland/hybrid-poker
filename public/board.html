@@ -69,7 +69,7 @@
       gap: 20px;
     }
 
-    /* Animasjon når nye kort legges ut */
+    /* Animasjon når kun NYE kort legges ut */
     @keyframes cardFlip {
       0% {
         transform: rotateY(90deg) scale(0.8);
@@ -94,8 +94,11 @@
       box-shadow: 0 8px 20px rgba(0,0,0,0.6);
       font-weight: bold;
       position: relative;
-      animation: cardFlip 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
       backface-visibility: hidden;
+    }
+
+    .card.animate-new {
+      animation: cardFlip 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
     }
 
     .card.red { color: #d9534f; }
@@ -142,7 +145,6 @@
       transform: translate(-50%, -50%);
     }
 
-    /* Opp-ned orientering for nederste symboler */
     .pip.flip {
       transform: translate(-50%, -50%) rotate(180deg);
     }
@@ -198,7 +200,6 @@
       const val = parseInt(rawVal === 'T' ? '10' : rawVal, 10);
       if (isNaN(val)) return '';
 
-      // Standard koordinater (x%, y%) og om de skal roteres (flip)
       const positions = [];
 
       if (val === 2) {
@@ -229,7 +230,7 @@
       return html;
     }
 
-    function formatCard(cardCode) {
+    function formatCard(cardCode, isNew) {
       if (!cardCode) return '';
       let rawVal = cardCode.slice(0, -1).toUpperCase();
       let displayVal = rawVal === 'T' ? '10' : rawVal;
@@ -244,7 +245,6 @@
       
       const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
 
-      // Bildekort SVG-grafikk
       const faceGraphics = {
         'J': '<svg class="face-img" viewBox="0 0 100 140"><rect width="100" height="140" fill="#f8f9fa" rx="8"/><path d="M30 40 L50 20 L70 40 L60 40 L60 80 L70 80 L50 100 L30 80 L40 80 L40 40 Z" fill="#4a5568"/><circle cx="50" cy="50" r="12" fill="#e53e3e"/><path d="M40 90 Q50 80 60 90" stroke="#2b6cb0" stroke-width="4" fill="none"/><text x="50" y="125" font-size="16" font-weight="bold" text-anchor="middle" fill="#2d3748">KNEKT</text></svg>',
         'Q': '<svg class="face-img" viewBox="0 0 100 140"><rect width="100" height="140" fill="#fff5f5" rx="8"/><path d="M25 50 L35 30 L50 45 L65 30 L75 50 L65 90 L35 90 Z" fill="#d69e2e"/><circle cx="35" cy="30" r="4" fill="#d69e2e"/><circle cx="50" cy="25" r="5" fill="#e53e3e"/><circle cx="65" cy="30" r="4" fill="#d69e2e"/><circle cx="50" cy="65" r="14" fill="#9b2c2c"/><text x="50" y="125" font-size="16" font-weight="bold" text-anchor="middle" fill="#742a2a">DRONNING</text></svg>',
@@ -259,7 +259,7 @@
       }
 
       return `
-        <div class="card ${suit.color}">
+        <div class="card ${suit.color} ${isNew ? 'animate-new' : ''}" data-card="${cardCode}">
           <div class="card-corner top-left">
             <span class="val">${displayVal}</span>
             <span class="suit">${suit.symbol}</span>
@@ -275,13 +275,29 @@
       `;
     }
 
+    // Holder styr på hvilke kort som allerede er vist på bordet
+    let currentBoardCards = [];
+
     socket.on('state_update', (state) => {
       const boardContainer = document.getElementById('board-cards');
-      if (state.board && state.board.length > 0) {
-        boardContainer.innerHTML = state.board.map(c => formatCard(c)).join('');
-      } else {
+      const newBoard = state.board || [];
+
+      if (newBoard.length === 0) {
         boardContainer.innerHTML = '';
+        currentBoardCards = [];
+        return;
       }
+
+      // Bygg kun opp HTML for kortene
+      let html = '';
+      newBoard.forEach((cardCode, index) => {
+        // Kortet animeres KUN hvis det er helt nytt (dvs. indeksen er høyere enn tidligere antall kort)
+        const isNew = index >= currentBoardCards.length;
+        html += formatCard(cardCode, isNew);
+      });
+
+      boardContainer.innerHTML = html;
+      currentBoardCards = [...newBoard];
     });
   </script>
 </body>
