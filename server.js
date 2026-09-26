@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const crypto = require('crypto');
 const { Server } = require('socket.io');
 const Hand = require('pokersolver').Hand;
 
@@ -104,6 +105,7 @@ let gameState = {
 
 let players = {};
 const disconnectTimeouts = {};
+const uuidToPlayerId = new Map();
 
 // Hjælpefunksjon for å stokke om rekkefølgen på spillerne i `players`-objektet
 function randomizePlayerSeats() {
@@ -287,16 +289,55 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('rejoin_game', (data) => {
+    const uuid = (data && data.uuid) || (typeof data === 'string' ? data : null);
+    if (!uuid) return;
+
+    const existingId = uuidToPlayerId.get(uuid);
+    if (!existingId || !players[existingId]) return;
+
+    const player = players[existingId];
+
+    // Clear any pending disconnect timeout
+    if (disconnectTimeouts[existingId]) {
+      clearTimeout(disconnectTimeouts[existingId]);
+      delete disconnectTimeouts[existingId];
+    }
+
+    // Rebind player to new socket
+    player.id = socket.id;
+    player.connected = true;
+
+    if (existingId !== socket.id) {
+      delete players[existingId];
+    }
+    players[socket.id] = player;
+    uuidToPlayerId.set(uuid, socket.id);
+
+    socket.emit('joined', { uuid: uuid, name: player.name });
+    updateAll();
+  });
+
   socket.on('disconnect', () => {
     if (players[socket.id]) {
       players[socket.id].connected = false;
       const disconnectedId = socket.id;
+      const playerUuid = players[socket.id].uuid;
 
+      // Clear any existing timeout for this socket
+      if (disconnectTimeouts[disconnectedId]) {
+        clearTimeout(disconnectTimeouts[disconnectedId]);
+      }
+
+      // 60-second grace period before permanently removing the player
       disconnectTimeouts[disconnectedId] = setTimeout(() => {
         delete players[disconnectedId];
         delete disconnectTimeouts[disconnectedId];
+        if (playerUuid) {
+          uuidToPlayerId.delete(playerUuid);
+        }
         updateAll();
-      }, 45000);
+      }, 60000);
 
       updateAll();
     }

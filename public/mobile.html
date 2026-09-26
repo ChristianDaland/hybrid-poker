@@ -178,13 +178,32 @@
     let isShowingCards = false;
     let revealTimer = null;
 
+    // UUID reconnection logic
+    const storedUuid = localStorage.getItem('poker_uuid');
+    const storedName = localStorage.getItem('poker_name');
+
+    socket.on('joined', (data) => {
+      if (data.uuid) {
+        localStorage.setItem('poker_uuid', data.uuid);
+        if (data.name) {
+          localStorage.setItem('poker_name', data.name);
+        }
+      }
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('game-screen').style.display = 'block';
+    });
+
+    socket.on('connect', () => {
+      if (storedUuid && storedName) {
+        socket.emit('rejoin_game', { uuid: storedUuid, name: storedName });
+      }
+    });
+
     function joinGame() {
       const name = document.getElementById('player-name').value.trim();
       if (!name) return alert('Vennligst skriv inn et navn!');
 
       socket.emit('join_game', name);
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('game-screen').style.display = 'block';
     }
 
     function foldHand() {
