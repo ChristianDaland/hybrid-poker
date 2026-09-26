@@ -163,15 +163,11 @@
 
     <div id="role-label" class="role-badge" style="display: none;"></div>
 
-    <div class="instruction-text">💡 Trykk og hold på feltet under for å se kortene dine</div>
+    <div class="instruction-text">💡 Trykk på feltet under for å se kortene dine (de vises i 5 sekunder)</div>
 
     <div id="my-cards" class="cards-container"
-         onmousedown="showAllCards()" 
-         onmouseup="hideAllCards()"
-         onmouseleave="hideAllCards()"
-         ontouchstart="showAllCards()" 
-         ontouchend="hideAllCards()"
-         ontouchcancel="hideAllCards()">
+         onmousedown="showAllCards()"
+         ontouchstart="showAllCards()">
     </div>
   </div>
 
@@ -181,7 +177,6 @@
     let myCardsData = [];
     let isShowingCards = false;
     let revealTimer = null;
-    let lastPhase = null;
 
     function joinGame() {
       const name = document.getElementById('player-name').value.trim();
@@ -262,12 +257,6 @@
 
       myCardsData = state.cards || [];
       renderCards();
-
-      // Nytt utspill (overgang til PREFLOP): vis kortene i 5 sekunder
-      if (state.phase === 'PREFLOP' && lastPhase !== 'PREFLOP' && myCardsData.length > 0) {
-        showAllCards();
-      }
-      lastPhase = state.phase;
 
       const foldBtn = document.getElementById('btn-fold');
       if (state.folded) {
