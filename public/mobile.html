@@ -153,7 +153,8 @@
   </div>
 
   <div id="game-screen" style="display: none;">
-    <!-- Øverste linje med fase og trygg Fold-knapp -->
+
+    <div id="connection-status" style="font-size:0.8rem;color:#888;margin-bottom:10px;"></div>    <!-- Øverste linje med fase og trygg Fold-knapp -->
     <div class="header-row">
       <div class="top-bar">
         Fase: <span id="phase-label">VENTING</span>
@@ -172,38 +173,52 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script>
-    const socket = io();
+  <script>    const socket = io();
     let myCardsData = [];
     let isShowingCards = false;
     let revealTimer = null;
+    let joinTimeout = null;
+    let isJoined = false;
 
-    // UUID reconnection logic
-    const storedUuid = localStorage.getItem('poker_uuid');
-    const storedName = localStorage.getItem('poker_name');
+    const savedUuid = localStorage.getItem('poker_uuid');
+    const savedName = localStorage.getItem('poker_name');
 
-    socket.on('joined', (data) => {
-      if (data.uuid) {
-        localStorage.setItem('poker_uuid', data.uuid);
-        if (data.name) {
-          localStorage.setItem('poker_name', data.name);
-        }
-      }
+    function setConnectionStatus(text, color) {
+      const el = document.getElementById('connection-status');
+      if (el) { el.innerText = text; el.style.color = color || '#888'; }
+    }
+
+    function switchToGame() {
       document.getElementById('login-screen').style.display = 'none';
       document.getElementById('game-screen').style.display = 'block';
-    });
+    }
 
-    socket.on('connect', () => {
-      if (storedUuid && storedName) {
-        socket.emit('rejoin_game', { uuid: storedUuid, name: storedName });
-      }
-    });
+    function switchToLogin() {
+      document.getElementById('login-screen').style.display = 'block';
+      document.getElementById('game-screen').style.display = 'none';
+    }
+
+    function startJoinTimeout() {
+      clearJoinTimeout();
+      joinTimeout = setTimeout(() => {
+        if (!isJoined) {
+          setConnectionStatus('\u26A0\uFE0F Koblingsfeil \u2013 Pr\u00F8v igjen', '#f44336');
+          switchToLogin();
+          alert('Klarte ikke \u00E5 koble til spillet. Pr\u00F8v igjen.');
+        }
+      }, 8000);
+    }
+
+    function clearJoinTimeout() {
+      if (joinTimeout) { clearTimeout(joinTimeout); joinTimeout = null; }
+    }
 
     function joinGame() {
       const name = document.getElementById('player-name').value.trim();
       if (!name) return alert('Vennligst skriv inn et navn!');
-
+      setConnectionStatus('\u23F3 Kobler til...', '#4caf50');
       socket.emit('join_game', name);
+      startJoinTimeout();
     }
 
     function foldHand() {
@@ -213,7 +228,6 @@
     function showAllCards() {
       isShowingCards = true;
       renderCards();
-      // Vis kortene i 5 sekunder, deretter gjem automatisk
       if (revealTimer) { clearTimeout(revealTimer); revealTimer = null; }
       revealTimer = setTimeout(hideAllCards, 5000);
     }
@@ -227,45 +241,66 @@
     function renderCards() {
       const container = document.getElementById('my-cards');
       if (!myCardsData || myCardsData.length === 0) {
-        container.innerHTML = '<span style="color:#aaa;">Ingen kort utdelt ennå</span>';
+        container.innerHTML = '<span style="color:#aaa;">Ingen kort utdelt enn\u00E5</span>';
         return;
       }
-
       container.innerHTML = myCardsData.map((cardCode) => {
         if (!isShowingCards) {
-          return `
-            <div class="card hidden-card">
-              <span class="eye-icon">👁️</span>
-              <span style="font-size: 0.7rem; margin-top: 4px; opacity: 0.8;">VIS</span>
-            </div>
-          `;
+          return '<div class="card hidden-card"><span class="eye-icon">\uD83D\uDC41\uFE0F</span><span style="font-size:0.7rem;margin-top:4px;opacity:0.8;">VIS</span></div>';
         }
-
         let value = cardCode.slice(0, -1).toUpperCase();
         if (value === 'T') value = '10';
         const suitChar = cardCode.slice(-1).toLowerCase();
-
         const suits = {
-          'h': { symbol: '♥', color: 'red' },
-          'd': { symbol: '♦', color: 'red' },
-          'c': { symbol: '♣', color: 'black' },
-          's': { symbol: '♠', color: 'black' }
+          'h': { symbol: '\u2665', color: 'red' },
+          'd': { symbol: '\u2666', color: 'red' },
+          'c': { symbol: '\u2663', color: 'black' },
+          's': { symbol: '\u2660', color: 'black' }
         };
-
         const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
-
-        return `
-          <div class="card ${suit.color}">
-            <span class="card-val">${value}</span>
-            <span class="card-suit">${suit.symbol}</span>
-          </div>
-        `;
+        return '<div class="card ' + suit.color + '"><span class="card-val">' + value + '</span><span class="card-suit">' + suit.symbol + '</span></div>';
       }).join('');
     }
 
-    socket.on('player_state', (state) => {
-      document.getElementById('phase-label').innerText = state.phase;
+    // --- Socket event handlers ---
 
+    socket.on('connect', () => {
+      console.log('[Mobile] Socket connected:', socket.id);
+      setConnectionStatus('\u2705 Tilkoblet', '#4caf50');
+      if (savedUuid && !isJoined) {
+        console.log('[Mobile] Attempting rejoin with UUID:', savedUuid);
+        socket.emit('rejoin_game', { uuid: savedUuid });
+        startJoinTimeout();
+      }
+    });
+
+    socket.on('disconnect', (reason) => {
+      console.log('[Mobile] Socket disconnected:', reason);
+      if (isJoined) {
+        setConnectionStatus('\u274C Frakoblet \u2013 Kobler p\u00E5 nytt...', '#f44336');
+      }
+    });
+
+    socket.on('joined', (data) => {
+      console.log('[Mobile] Joined confirmed:', data);
+      if (data && data.uuid) {
+        localStorage.setItem('poker_uuid', data.uuid);
+        if (data.name) localStorage.setItem('poker_name', data.name);
+      }
+      isJoined = true;
+      clearJoinTimeout();
+      setConnectionStatus('\u2705 Tilkoblet', '#4caf50');
+      switchToGame();
+    });
+
+    socket.on('player_state', (state) => {
+      if (!isJoined) {
+        isJoined = true;
+        clearJoinTimeout();
+        switchToGame();
+        setConnectionStatus('\u2705 Tilkoblet', '#4caf50');
+      }
+      document.getElementById('phase-label').innerText = state.phase;
       const roleBadge = document.getElementById('role-label');
       if (state.role) {
         roleBadge.innerText = state.role;
@@ -273,10 +308,8 @@
       } else {
         roleBadge.style.display = 'none';
       }
-
       myCardsData = state.cards || [];
       renderCards();
-
       const foldBtn = document.getElementById('btn-fold');
       if (state.folded) {
         foldBtn.disabled = true;
@@ -286,6 +319,14 @@
         foldBtn.innerText = 'Fold (Kast)';
       }
     });
-  </script>
+
+    // Restore name if saved
+    if (savedName) {
+      const input = document.getElementById('player-name');
+      if (input && !input.value) input.value = savedName;
+    }
+
+
+    </script>
 </body>
 </html>
