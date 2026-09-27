@@ -129,19 +129,29 @@ function translateHandDescription(descr) {
   return text;
 }
 
-function getHandRankValue(descr) {
-  if (!descr) return 1;
-  const d = String(descr).toLowerCase();
-  if (d.includes('royal')) return 10;
-  if (d.includes('straight flush')) return 9;
-  if (d.includes('fire like') || d.includes('four of a kind')) return 8;
-  if (d.includes('fullt hus') || d.includes('full house')) return 7;
-  if (d.includes('flush')) return 6;
-  if (d.includes('straight')) return 5;
-  if (d.includes('tre like') || d.includes('three of a kind')) return 4;
-  if (d.includes('to par') || d.includes('two pair')) return 3;
-  if (d.includes('ett par') || d.includes('par') || d.includes('pair')) return 2;
-  return 1;
+function getCardNumericValue(v) {
+  if (typeof v === 'number') return v;
+  const s = String(v).toUpperCase();
+  if (s === 'A') return 14;
+  if (s === 'K') return 13;
+  if (s === 'Q') return 12;
+  if (s === 'J') return 11;
+  if (s === 'T' || s === '10') return 10;
+  return parseInt(s, 10) || 2;
+}
+
+function calculateHandScore(solved) {
+  if (!solved) return 1000;
+  const baseRank = solved.rank || 1; 
+  let cardValues = [];
+  if (solved.cards && Array.isArray(solved.cards)) {
+    cardValues = solved.cards.map(c => getCardNumericValue(c.value));
+  }
+  let score = baseRank * 10000000;
+  for (let i = 0; i < cardValues.length && i < 5; i++) {
+    score += cardValues[i] * Math.pow(10, (4 - i) * 2);
+  }
+  return score;
 }
 
 function evaluatePlayerHand(playerCards, boardCards, gameMode) {
@@ -245,11 +255,10 @@ async function ensureTables() {
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`);
 
-  // Sikrer at hand_rank kolonnen finnes selv om tabellen fra før manglet den
   try {
     await db.execute(`ALTER TABLE winning_hands ADD COLUMN hand_rank INTEGER DEFAULT 0`);
   } catch (e) {
-    // Kolonnen finnes allerede, ignoreres trygt
+    // Kolonnen finnes allerede
   }
 }
 
@@ -277,10 +286,9 @@ async function persistHandResult() {
   }
 
   const rawDescr = winnerInfo.descr || 'Ukjent hånd';
-  const rankVal = getHandRankValue(rawDescr);
+  const rankVal = winnerInfo.rankVal !== undefined ? winnerInfo.rankVal : 0;
   const nowIso = new Date().toISOString();
 
-  // 1. Sørg for gyldig session_id
   if (!currentSessionId) {
     try {
       const ins = await db.execute({
@@ -294,7 +302,6 @@ async function persistHandResult() {
     }
   }
 
-  // 2. Finn vinnere direkte fra players-objektet
   const activePlayersList = Object.values(players);
   const winners = activePlayersList.filter(p => 
     winnerInfo.winnerName && winnerInfo.winnerName.includes(p.name)
@@ -308,7 +315,6 @@ async function persistHandResult() {
     ? winners.map(w => w.uuid).join(', ') 
     : 'ukjent-uuid';
 
-  // 3. Oppdater player_stats
   for (const p of activePlayersList) {
     if (!p.uuid) continue;
     const isWinner = winners.some(w => w.uuid === p.uuid);
@@ -322,7 +328,6 @@ async function persistHandResult() {
     }
   }
 
-  // 4. Skriv til winning_hands
   try {
     const cleanBoard = Array.isArray(board) ? board.map(c => String(c)) : [];
     const cleanWinningCards = Array.isArray(winnerInfo.rawCards) 
@@ -356,7 +361,6 @@ async function persistHandResult() {
     console.log('[DB SUCCESS] Skrevet til winning_hands! Rader satt inn:', res.rowsAffected);
   } catch (err) {
     console.error('[DB CRITICAL ERROR] Feil under skriving til winning_hands:', err.message);
-    console.error('[DB ERROR DETAILS]:', err);
   }
 }
 
@@ -515,7 +519,7 @@ io.on('connection', (socket) => {
         descr: 'Alle andre kastet seg',
         foldedWin: true,
         rawCards: [],
-        rank: 0
+        rankVal: 0
       };
       await persistHandResult();
       updateAll();
@@ -553,12 +557,14 @@ io.on('connection', (socket) => {
       }
 
       const rawDescr = winners[0] ? winners[0].solved.descr : 'Ukjent hånd';
+      const exactRankVal = winners[0] ? calculateHandScore(winners[0].solved) : 0;
 
       gameState.winnerInfo = {
         winnerName: winnerText,
         descr: translateHandDescription(rawDescr),
         foldedWin: false,
-        rawCards: winners[0] ? winners[0].solved.cards : []
+        rawCards: winners[0] ? winners[0].solved.cards : [],
+        rankVal: exactRankVal
       };
 
       await persistHandResult();
@@ -578,7 +584,7 @@ io.on('connection', (socket) => {
           descr: 'Alle andre kastet seg',
           foldedWin: true,
           rawCards: [],
-          rank: 0
+          rankVal: 0
         };
         await persistHandResult();
       }
