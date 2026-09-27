@@ -18,7 +18,6 @@ app.use(express.json());
 // API: Statistikk, Topp 10 vinnerhender og DB-nullstilling
 // ============================================================
 
-// Hent spillerstatistikk (gruppert på spillernavn for å unngå duplikater)
 app.get('/api/stats', async (req, res) => {
   if (!db) {
     return res.status(503).json({ error: 'Database ikke tilkoblet.' });
@@ -40,7 +39,6 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
-// Hent Top 10 beste vinnerhender
 app.get('/api/winning-hands', async (req, res) => {
   if (!db) {
     return res.status(503).json({ error: 'Database ikke tilkoblet.' });
@@ -49,7 +47,6 @@ app.get('/api/winning-hands', async (req, res) => {
     const result = await db.execute(`
       SELECT player_name, hand_description, winning_cards, hand_rank, created_at 
       FROM winning_hands 
-      WHERE hand_description IS NOT NULL AND hand_description != ''
       ORDER BY hand_rank DESC, id DESC 
       LIMIT 10
     `);
@@ -60,7 +57,6 @@ app.get('/api/winning-hands', async (req, res) => {
   }
 });
 
-// Midlertidig API for å tømme databasen for testdata
 app.post('/api/reset-db', async (req, res) => {
   if (!db) {
     return res.status(503).json({ error: 'Database ikke tilkoblet.' });
@@ -280,10 +276,8 @@ function isMonsterHand(descr) {
          d.includes('royal');
 }
 
-function persistPreviousHand() {
+function persistHandResult() {
   const { winnerInfo, board, gameMode } = gameState;
-  
-  // Sjekker kun at det faktisk finnes en winnerInfo før lagring
   if (!winnerInfo) return;
 
   if (!winnerInfo.foldedWin && isMonsterHand(winnerInfo.descr) &&
@@ -299,7 +293,7 @@ function persistPreviousHand() {
 
   const inHand = Object.values(players).filter(p => !p.folded);
   const winnerNames = parseWinnerNames(winnerInfo);
-  const description = winnerInfo.descr || '';
+  const description = winnerInfo.descr || 'Kastet seg';
   const rankVal = getHandRankValue(description, winnerInfo.rank);
   const nowIso = new Date().toISOString();
   
@@ -324,7 +318,8 @@ function persistPreviousHand() {
       await db.execute("UPDATE poker_sessions SET ended_at = ? WHERE id = ?", [nowIso, sessionId]);
     }
 
-    for (const p of inHand) {
+    // Oppdater spillerstatistikk
+    for (const p of Object.values(players)) {
       const isWinner = winnerNames.includes(p.name);
       await db.execute(
         "UPDATE player_stats SET hands_played = hands_played + 1, hands_won = hands_won + ? WHERE uuid = ?",
@@ -332,14 +327,15 @@ function persistPreviousHand() {
       );
     }
 
-    const winnerPlayer = inHand.find(p => winnerNames.includes(p.name));
+    // Lagre vinnerhånd (også om det var ett par/høyt kort osv)
+    const winnerPlayer = Object.values(players).find(p => winnerNames.includes(p.name));
     await db.execute(
       `INSERT INTO winning_hands (session_id, player_uuid, player_name, hand_description, winning_cards, hand_rank, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [sessionId, winnerPlayer ? winnerPlayer.uuid : null, winnerNames.join(' & '), description, winningCards, rankVal, nowIso]
     );
-    console.log('[DB] Håndresultat lagret i winning_hands for:', winnerNames.join(' & '));
-  })().catch(err => console.error('[DB] Kunne ikke lagre håndresultat:', err.message));
+    console.log('[DB SUCCESS] Håndresultat lagret i winning_hands for:', winnerNames.join(' & '));
+  })().catch(err => console.error('[DB ERROR] Kunne ikke lagre håndresultat:', err.message));
 }
 
 function randomizePlayerSeats() {
@@ -361,8 +357,6 @@ function randomizePlayerSeats() {
 function startNewHandLogic() {
   const playerList = Object.values(players);
   if (playerList.length === 0 || !gameState.gameMode) return;
-
-  persistPreviousHand();
 
   gameState.deck = createDeck();
   gameState.board = [];
@@ -500,6 +494,7 @@ io.on('connection', (socket) => {
         foldedWin: true,
         rank: 0
       };
+      persistHandResult(); // Lagrer umiddelbart ved vinn via fold!
       updateAll();
       return;
     }
@@ -543,6 +538,8 @@ io.on('connection', (socket) => {
         rank: winners[0] ? winners[0].solved.rank : 0,
         rawCards: winners[0] ? winners[0].solved.cards : []
       };
+
+      persistHandResult(); // Lagrer umiddelbart ved SHOWDOWN!
     }
     updateAll();
   });
@@ -560,6 +557,7 @@ io.on('connection', (socket) => {
           foldedWin: true,
           rank: 0
         };
+        persistHandResult(); // Lagrer umiddelbart ved fold!
       }
       updateAll();
     }
