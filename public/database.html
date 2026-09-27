@@ -55,14 +55,25 @@
       cursor: pointer;
       border-radius: 4px;
       margin-bottom: 20px;
+      margin-right: 10px;
     }
     .btn:hover { background: #66bb6a; }
+    .reset-btn {
+      background-color: #d32f2f;
+      color: white;
+    }
+    .reset-btn:hover {
+      background-color: #b71c1c;
+    }
   </style>
 </head>
 <body>
 
   <h1>🔍 Turso Database Inspector</h1>
-  <button class="btn" onclick="fetchData()">🔄 Oppdater nå</button>
+  <div>
+    <button class="btn" onclick="fetchData()">🔄 Oppdater nå</button>
+    <button class="btn reset-btn" onclick="resetDb()">⚠️ Tøm databasen for testdata</button>
+  </div>
 
   <h2>1. Tabell: <code>winning_hands</code> <span id="count-hands" class="badge">0 rader</span></h2>
   <div id="container-hands">Laster data...</div>
@@ -130,6 +141,21 @@
       } catch (err) {
         console.error('Feil ved henting av DB-data:', err);
         alert('Kunne ikke hente database-data: ' + err.message);
+      }
+    }
+
+    async function resetDb() {
+      if (confirm('Er du sikker på at du vil slette all historikk og nullstille databasen?')) {
+        try {
+          const res = await fetch('/api/reset-db', { method: 'POST' });
+          if (res.ok) {
+            fetchData();
+          } else {
+            alert('Kunne ikke nullstille databasen.');
+          }
+        } catch (err) {
+          console.error('Feil ved nullstilling:', err);
+        }
       }
     }
 

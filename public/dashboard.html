@@ -54,20 +54,6 @@
       color: #4caf50;
       font-weight: bold;
     }
-    .reset-btn {
-      margin-top: 20px;
-      background-color: #d32f2f;
-      color: white;
-      border: none;
-      padding: 10px 15px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-weight: bold;
-      float: right;
-    }
-    .reset-btn:hover {
-      background-color: #b71c1c;
-    }
   </style>
 </head>
 <body>
@@ -112,8 +98,6 @@
     </div>
   </div>
 
-  <button class="reset-btn" onclick="resetDb()">⚠️ Tøm databasen for testdata</button>
-
   <script>
     async function loadDashboardData() {
       try {
@@ -147,7 +131,6 @@
 
         if (Array.isArray(hands) && hands.length > 0) {
           topBody.innerHTML = hands.map((h, index) => {
-            // Håndterer ulike feltnavn uansett hvordan serveren sender dem
             const playerName = h.player_name || h.playerName || h.name || 'Ukjent';
             const handDescr = h.hand_description || h.handDescr || h.descr || 'Vinnerhånd';
             const createdAt = h.created_at || h.createdAt;
@@ -168,13 +151,6 @@
 
       } catch (err) {
         console.error('Feil ved oppdatering av dashboard:', err);
-      }
-    }
-
-    async function resetDb() {
-      if (confirm('Er du sikker på at du vil slette all historikk og nullstille databasen?')) {
-        await fetch('/api/reset-db', { method: 'POST' });
-        loadDashboardData();
       }
     }
 
