@@ -6,194 +6,164 @@
   <title>Poker Dashboard</title>
   <style>
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background-color: #121212;
-      color: #e0e0e0;
+      color: #ffffff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       margin: 0;
-      padding: 24px;
-    }
-    .container {
-      max-width: 1200px;
-      margin: 0 auto;
+      padding: 30px;
     }
     h1 {
-      font-size: 1.8rem;
-      margin-bottom: 20px;
-      color: #ffffff;
+      margin-bottom: 30px;
+      font-size: 28px;
     }
     .grid {
       display: grid;
-      grid-template-columns: 1fr 1.2fr;
+      grid-template-columns: 1fr 1fr;
       gap: 20px;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
     }
     .card {
       background: #1e1e1e;
       border-radius: 8px;
       padding: 20px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
     }
-    h2 {
+    .card h2 {
       margin-top: 0;
-      font-size: 1.2rem;
-      color: #4caf50;
-      border-bottom: 1px solid #333;
-      padding-bottom: 10px;
+      font-size: 18px;
     }
+    .green-title { color: #4caf50; }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 10px;
+      margin-top: 15px;
     }
     th, td {
-      padding: 10px 8px;
       text-align: left;
-      border-bottom: 1px solid #2a2a2a;
-      font-size: 0.95rem;
+      padding: 10px;
+      border-bottom: 1px solid #333;
+      font-size: 14px;
     }
     th {
-      color: #888;
+      color: #aaa;
       font-weight: 600;
     }
-    .rank-badge {
-      display: inline-block;
-      width: 24px;
-      height: 24px;
-      line-height: 24px;
-      text-align: center;
-      background-color: #333;
-      color: #fff;
-      border-radius: 50%;
-      font-size: 0.8rem;
+    .percent {
+      color: #4caf50;
       font-weight: bold;
     }
-    .top3 {
-      background-color: #ffb300;
-      color: #000;
-    }
-    .win-rate {
-      color: #81c784;
-      font-weight: bold;
-    }
-    .time-col {
-      color: #aaa;
-      font-size: 0.85rem;
-    }
-    .actions-bar {
-      margin-top: 30px;
-      padding-top: 15px;
-      border-top: 1px solid #333;
-      display: flex;
-      justify-content: flex-end;
-    }
-    .btn-reset {
+    .reset-btn {
+      margin-top: 20px;
       background-color: #d32f2f;
       color: white;
       border: none;
-      padding: 10px 16px;
-      font-size: 0.9rem;
-      font-weight: bold;
-      border-radius: 6px;
+      padding: 10px 15px;
+      border-radius: 5px;
       cursor: pointer;
-      transition: background-color 0.2s ease;
+      font-weight: bold;
+      float: right;
     }
-    .btn-reset:hover {
+    .reset-btn:hover {
       background-color: #b71c1c;
     }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Poker Dashboard</h1>
-    
-    <div class="grid">
-      <!-- Spillstatistikk -->
-      <div class="card">
-        <h2>Spillerstatistikk</h2>
-        <table id="player-stats-table">
-          <thead>
-            <tr>
-              <th>Spiller</th>
-              <th>Hender Spilt</th>
-              <th>Hender Vunnet</th>
-              <th>Seiersprosent</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
 
-      <!-- Top 10 beste vinnerhender -->
-      <div class="card">
-        <h2>Top 10 Beste Vinnerhender (Spillekveld)</h2>
-        <table id="winning-hands-table">
-          <thead>
-            <tr>
-              <th>#</th>
-              <th>Spiller</th>
-              <th>Vinnerhånd</th>
-              <th>Tidspunkt</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
+  <h1>Poker Dashboard</h1>
+
+  <div class="grid">
+    <!-- Spillerstatistikk -->
+    <div class="card">
+      <h2 class="green-title">Spillerstatistikk</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Spiller</th>
+            <th>Hender Spilt</th>
+            <th>Hender Vunnet</th>
+            <th>Seiersprosent</th>
+          </tr>
+        </thead>
+        <tbody id="stats-body">
+          <tr><td colspan="4">Laster statistikk...</td></tr>
+        </tbody>
+      </table>
     </div>
 
-    <!-- Handlingsbar med knapp for å tømme databasen -->
-    <div class="actions-bar">
-      <button class="btn-reset" onclick="resetDatabase()">⚠️ Tøm databasen for testdata</button>
+    <!-- Top 10 Beste Vinnerhender -->
+    <div class="card">
+      <h2 class="green-title">Top 10 Beste Vinnerhender (Spillekveld)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Spiller</th>
+            <th>Vinnerhånd</th>
+            <th>Tidspunkt</th>
+          </tr>
+        </thead>
+        <tbody id="top-body">
+          <tr><td colspan="4">Laster topphender...</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
+
+  <button class="reset-btn" onclick="resetDb()">⚠️ Tøm databasen for testdata</button>
 
   <script>
     async function loadDashboardData() {
       try {
-        // 1. Spillerstatistikk fra /api/stats
-        const statsRes = await fetch('/api/stats');
-        if (statsRes.ok) {
-          const stats = await statsRes.json();
-          const statsBody = document.querySelector('#player-stats-table tbody');
-          statsBody.innerHTML = '';
-          
-          stats.forEach(p => {
-            const pct = p.hands_played > 0 
-              ? ((p.hands_won / p.hands_played) * 100).toFixed(1) + '%' 
-              : '0%';
-
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td><strong>${p.name}</strong></td>
-              <td>${p.hands_played}</td>
-              <td>${p.hands_won}</td>
-              <td><span class="win-rate">${pct}</span></td>
+        // 1. Hent Spillerstatistikk
+        const resStats = await fetch('/api/stats');
+        const stats = await resStats.json();
+        const statsBody = document.getElementById('stats-body');
+        
+        if (Array.isArray(stats) && stats.length > 0) {
+          statsBody.innerHTML = stats.map(s => {
+            const played = s.hands_played || s.handsPlayed || 0;
+            const won = s.hands_won || s.handsWon || 0;
+            const pct = played > 0 ? ((won / played) * 100).toFixed(1) : '0.0';
+            return `
+              <tr>
+                <td><strong>${s.name || s.player_name || 'Ukjent'}</strong></td>
+                <td>${played}</td>
+                <td>${won}</td>
+                <td class="percent">${pct}%</td>
+              </tr>
             `;
-            statsBody.appendChild(row);
-          });
+          }).join('');
+        } else {
+          statsBody.innerHTML = '<tr><td colspan="4">Ingen data ennå.</td></tr>';
         }
 
-        // 2. Top 10 Vinnerhender fra /api/winning-hands
-        const handsRes = await fetch('/api/winning-hands');
-        if (handsRes.ok) {
-          const hands = await handsRes.json();
-          const handsBody = document.querySelector('#winning-hands-table tbody');
-          handsBody.innerHTML = '';
+        // 2. Hent Top 10 Vinnerhender
+        const resHands = await fetch('/api/winning-hands');
+        const hands = await resHands.json();
+        const topBody = document.getElementById('top-body');
 
-          hands.forEach((h, index) => {
-            const timeStr = h.created_at 
-              ? new Date(h.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-              : '-';
+        if (Array.isArray(hands) && hands.length > 0) {
+          topBody.innerHTML = hands.map((h, index) => {
+            // Håndterer ulike feltnavn uansett hvordan serveren sender dem
+            const playerName = h.player_name || h.playerName || h.name || 'Ukjent';
+            const handDescr = h.hand_description || h.handDescr || h.descr || 'Vinnerhånd';
+            const createdAt = h.created_at || h.createdAt;
+            const timeStr = createdAt ? new Date(createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-';
 
-            const badgeClass = index < 3 ? 'rank-badge top3' : 'rank-badge';
-
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td><span class="${badgeClass}">${index + 1}</span></td>
-              <td><strong>${h.player_name}</strong></td>
-              <td>${h.hand_description}</td>
-              <td class="time-col">${timeStr}</td>
+            return `
+              <tr>
+                <td>${index + 1}</td>
+                <td><strong>${playerName}</strong></td>
+                <td>${handDescr}</td>
+                <td>${timeStr}</td>
+              </tr>
             `;
-            handsBody.appendChild(row);
-          });
+          }).join('');
+        } else {
+          topBody.innerHTML = '<tr><td colspan="4">Ingen vinnerhender registrert til showdown ennå.</td></tr>';
         }
 
       } catch (err) {
@@ -201,25 +171,16 @@
       }
     }
 
-    async function resetDatabase() {
-      const confirmed = confirm("Er du sikker på at du vil tømme databasen for all testdata? Dette kan ikke angres.");
-      if (!confirmed) return;
-
-      try {
-        const res = await fetch('/api/reset-db', { method: 'POST' });
-        if (res.ok) {
-          alert("Databasen er nå tømt!");
-          loadDashboardData();
-        } else {
-          alert("Feil ved tømming av database.");
-        }
-      } catch (err) {
-        alert("Kunne ikke kontakte serveren for å tømme databasen.");
+    async function resetDb() {
+      if (confirm('Er du sikker på at du vil slette all historikk og nullstille databasen?')) {
+        await fetch('/api/reset-db', { method: 'POST' });
+        loadDashboardData();
       }
     }
 
+    // Oppdaterer data med en gang, og deretter hvert 3. sekund
     loadDashboardData();
-    setInterval(loadDashboardData, 4000);
+    setInterval(loadDashboardData, 3000);
   </script>
 </body>
 </html>
