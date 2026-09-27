@@ -123,9 +123,9 @@ function translateHandDescription(descr) {
 }
 
 function getHandRankValue(descr, rankNum) {
-  if (rankNum) return rankNum;
-  if (!descr) return 0;
-  const d = descr.toLowerCase();
+  if (typeof rankNum === 'number' && rankNum > 0) return rankNum;
+  if (!descr) return 1;
+  const d = String(descr).toLowerCase();
   if (d.includes('royal')) return 10;
   if (d.includes('straight flush')) return 9;
   if (d.includes('fire like')) return 8;
@@ -134,9 +134,9 @@ function getHandRankValue(descr, rankNum) {
   if (d.includes('straight')) return 5;
   if (d.includes('tre like')) return 4;
   if (d.includes('to par')) return 3;
-  if (d.includes('ett par')) return 2;
+  if (d.includes('ett par') || d.includes('par')) return 2;
   if (d.includes('høyt kort')) return 1;
-  return 0;
+  return 1;
 }
 
 function evaluatePlayerHand(playerCards, boardCards, gameMode) {
@@ -297,31 +297,26 @@ function persistHandResult() {
   const inHand = Object.values(players).filter(p => !p.folded);
   const winnerNames = parseWinnerNames(winnerInfo);
   const description = winnerInfo.descr || 'Ukjent hånd';
-  const rankVal = Number(getHandRankValue(description, winnerInfo.rank)) || 0;
+  const rankVal = getHandRankValue(description, winnerInfo.rank);
   const nowIso = new Date().toISOString();
 
   (async () => {
     try {
-      let sessionId = currentSessionId;
-      if (!sessionId) {
-        await db.execute({
-          sql: "UPDATE poker_sessions SET ended_at = ? WHERE ended_at IS NULL",
-          args: [nowIso]
-        });
-        const ins = await db.execute({
-          sql: "INSERT INTO poker_sessions (started_at, game_mode) VALUES (?, ?)",
-          args: [nowIso, gameMode || 'UNKNOWN']
-        });
-        sessionId = Number(ins.lastInsertRowid);
-        currentSessionId = sessionId;
-      } else {
-        await db.execute({
-          sql: "UPDATE poker_sessions SET ended_at = ? WHERE id = ?",
-          args: [nowIso, sessionId]
-        });
+      // Sørg for at vi har en fungerende poker_session ID
+      if (!currentSessionId) {
+        try {
+          const ins = await db.execute({
+            sql: "INSERT INTO poker_sessions (started_at, game_mode) VALUES (?, ?)",
+            args: [nowIso, gameMode || 'OMAHA']
+          });
+          currentSessionId = Number(ins.lastInsertRowid) || 1;
+        } catch (sErr) {
+          console.warn('[DB] Kunne ikke opprette sesjon, bruker fallback ID 1:', sErr.message);
+          currentSessionId = 1;
+        }
       }
 
-      // 1. Oppdater generell spillerstatistikk for alle som spilte denne hånden
+      // 1. Oppdater generell spillerstatistikk
       for (const p of Object.values(players)) {
         if (!p.uuid) continue;
         const isWinner = winnerNames.includes(p.name);
@@ -331,7 +326,7 @@ function persistHandResult() {
         });
       }
 
-      // 2. Lagre i winning_hands (KUN DERSOM HÅNDEN GIKK TIL SHOWDOWN OG IKKE FOLD)
+      // 2. Lagre i winning_hands hvis hånden gikk til showdown
       if (!winnerInfo.foldedWin) {
         const winningCardsStr = JSON.stringify({
           board: board || [],
@@ -347,12 +342,12 @@ function persistHandResult() {
           sql: `INSERT INTO winning_hands (session_id, player_uuid, player_name, hand_description, winning_cards, hand_rank, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)`,
           args: [
-            sessionId || null,
+            currentSessionId,
             String(playerUuid),
             String(playerNameStr),
             String(description),
             String(winningCardsStr),
-            rankVal,
+            Number(rankVal),
             nowIso
           ]
         });
