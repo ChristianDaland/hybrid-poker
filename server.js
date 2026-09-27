@@ -361,6 +361,7 @@ io.on('connection', (socket) => {
 
     player.connected = true;
     player.uuid = uuid;
+    player.id = socket.id; // Viktig: updateAll() sender player_state til p.id
     players[socket.id] = player;
     uuidToPlayerId.set(uuid, socket.id);
 

@@ -180,7 +180,7 @@
     let joinTimeout = null;
     let isJoined = false;
 
-    const savedUuid = localStorage.getItem('poker_uuid');
+    let savedUuid = localStorage.getItem('poker_uuid');
     const savedName = localStorage.getItem('poker_name');
 
     function setConnectionStatus(text, color) {
@@ -267,7 +267,7 @@
     socket.on('connect', () => {
       console.log('[Mobile] Socket connected:', socket.id);
       setConnectionStatus('\u2705 Tilkoblet', '#4caf50');
-      if (savedUuid && !isJoined) {
+      if (savedUuid) {
         console.log('[Mobile] Attempting rejoin with UUID:', savedUuid);
         socket.emit('rejoin_game', { uuid: savedUuid });
         startJoinTimeout();
@@ -284,6 +284,7 @@
     socket.on('joined', (data) => {
       console.log('[Mobile] Joined confirmed:', data);
       if (data && data.uuid) {
+        savedUuid = data.uuid;
         localStorage.setItem('poker_uuid', data.uuid);
         if (data.name) localStorage.setItem('poker_name', data.name);
       }
@@ -295,14 +296,18 @@
 
     socket.on('rejoin_failed', (data) => {
       console.log('[Mobile] Rejoin failed:', data);
+      const wasInGame = isJoined;
       isJoined = false;
+      savedUuid = null;
       clearJoinTimeout();
       const reason = (data && data.reason) ? data.reason : 'Klarte ikke å gjenoppta spillet.';
       setConnectionStatus('⚠️ ' + reason, '#f44336');
       // Fjern lagret UUID for å unngå at samme feil gjentas
       localStorage.removeItem('poker_uuid');
       switchToLogin();
-      alert(reason);
+      if (wasInGame) {
+        alert(reason);
+      }
     });
 
     socket.on('player_state', (state) => {
