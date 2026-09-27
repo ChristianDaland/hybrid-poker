@@ -24,11 +24,16 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 // --- DATABASE OPPSETT ---
-const db = new sqlite3.Database(path.join(__dirname, 'poker.db'), (err) => {
+// Bruker /tmp på Render/produksjon for å unngå "Read-only file system"-feil
+const dbPath = process.env.RENDER || process.env.NODE_ENV === 'production'
+  ? '/tmp/poker.db'
+  : path.join(__dirname, 'poker.db');
+
+const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Feil ved åpning av database:', err.message);
   } else {
-    console.log('Tilkoblet SQLite-database.');
+    console.log(`Tilkoblet SQLite-database på: ${dbPath}`);
   }
 });
 
@@ -142,7 +147,6 @@ function evaluatePlayerHand(playerCards, boardCards, gameMode) {
     const allCards = [...playerCards, ...boardCards];
     return Hand.solve(allCards);
   } else if (gameMode === 'OMAHA') {
-    // I Omaha MÅ man bruke eksakt 2 fra hånden og eksakt 3 fra bordet
     let bestHand = null;
 
     // Generer alle kombinasjoner av 2 kort fra 4 på hånden
@@ -186,10 +190,8 @@ function startNewHandLogic() {
   gameState.winnerInfo = null;
   gameState.phase = 'PREFLOP';
 
-  // Sorter spillere etter sete
   activePlayers.sort((a, b) => a.seat - b.seat);
 
-  // Dealer / Blinds rotasjon
   gameState.dealerIndex = (gameState.dealerIndex + 1) % activePlayers.length;
   gameState.smallBlindIndex = (gameState.dealerIndex + 1) % activePlayers.length;
   gameState.bigBlindIndex = (gameState.dealerIndex + 2) % activePlayers.length;
@@ -203,7 +205,6 @@ function startNewHandLogic() {
       p.cards.push(gameState.deck.pop());
     }
 
-    // Sett roller
     if (idx === gameState.dealerIndex) p.role = 'DEALER';
     else if (idx === gameState.smallBlindIndex) p.role = 'SB';
     else if (idx === gameState.bigBlindIndex) p.role = 'BB';
