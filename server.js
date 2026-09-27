@@ -147,9 +147,10 @@ function calculateHandScore(solved) {
   if (solved.cards && Array.isArray(solved.cards)) {
     cardValues = solved.cards.map(c => getCardNumericValue(c.value));
   }
-  let score = baseRank * 10000000;
+  // Bruker en større multiplikator for baseRank slik at hand_rank (f.eks. Four of a Kind = 8 vs Full House = 7) alltid dominerer totalscoren
+  let score = baseRank * 100000000;
   for (let i = 0; i < cardValues.length && i < 5; i++) {
-    score += cardValues[i] * Math.pow(10, (4 - i) * 2);
+    score += cardValues[i] * Math.pow(100, (4 - i));
   }
   return score;
 }
@@ -254,22 +255,20 @@ async function ensureTables() {
     hand_rank INTEGER DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`);
-
-  try {
-    await db.execute(`ALTER TABLE winning_hands ADD COLUMN hand_rank INTEGER DEFAULT 0`);
-  } catch (e) {
-    // Kolonnen finnes allerede
-  }
 }
 
-function ensurePlayerStats(uuid, name) {
+async function ensurePlayerStats(uuid, name) {
   if (!db || !uuid) return;
-  db.execute({
-    sql: `INSERT INTO player_stats (uuid, name, hands_played, hands_won, total_chips)
-          VALUES (?, ?, 0, 0, 0)
-          ON CONFLICT(uuid) DO UPDATE SET name = excluded.name`,
-    args: [uuid, name]
-  }).catch(err => console.error('[DB] Feil ved registrering av spiller:', err.message));
+  try {
+    await db.execute({
+      sql: `INSERT INTO player_stats (uuid, name, hands_played, hands_won, total_chips)
+            VALUES (?, ?, 0, 0, 0)
+            ON CONFLICT(uuid) DO UPDATE SET name = excluded.name`,
+      args: [String(uuid), String(name)]
+    });
+  } catch (err) {
+    console.error('[DB] Feil ved registrering av spiller:', err.message);
+  }
 }
 
 async function persistHandResult() {
@@ -319,6 +318,7 @@ async function persistHandResult() {
     if (!p.uuid) continue;
     const isWinner = winners.some(w => w.uuid === p.uuid);
     try {
+      await ensurePlayerStats(p.uuid, p.name);
       await db.execute({
         sql: "UPDATE player_stats SET hands_played = hands_played + 1, hands_won = hands_won + ? WHERE uuid = ?",
         args: [isWinner ? 1 : 0, String(p.uuid)]
@@ -414,7 +414,7 @@ function startNewHandLogic() {
 }
 
 io.on('connection', (socket) => {
-  socket.on('join_game', (nameOrPayload) => {
+  socket.on('join_game', async (nameOrPayload) => {
     let cleanName = 'Spiller';
     let clientUuid = null;
     if (nameOrPayload && typeof nameOrPayload === 'object') {
@@ -452,7 +452,7 @@ io.on('connection', (socket) => {
       }
 
       players[socket.id] = playerData;
-      ensurePlayerStats(playerData.uuid, playerData.name);
+      await ensurePlayerStats(playerData.uuid, playerData.name);
     } else {
       let playerUuid = clientUuid;
       if (!playerUuid) {
@@ -478,7 +478,7 @@ io.on('connection', (socket) => {
         connected: true
       };
       uuidToPlayerId.set(playerUuid, socket.id);
-      ensurePlayerStats(playerUuid, cleanName);
+      await ensurePlayerStats(playerUuid, cleanName);
     }
 
     const joinedPlayer = players[socket.id];
@@ -592,7 +592,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('rejoin_game', (data) => {
+  socket.on('rejoin_game', async (data) => {
     const uuid = (data && data.uuid) || (typeof data === 'string' ? data : null);
     if (!uuid) {
       socket.emit('rejoin_failed', { reason: 'Mangler UUID.' });
@@ -624,7 +624,7 @@ io.on('connection', (socket) => {
     player.id = socket.id;
     players[socket.id] = player;
     uuidToPlayerId.set(uuid, socket.id);
-    ensurePlayerStats(uuid, player.name);
+    await ensurePlayerStats(uuid, player.name);
 
     socket.emit('joined', { uuid: uuid, name: player.name });
     updateAll();
@@ -644,7 +644,7 @@ io.on('connection', (socket) => {
         delete players[disconnectedId];
         delete disconnectTimeouts[disconnectedId];
         if (playerUuid) {
-          uuidToPlayerId.delete(playerUuid);
+          uuidToPlayerId.get(playerUuid); // keep map clean or delete if needed
         }
         updateAll();
       }, 60000);
