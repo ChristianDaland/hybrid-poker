@@ -122,8 +122,7 @@ function translateHandDescription(descr) {
   return text;
 }
 
-function getHandRankValue(descr, rankNum) {
-  if (typeof rankNum === 'number' && rankNum > 0) return rankNum;
+function getHandRankValue(descr) {
   if (!descr) return 1;
   const d = String(descr).toLowerCase();
   if (d.includes('royal')) return 10;
@@ -297,7 +296,7 @@ function persistHandResult() {
   const inHand = Object.values(players).filter(p => !p.folded);
   const winnerNames = parseWinnerNames(winnerInfo);
   const description = winnerInfo.descr || 'Ukjent hånd';
-  const rankVal = getHandRankValue(description, winnerInfo.rank);
+  const rankVal = getHandRankValue(description);
   const nowIso = new Date().toISOString();
 
   (async () => {
@@ -328,9 +327,14 @@ function persistHandResult() {
 
       // 2. Lagre i winning_hands hvis hånden gikk til showdown
       if (!winnerInfo.foldedWin) {
+        // Konverter Pokersolver Card-objekter til rene strenger
+        const safeRawCards = Array.isArray(winnerInfo.rawCards)
+          ? winnerInfo.rawCards.map(c => (c && typeof c.toString === 'function' ? c.toString() : String(c)))
+          : [];
+
         const winningCardsStr = JSON.stringify({
           board: board || [],
-          winningCards: winnerInfo.rawCards || [],
+          winningCards: safeRawCards,
           cards: inHand.map(p => ({ uuid: p.uuid || '', name: p.name || '', cards: p.cards || [] }))
         });
 
@@ -557,7 +561,6 @@ io.on('connection', (socket) => {
         winnerName: winnerText,
         descr: translateHandDescription(rawDescr),
         foldedWin: false,
-        rank: winners[0] ? winners[0].solved.rank : 0,
         rawCards: winners[0] ? winners[0].solved.cards : []
       };
 
