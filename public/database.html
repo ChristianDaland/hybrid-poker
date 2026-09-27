@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Database Inspector - Løland Gård Poker</title>
+  <style>
+    body {
+      background-color: #121212;
+      color: #e0e0e0;
+      font-family: monospace;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 { color: #4caf50; }
+    h2 { color: #81c784; margin-top: 30px; border-bottom: 1px solid #333; padding-bottom: 5px; }
+    .badge {
+      background: #333;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      background: #1e1e1e;
+    }
+    th, td {
+      text-align: left;
+      padding: 8px 12px;
+      border: 1px solid #333;
+      font-size: 12px;
+      vertical-align: top;
+    }
+    th {
+      background-color: #2a2a2a;
+      color: #4caf50;
+    }
+    pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-break: break-all;
+      max-height: 150px;
+      overflow-y: auto;
+      font-size: 11px;
+      color: #ce9178;
+    }
+    .btn {
+      background: #4caf50;
+      color: black;
+      border: none;
+      padding: 8px 16px;
+      font-weight: bold;
+      cursor: pointer;
+      border-radius: 4px;
+      margin-bottom: 20px;
+    }
+    .btn:hover { background: #66bb6a; }
+  </style>
+</head>
+<body>
+
+  <h1>🔍 Turso Database Inspector</h1>
+  <button class="btn" onclick="fetchData()">🔄 Oppdater nå</button>
+
+  <h2>1. Tabell: <code>winning_hands</code> <span id="count-hands" class="badge">0 rader</span></h2>
+  <div id="container-hands">Laster data...</div>
+
+  <h2>2. Tabell: <code>player_stats</code> <span id="count-stats" class="badge">0 rader</span></h2>
+  <div id="container-stats">Laster data...</div>
+
+  <h2>3. Tabell: <code>poker_sessions</code> <span id="count-sessions" class="badge">0 rader</span></h2>
+  <div id="container-sessions">Laster data...</div>
+
+  <script>
+    function renderTable(data) {
+      if (!data || data.length === 0) {
+        return '<p style="color: #888;">Ingen rader funnet i denne tabellen.</p>';
+      }
+
+      const keys = Object.keys(data[0]);
+      let html = '<table><thead><tr>';
+      keys.forEach(k => html += `<th>${k}</th>`);
+      html += '</tr></thead><tbody>';
+
+      data.forEach(row => {
+        html += '<tr>';
+        keys.forEach(k => {
+          let val = row[k];
+          if (typeof val === 'object' && val !== null) {
+            val = `<pre>${JSON.stringify(val, null, 2)}</pre>`;
+          } else if (typeof val === 'string' && (val.startsWith('{') || val.startsWith('['))) {
+            try {
+              const parsed = JSON.parse(val);
+              val = `<pre>${JSON.stringify(parsed, null, 2)}</pre>`;
+            } catch (e) {
+              /* La den være råstreng hvis json-parse feiler */
+            }
+          }
+          html += `<td>${val !== null && val !== undefined ? val : '<i style="color:#666">null</i>'}</td>`;
+        });
+        html += '</tr>';
+      });
+
+      html += '</tbody></table>';
+      return html;
+    }
+
+    async function fetchData() {
+      try {
+        const res = await fetch('/api/debug-db');
+        if (!res.ok) {
+          throw new Error(`Server svarte med status ${res.status}`);
+        }
+        const json = await res.json();
+
+        // 1. Winning Hands
+        document.getElementById('count-hands').innerText = `${json.winning_hands.length} rader`;
+        document.getElementById('container-hands').innerHTML = renderTable(json.winning_hands);
+
+        // 2. Player Stats
+        document.getElementById('count-stats').innerText = `${json.player_stats.length} rader`;
+        document.getElementById('container-stats').innerHTML = renderTable(json.player_stats);
+
+        // 3. Poker Sessions
+        document.getElementById('count-sessions').innerText = `${json.poker_sessions.length} rader`;
+        document.getElementById('container-sessions').innerHTML = renderTable(json.poker_sessions);
+
+      } catch (err) {
+        console.error('Feil ved henting av DB-data:', err);
+        alert('Kunne ikke hente database-data: ' + err.message);
+      }
+    }
+
+    fetchData();
+  </script>
+</body>
+</html>

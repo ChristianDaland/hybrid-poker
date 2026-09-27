@@ -15,7 +15,7 @@ app.use(express.static('public'));
 app.use(express.json());
 
 // ============================================================
-// API: Statistikk, Topp 10 vinnerhender og DB-nullstilling
+// API: Statistikk, Topp 10 vinnerhender, DB-nullstilling og Inspeksjon
 // ============================================================
 
 app.get('/api/stats', async (req, res) => {
@@ -53,6 +53,26 @@ app.get('/api/winning-hands', async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('[DB Error /api/winning-hands]:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/debug-db', async (req, res) => {
+  if (!db) {
+    return res.status(503).json({ error: 'Database ikke tilkoblet.' });
+  }
+  try {
+    const hands = await db.execute("SELECT * FROM winning_hands ORDER BY id DESC");
+    const stats = await db.execute("SELECT * FROM player_stats ORDER BY id DESC");
+    const sessions = await db.execute("SELECT * FROM poker_sessions ORDER BY id DESC");
+
+    res.json({
+      winning_hands: hands.rows,
+      player_stats: stats.rows,
+      poker_sessions: sessions.rows
+    });
+  } catch (err) {
+    console.error('[DB Error /api/debug-db]:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -301,7 +321,6 @@ function persistHandResult() {
 
   (async () => {
     try {
-      // Sørg for at vi har en fungerende poker_session ID
       if (!currentSessionId) {
         try {
           const ins = await db.execute({
@@ -327,7 +346,6 @@ function persistHandResult() {
 
       // 2. Lagre i winning_hands hvis hånden gikk til showdown
       if (!winnerInfo.foldedWin) {
-        // Konverter Pokersolver Card-objekter til rene strenger
         const safeRawCards = Array.isArray(winnerInfo.rawCards)
           ? winnerInfo.rawCards.map(c => (c && typeof c.toString === 'function' ? c.toString() : String(c)))
           : [];
