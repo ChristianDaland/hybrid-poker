@@ -36,14 +36,19 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
+// Henter de 10 beste hendene noensinne og sorterer fra 1. plass (beste) og nedover
 app.get('/api/winning-hands', async (req, res) => {
   if (!db) return res.status(503).json({ error: 'Database ikke tilkoblet.' });
   try {
     const result = await db.execute(`
       SELECT player_name, hand_description, winning_cards, hand_rank, created_at 
-      FROM winning_hands 
-      ORDER BY hand_rank DESC, id DESC 
-      LIMIT 10
+      FROM (
+        SELECT player_name, hand_description, winning_cards, hand_rank, created_at, id
+        FROM winning_hands
+        ORDER BY hand_rank DESC, id DESC
+        LIMIT 10
+      )
+      ORDER BY hand_rank DESC, id DESC
     `);
     res.json(result.rows);
   } catch (err) {
@@ -147,7 +152,6 @@ function calculateHandScore(solved) {
   if (solved.cards && Array.isArray(solved.cards)) {
     cardValues = solved.cards.map(c => getCardNumericValue(c.value));
   }
-  // Bruker en større multiplikator for baseRank slik at hand_rank (f.eks. Four of a Kind = 8 vs Full House = 7) alltid dominerer totalscoren
   let score = baseRank * 100000000;
   for (let i = 0; i < cardValues.length && i < 5; i++) {
     score += cardValues[i] * Math.pow(100, (4 - i));
@@ -644,7 +648,7 @@ io.on('connection', (socket) => {
         delete players[disconnectedId];
         delete disconnectTimeouts[disconnectedId];
         if (playerUuid) {
-          uuidToPlayerId.get(playerUuid); // keep map clean or delete if needed
+          uuidToPlayerId.delete(playerUuid);
         }
         updateAll();
       }, 60000);
