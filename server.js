@@ -134,13 +134,13 @@ function getHandRankValue(descr) {
   const d = String(descr).toLowerCase();
   if (d.includes('royal')) return 10;
   if (d.includes('straight flush')) return 9;
-  if (d.includes('fire like')) return 8;
-  if (d.includes('fullt hus')) return 7;
+  if (d.includes('fire like') || d.includes('four of a kind')) return 8;
+  if (d.includes('fullt hus') || d.includes('full house')) return 7;
   if (d.includes('flush')) return 6;
   if (d.includes('straight')) return 5;
-  if (d.includes('tre like')) return 4;
-  if (d.includes('to par')) return 3;
-  if (d.includes('ett par') || d.includes('par')) return 2;
+  if (d.includes('tre like') || d.includes('three of a kind')) return 4;
+  if (d.includes('to par') || d.includes('two pair')) return 3;
+  if (d.includes('ett par') || d.includes('par') || d.includes('pair')) return 2;
   return 1;
 }
 
@@ -269,8 +269,8 @@ async function persistHandResult() {
     return;
   }
 
-  const description = winnerInfo.descr || 'Ukjent hånd';
-  const rankVal = getHandRankValue(description);
+  const rawDescr = winnerInfo.descr || 'Ukjent hånd';
+  const rankVal = getHandRankValue(rawDescr);
   const nowIso = new Date().toISOString();
 
   // 1. Sørg for gyldig session_id
@@ -287,7 +287,7 @@ async function persistHandResult() {
     }
   }
 
-  // 2. Finn vinnere direkte fra players-objektet basert på teksten
+  // 2. Finn vinnere direkte fra players-objektet
   const activePlayersList = Object.values(players);
   const winners = activePlayersList.filter(p => 
     winnerInfo.winnerName && winnerInfo.winnerName.includes(p.name)
@@ -315,7 +315,7 @@ async function persistHandResult() {
     }
   }
 
-  // 4. Skriv direkte til winning_hands
+  // 4. Skriv til winning_hands
   try {
     const cleanBoard = Array.isArray(board) ? board.map(c => String(c)) : [];
     const cleanWinningCards = Array.isArray(winnerInfo.rawCards) 
@@ -339,7 +339,7 @@ async function persistHandResult() {
         Number(currentSessionId),
         String(winnerUuidStr),
         String(winnerNamesStr),
-        String(description),
+        String(rawDescr),
         jsonPayload,
         Number(rankVal),
         nowIso
