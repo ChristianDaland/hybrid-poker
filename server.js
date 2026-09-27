@@ -1,4 +1,4 @@
-// Laster miljøvariabler fra .env hvis tilgjengelig (kan også settes i systemet)
+// Laster miljøvariabler fra .env hvis tilgjengelig
 try { require('dotenv').config(); } catch (err) { /* dotenv ikke installert – OK */ }
 
 const express = require('express');
@@ -12,16 +12,27 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.static('public'));
+app.use(express.json());
 
 // ============================================================
-// API: Statistikk og Topp 10 vinnerhender for denne spillekvelden
+// API: Statistikk, Topp 10 vinnerhender og DB-nullstilling
 // ============================================================
+
+// Hent spillerstatistikk (gruppert på spillernavn for å unngå duplikater)
 app.get('/api/stats', async (req, res) => {
   if (!db) {
-    return res.status(503).json({ error: 'Database ikke tilkoblet. Set TURSO_DATABASE_URL og TURSO_AUTH_TOKEN.' });
+    return res.status(503).json({ error: 'Database ikke tilkoblet.' });
   }
   try {
-    const result = await db.execute("SELECT name, hands_played, hands_won, total_chips FROM player_stats ORDER BY hands_won DESC, hands_played DESC");
+    const result = await db.execute(`
+      SELECT 
+        name, 
+        SUM(hands_played) as hands_played, 
+        SUM(hands_won) as hands_won 
+      FROM player_stats 
+      GROUP BY LOWER(name)
+      ORDER BY hands_won DESC, hands_played DESC
+    `);
     res.json(result.rows);
   } catch (err) {
     console.error('[DB Error /api/stats]:', err);
@@ -29,23 +40,40 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
+// Hent Top 10 beste vinnerhender
 app.get('/api/winning-hands', async (req, res) => {
   if (!db) {
-    return res.status(503).json({ error: 'Database ikke tilkoblet. Set TURSO_DATABASE_URL og TURSO_AUTH_TOKEN.' });
+    return res.status(503).json({ error: 'Database ikke tilkoblet.' });
   }
   try {
-    // Hent hendene fra nåværende sesjon (eller den seneste sesjonen) sortert på rangering/vekt
     const result = await db.execute(`
       SELECT player_name, hand_description, winning_cards, hand_rank, created_at 
       FROM winning_hands 
-      WHERE session_id = ? OR session_id = (SELECT MAX(id) FROM poker_sessions)
+      WHERE hand_description IS NOT NULL AND hand_description != ''
       ORDER BY hand_rank DESC, id DESC 
       LIMIT 10
-    `, [currentSessionId || 0]);
-    
+    `);
     res.json(result.rows);
   } catch (err) {
     console.error('[DB Error /api/winning-hands]:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Midlertidig API for å tømme databasen for testdata
+app.post('/api/reset-db', async (req, res) => {
+  if (!db) {
+    return res.status(503).json({ error: 'Database ikke tilkoblet.' });
+  }
+  try {
+    await db.execute("DELETE FROM winning_hands");
+    await db.execute("DELETE FROM player_stats");
+    await db.execute("DELETE FROM poker_sessions");
+    currentSessionId = null;
+    console.log('[DB] Databasen er tømt for testdata!');
+    res.json({ message: 'Databasen er tømt for all data.' });
+  } catch (err) {
+    console.error('[DB Error /api/reset-db]:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -98,7 +126,6 @@ function translateHandDescription(descr) {
   return text;
 }
 
-// Beregner en numerisk rangering for sortering av Topp 10 hender
 function getHandRankValue(descr, rankNum) {
   if (rankNum) return rankNum;
   if (!descr) return 0;
@@ -176,7 +203,7 @@ function initDatabase() {
   const authToken = process.env.TURSO_AUTH_TOKEN;
 
   if (!url || !authToken) {
-    console.warn('[DB] TURSO_DATABASE_URL / TURSO_AUTH_TOKEN er ikke satt – serveren kjører uten database.');
+    console.warn('[DB] TURSO_DATABASE_URL / TURSO_AUTH_TOKEN er ikke satt.');
     return;
   }
 
@@ -184,14 +211,14 @@ function initDatabase() {
   try {
     createClient = require('@libsql/client').createClient;
   } catch (err) {
-    console.error('[DB] Kunne ikke laste @libsql/client. Kjør: npm install');
+    console.error('[DB] Kunne ikke laste @libsql/client.');
     return;
   }
 
   db = createClient({ url: url, authToken: authToken });
 
   ensureTables()
-    .then(() => console.log('[DB] Tilkoblet Turso – tabeller er opprettet/verifisert.'))
+    .then(() => console.log('[DB] Tilkoblet Turso – tabeller verifisert.'))
     .catch(err => {
       console.error('[DB] Feil ved databaseinit:', err.message);
       db = null;
@@ -265,7 +292,6 @@ function persistPreviousHand() {
       handDescription: winnerInfo.descr,
       winningCards: winnerInfo.rawCards || []
     });
-    console.log('[FEIRING] Monsterhånd!', winnerInfo.winnerName, '–', winnerInfo.descr);
   }
 
   if (!db) return;
@@ -540,19 +566,19 @@ io.on('connection', (socket) => {
   socket.on('rejoin_game', (data) => {
     const uuid = (data && data.uuid) || (typeof data === 'string' ? data : null);
     if (!uuid) {
-      socket.emit('rejoin_failed', { reason: 'Mangler UUID. Last om siden og prøv igjen.' });
+      socket.emit('rejoin_failed', { reason: 'Mangler UUID.' });
       return;
     }
 
     const existingId = uuidToPlayerId.get(uuid);
     if (!existingId) {
-      socket.emit('rejoin_failed', { reason: 'Ukjent UUID. Spilleren er kanskje fjernet fra bordet.' });
+      socket.emit('rejoin_failed', { reason: 'Ukjent UUID.' });
       return;
     }
 
     const player = players[existingId];
     if (!player) {
-      socket.emit('rejoin_failed', { reason: 'Spilleren finnes ikke lenger på bordet.' });
+      socket.emit('rejoin_failed', { reason: 'Spilleren finnes ikke lenger.' });
       return;
     }
 
