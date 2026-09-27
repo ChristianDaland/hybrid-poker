@@ -409,6 +409,8 @@
         nextBtn.innerText = 'Vis Vinner (Showdown)';
       } else if (state.phase === 'SHOWDOWN') {
         nextBtn.innerText = 'Ny Runde';
+      } else if (state.phase === 'FINISHED') {
+        nextBtn.innerText = 'Ny Runde';
       } else {
         nextBtn.innerText = 'Neste Fase';
       }

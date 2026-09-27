@@ -1,105 +1,62 @@
-import express from 'express';
-import http from 'http';
-import { Server } from 'socket.io';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import sqlite3 from 'sqlite3';
-import crypto from 'crypto';
-import pkg from 'pokersolver';
-const { Hand } = pkg;
+// Laster miljøvariabler fra .env hvis tilgjengelig (kan også settes i systemet)
+try { require('dotenv').config(); } catch (err) { /* dotenv ikke installert – OK */ }
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const express = require('express');
+const http = require('http');
+const crypto = require('crypto');
+const { Server } = require('socket.io');
+const Hand = require('pokersolver').Hand;
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST']
+const io = new Server(server);
+
+app.use(express.static('public'));
+
+// ============================================================
+// API: Statistikk og vinnerhender
+// ============================================================
+app.get('/api/stats', async (req, res) => {
+  if (!db) {
+    return res.status(503).json({ error: 'Database ikke tilkoblet. Set TURSO_DATABASE_URL og TURSO_AUTH_TOKEN.' });
+  }
+  try {
+    const result = await db.execute("SELECT name, hands_played, hands_won, total_chips FROM player_stats ORDER BY hands_won DESC, hands_played DESC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[DB Error /api/stats]:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
-
-// --- DATABASE OPPSETT ---
-// Bruker minnet (:memory:) på Render/sky for å unngå skrivefeil på skrivebeskyttet disk
-const dbPath = process.env.NODE_ENV === 'production' || process.env.RENDER
-  ? ':memory:'
-  : path.join(__dirname, 'poker.db');
-
-const db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('Feil ved åpning av database:', err.message);
-  } else {
-    console.log(`Tilkoblet SQLite-database (${dbPath})`);
+app.get('/api/winning-hands', async (req, res) => {
+  if (!db) {
+    return res.status(503).json({ error: 'Database ikke tilkoblet. Set TURSO_DATABASE_URL og TURSO_AUTH_TOKEN.' });
+  }
+  try {
+    const result = await db.execute("SELECT player_name, hand_description, winning_cards, created_at FROM winning_hands ORDER BY created_at DESC, id DESC LIMIT 10");
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[DB Error /api/winning-hands]:', err);
+    res.status(500).json({ error: err.message });
   }
 });
 
-function initDatabase() {
-  db.serialize(() => {
-    db.run(`
-      CREATE TABLE IF NOT EXISTS player_stats (
-        uuid TEXT PRIMARY KEY,
-        name TEXT,
-        hands_played INTEGER DEFAULT 0,
-        hands_won INTEGER DEFAULT 0,
-        texas_played INTEGER DEFAULT 0,
-        texas_won INTEGER DEFAULT 0,
-        omaha_played INTEGER DEFAULT 0,
-        omaha_won INTEGER DEFAULT 0
-      )
-    `);
-  });
-}
+const SUITS = ['c', 'd', 'h', 's'];
+const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
 
-function ensurePlayerStats(uuid, name) {
-  db.run(
-    `INSERT INTO player_stats (uuid, name) VALUES (?, ?)
-     ON CONFLICT(uuid) DO UPDATE SET name=excluded.name`,
-    [uuid, name]
-  );
-}
-
-// REST API for historikk
-app.get('/api/stats', (req, res) => {
-  db.all('SELECT * FROM player_stats ORDER BY hands_won DESC', [], (err, rows) => {
-    if (err) {
-      res.status(500).json({ error: err.message });
-      return;
-    }
-    res.json(rows);
-  });
-});
-
-// --- SPILLTILSTAND ---
-let players = {}; // socket.id -> Player
-let uuidToPlayerId = new Map(); // uuid -> socket.id
-let disconnectTimeouts = {}; // uuid -> timeoutId
-
-let gameState = {
-  phase: 'VENTING', // VENTING, PREFLOP, FLOP, TURN, RIVER, SHOWDOWN, FINISHED
-  gameMode: null,  // TEXAS eller OMAHA
-  board: [],       // Felleskort
-  deck: [],
-  dealerIndex: 0,
-  smallBlindIndex: -1,
-  bigBlindIndex: -1,
-  winnerInfo: null
-};
-
-// --- HJELPEFUNKSJONER ---
-function generateDeck() {
-  const suits = ['s', 'h', 'd', 'c'];
-  const values = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
+function createDeck() {
   const deck = [];
-  for (const s of suits) {
-    for (const v of values) {
+  for (let s of SUITS) {
+    for (let v of VALUES) {
       deck.push(v + s);
     }
   }
-  // Shuffle
+  return shuffle(deck);
+}
+
+function shuffle(array) {
+  let deck = [...array];
   for (let i = deck.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -107,69 +64,61 @@ function generateDeck() {
   return deck;
 }
 
-function randomizePlayerSeats() {
-  const playerList = Object.values(players);
-  for (let i = playerList.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [playerList[i], playerList[j]] = [playerList[j], playerList[i]];
-  }
-  playerList.forEach((p, idx) => {
-    p.seat = idx + 1;
-  });
+function formatForSolver(card) {
+  return card;
 }
 
 function translateHandDescription(descr) {
-  if (!descr) return '';
-  const translations = {
-    'Straight Flush': 'Straight Flush',
-    'Four of a Kind': 'Fire like',
-    'Full House': 'Fullt hus',
-    'Flush': 'Flush',
-    'Straight': 'Straight',
-    'Three of a Kind': 'Tre like',
-    'Two Pair': 'To par',
-    'Pair': 'Ett par',
-    'High Card': 'Høyt kort'
-  };
-  
-  let translated = descr;
-  Object.keys(translations).forEach(key => {
-    if (translated.includes(key)) {
-      translated = translated.replace(key, translations[key]);
-    }
-  });
-  return translated;
+  let text = descr;
+
+  text = text.replace(/\bT\b/g, '10');
+  text = text.replace(/Straight Flush/g, 'Straight Flush');
+  text = text.replace(/Four of a Kind/g, 'Fire like');
+  text = text.replace(/Full House/g, 'Fullt Hus');
+  text = text.replace(/Flush/g, 'Flush');
+  text = text.replace(/Straight/g, 'Straight');
+  text = text.replace(/Three of a Kind/g, 'Tre like');
+  text = text.replace(/Two Pair/g, 'To Par');
+  text = text.replace(/Pair/g, 'Ett Par');
+  text = text.replace(/High Card/g, 'Høyt Kort');
+
+  text = text.replace(/Spades/g, 'Spar');
+  text = text.replace(/Hearts/g, 'Hjerter');
+  text = text.replace(/Diamonds/g, 'Ruter');
+  text = text.replace(/Clubs/g, 'Kløver');
+
+  return text;
 }
 
 function evaluatePlayerHand(playerCards, boardCards, gameMode) {
+  const formattedBoard = boardCards.map(formatForSolver);
+  const formattedPlayer = playerCards.map(formatForSolver);
+
   if (gameMode === 'TEXAS') {
-    const allCards = [...playerCards, ...boardCards];
+    const allCards = [...formattedPlayer, ...formattedBoard];
     return Hand.solve(allCards);
-  } else if (gameMode === 'OMAHA') {
+  } else {
     let bestHand = null;
+    for (let i = 0; i < formattedPlayer.length; i++) {
+      for (let j = i + 1; j < formattedPlayer.length; j++) {
+        const hand2 = [formattedPlayer[i], formattedPlayer[j]];
 
-    const handCombos = [];
-    for (let i = 0; i < playerCards.length; i++) {
-      for (let j = i + 1; j < playerCards.length; j++) {
-        handCombos.push([playerCards[i], playerCards[j]]);
-      }
-    }
-
-    const boardCombos = [];
-    for (let i = 0; i < boardCards.length; i++) {
-      for (let j = i + 1; j < boardCards.length; j++) {
-        for (let k = j + 1; k < boardCards.length; k++) {
-          boardCombos.push([boardCards[i], boardCards[j], boardCards[k]]);
-        }
-      }
-    }
-
-    for (const hCombo of handCombos) {
-      for (const bCombo of boardCombos) {
-        const candidate = [...hCombo, ...bCombo];
-        const solved = Hand.solve(candidate);
-        if (!bestHand || solved.rank > bestHand.rank || (solved.rank === bestHand.rank && solved.compare(bestHand) > 0)) {
-          bestHand = solved;
+        for (let b1 = 0; b1 < formattedBoard.length; b1++) {
+          for (let b2 = b1 + 1; b2 < formattedBoard.length; b2++) {
+            for (let b3 = b2 + 1; b3 < formattedBoard.length; b3++) {
+              const board3 = [formattedBoard[b1], formattedBoard[b2], formattedBoard[b3]];
+              const combo = Hand.solve([...hand2, ...board3]);
+              
+              if (!bestHand) {
+                bestHand = combo;
+              } else {
+                const winner = Hand.winners([bestHand, combo]);
+                if (winner.includes(combo) && !winner.includes(bestHand)) {
+                  bestHand = combo;
+                }
+              }
+            }
+          }
         }
       }
     }
@@ -177,144 +126,343 @@ function evaluatePlayerHand(playerCards, boardCards, gameMode) {
   }
 }
 
+let gameState = {
+  gameMode: null,
+  phase: 'VENTING',
+  board: [],
+  deck: [],
+  winnerInfo: null,
+  dealerIndex: 0
+};
+
+let players = {};
+const disconnectTimeouts = {};
+const uuidToPlayerId = new Map();
+
+// ============================================================
+// Turso (SQLite) database-integrasjon
+// ============================================================
+let db = null;
+let currentSessionId = null;
+
+function initDatabase() {
+  const url = process.env.TURSO_DATABASE_URL;
+  const authToken = process.env.TURSO_AUTH_TOKEN;
+
+  if (!url || !authToken) {
+    console.warn('[DB] TURSO_DATABASE_URL / TURSO_AUTH_TOKEN er ikke satt – serveren kjører uten database.');
+    return;
+  }
+
+  let createClient;
+  try {
+    createClient = require('@libsql/client').createClient;
+  } catch (err) {
+    console.error('[DB] Kunne ikke laste @libsql/client. Kjør: npm install');
+    return;
+  }
+
+  db = createClient({ url: url, authToken: authToken });
+
+  ensureTables()
+    .then(() => console.log('[DB] Tilkoblet Turso – tabeller er opprettet/verifisert.'))
+    .catch(err => {
+      console.error('[DB] Feil ved databaseinit:', err.message);
+      db = null;
+    });
+}
+
+async function ensureTables() {
+  await db.execute(`CREATE TABLE IF NOT EXISTS poker_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at TEXT NOT NULL DEFAULT (datetime('now')),
+    ended_at TEXT,
+    game_mode TEXT
+  )`);
+  await db.execute(`CREATE TABLE IF NOT EXISTS player_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uuid TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    hands_played INTEGER NOT NULL DEFAULT 0,
+    hands_won INTEGER NOT NULL DEFAULT 0,
+    total_chips INTEGER NOT NULL DEFAULT 0
+  )`);
+  await db.execute(`CREATE TABLE IF NOT EXISTS winning_hands (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER,
+    player_uuid TEXT,
+    player_name TEXT,
+    hand_description TEXT,
+    winning_cards TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+}
+
+// Registrerer spiller i player_stats (eller oppdaterer navnet hvis vedkommende allerede finnes)
+function ensurePlayerStats(uuid, name) {
+  if (!db || !uuid) return;
+  db.execute(
+    `INSERT INTO player_stats (uuid, name, hands_played, hands_won, total_chips)
+     VALUES (?, ?, 0, 0, 0)
+     ON CONFLICT(uuid) DO UPDATE SET name = excluded.name`,
+    [uuid, name]
+  ).catch(err => console.error('[DB] Feil ved registrering av spiller:', err.message));
+}
+
+// Trekker ut vinnernavn fra winnerInfo (håndterer delte potter)
+function parseWinnerNames(winnerInfo) {
+  if (!winnerInfo || !winnerInfo.winnerName) return [];
+  const raw = winnerInfo.winnerName;
+  if (raw.startsWith('UAVGJOERT / DELING:')) {
+    return raw.split(':', 2)[1].split('&').map(s => s.trim()).filter(Boolean);
+  }
+  return [raw];
+}
+
+// Sjekker om en oversatt håndbeskrivelse er en «monsterhånd» som fortjener feiring
+function isMonsterHand(descr) {
+  if (!descr) return false;
+  const d = descr.toLowerCase();
+  return d.includes('straight/flush') ||
+         d.includes('full house') ||
+         d.includes('four of a kind') ||
+         d.includes('royal');
+}
+
+// Lagrer forrige hånd i databasen. Kalles rett før en ny hånd deles,
+// slik at både folded-win (FINISHED) og showdown (SHOWDOWN) fanges nøyaktig én gang.
+function persistPreviousHand() {
+  const { phase, winnerInfo, board, gameMode } = gameState;
+  if (!winnerInfo) return;
+  if (phase !== 'FINISHED' && phase !== 'SHOWDOWN') return;
+
+  // 🎉 Feiring ved monsterhånd (virker uavhengig av databasen)
+  if (!winnerInfo.foldedWin && isMonsterHand(winnerInfo.descr) &&
+      winnerInfo.winnerName && !winnerInfo.winnerName.startsWith('UAVGJOERT / DELING:')) {
+    io.to('game').emit('celebrate_win', {
+      playerName: winnerInfo.winnerName,
+      handDescription: winnerInfo.descr,
+      winningCards: winnerInfo.rawCards || []
+    });
+    console.log('[FEIRING] Monsterhånd!', winnerInfo.winnerName, '–', winnerInfo.descr);
+  }
+
+  if (!db) return;
+
+  const inHand = Object.values(players).filter(p => !p.folded);
+  const winnerNames = parseWinnerNames(winnerInfo);
+  const description = winnerInfo.descr || '';
+  const winningCards = winnerInfo.foldedWin
+    ? ''
+    : JSON.stringify({ board: board, cards: inHand.map(p => ({ name: p.name, cards: p.cards })) });
+
+  (async () => {
+    // Åpne sesjon ved første hånd, eller forlenge den pågående
+    let sessionId = currentSessionId;
+    if (!sessionId) {
+      await db.execute("UPDATE poker_sessions SET ended_at = datetime('now') WHERE ended_at IS NULL");
+      const ins = await db.execute(
+        "INSERT INTO poker_sessions (started_at, game_mode) VALUES (datetime('now'), ?)",
+        [gameMode || 'UNKNOWN']
+      );
+      sessionId = Number(ins.lastInsertRowid);
+      currentSessionId = sessionId;
+    } else {
+      await db.execute("UPDATE poker_sessions SET ended_at = datetime('now') WHERE id = ?", [sessionId]);
+    }
+
+    // Oppdater statistikk for de spillere som var med i hånden
+    for (const p of inHand) {
+      const isWinner = winnerNames.includes(p.name);
+      await db.execute(
+        "UPDATE player_stats SET hands_played = hands_played + 1, hands_won = hands_won + ? WHERE uuid = ?",
+        [isWinner ? 1 : 0, p.uuid]
+      );
+    }
+
+    // Logg vinnerhånden
+    const winnerPlayer = inHand.find(p => winnerNames.includes(p.name));
+    await db.execute(
+      `INSERT INTO winning_hands (session_id, player_uuid, player_name, hand_description, winning_cards, created_at)
+       VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+      [sessionId, winnerPlayer ? winnerPlayer.uuid : null, winnerNames.join(' & '), description, winningCards]
+    );
+    console.log('[DB] Håndresultat lagret (vinner:', winnerNames.join(' & ') + ')');
+  })().catch(err => console.error('[DB] Kunne ikke lagre håndresultat:', err.message));
+}
+
+// Hjælpefunksjon for å stokke om rekkefølgen på spillerne i `players`-objektet
+function randomizePlayerSeats() {
+  const playerArray = Object.values(players);
+  if (playerArray.length <= 1) return;
+
+  const shuffled = shuffle(playerArray);
+  const newPlayersObj = {};
+
+  shuffled.forEach((p, index) => {
+    p.seat = index + 1;
+    newPlayersObj[p.id] = p;
+  });
+
+  players = newPlayersObj;
+  gameState.dealerIndex = 0; // Nullstill dealerknapp til første plass
+}
+
 function startNewHandLogic() {
-  const activePlayers = Object.values(players);
-  if (activePlayers.length < 2) return;
+  const playerList = Object.values(players);
+  if (playerList.length === 0 || !gameState.gameMode) return;
 
-  gameState.deck = generateDeck();
+  // Persist forrige hånd (hvis noen) i databasen før kortene nullstilles
+  persistPreviousHand();
+
+  gameState.deck = createDeck();
   gameState.board = [];
-  gameState.winnerInfo = null;
   gameState.phase = 'PREFLOP';
+  gameState.winnerInfo = null;
 
-  activePlayers.sort((a, b) => a.seat - b.seat);
+  gameState.dealerIndex = (gameState.dealerIndex + 1) % playerList.length;
 
-  gameState.dealerIndex = (gameState.dealerIndex + 1) % activePlayers.length;
-  gameState.smallBlindIndex = (gameState.dealerIndex + 1) % activePlayers.length;
-  gameState.bigBlindIndex = (gameState.dealerIndex + 2) % activePlayers.length;
-
-  const cardCount = gameState.gameMode === 'TEXAS' ? 2 : 4;
-
-  activePlayers.forEach((p, idx) => {
+  playerList.forEach((p, idx) => {
     p.folded = false;
     p.cards = [];
+    
+    const relativePos = (idx - gameState.dealerIndex + playerList.length) % playerList.length;
+
+    if (playerList.length === 2) {
+      p.role = relativePos === 0 ? 'Lilleblind' : 'Storeblind';
+    } else {
+      if (relativePos === 0) p.role = 'Dealer';
+      else if (relativePos === 1) p.role = 'Lilleblind';
+      else if (relativePos === 2) p.role = 'Storeblind';
+      else p.role = '';
+    }
+    
+    const cardCount = gameState.gameMode === 'OMAHA' ? 4 : 2;
     for (let i = 0; i < cardCount; i++) {
       p.cards.push(gameState.deck.pop());
     }
-
-    if (idx === gameState.dealerIndex) p.role = 'DEALER';
-    else if (idx === gameState.smallBlindIndex) p.role = 'SB';
-    else if (idx === gameState.bigBlindIndex) p.role = 'BB';
-    else p.role = '';
   });
 }
 
-function maybeAutoStartHand() {
-  if (gameState.phase === 'FINISHED') {
-    const activeCount = Object.values(players).length;
-    if (activeCount >= 2 && gameState.gameMode) {
-      startNewHandLogic();
-    }
-  }
-}
-
-function resetToWaiting() {
-  gameState.phase = 'VENTING';
-  gameState.gameMode = null;
-  gameState.board = [];
-  gameState.deck = [];
-  gameState.winnerInfo = null;
-}
-
-// --- SOCKET.IO EVENTS ---
 io.on('connection', (socket) => {
-  console.log('[Socket] Ny tilkobling:', socket.id);
-
-  socket.emit('game_state', {
-    gameState,
-    players: Object.values(players)
-  });
-
-  socket.on('join_game', (payload) => {
-    let name = '';
-    let uuid = '';
-
-    if (typeof payload === 'string') {
-      name = payload;
-      uuid = crypto.randomUUID();
-    } else if (payload && typeof payload === 'object') {
-      name = payload.name || 'Anonym';
-      uuid = payload.uuid || crypto.randomUUID();
+  socket.on('join_game', (nameOrPayload) => {
+    // Støtter både gammelt format (navn som string) og nytt format ({ name, uuid })
+    let cleanName = 'Spiller';
+    let clientUuid = null;
+    if (nameOrPayload && typeof nameOrPayload === 'object') {
+      cleanName = nameOrPayload.name ? String(nameOrPayload.name).trim() : 'Spiller';
+      clientUuid = nameOrPayload.uuid || null;
+    } else {
+      cleanName = nameOrPayload ? String(nameOrPayload).trim() : 'Spiller';
     }
 
-    if (!name.trim()) return;
+    let existingPlayerKey = Object.keys(players).find(
+      key => players[key].name.toLowerCase() === cleanName.toLowerCase()
+    );
 
-    let existingPlayerId = uuidToPlayerId.get(uuid);
-    
-    if (existingPlayerId && players[existingPlayerId]) {
-      const p = players[existingPlayerId];
-      delete players[existingPlayerId];
-      
-      p.id = socket.id;
-      p.connected = true;
-      p.name = name.trim();
-      players[socket.id] = p;
-      
-      if (disconnectTimeouts[uuid]) {
-        clearTimeout(disconnectTimeouts[uuid]);
-        delete disconnectTimeouts[uuid];
+    if (existingPlayerKey) {
+      const playerData = players[existingPlayerKey];
+
+      // Clear any pending disconnect timeout
+      if (disconnectTimeouts[existingPlayerKey]) {
+        clearTimeout(disconnectTimeouts[existingPlayerKey]);
+        delete disconnectTimeouts[existingPlayerKey];
       }
+
+      delete players[existingPlayerKey];
+
+      playerData.id = socket.id;
+      playerData.connected = true;
+
+      // FIX: Oppdater UUID-mappingen slik at identiteten følger med det nye socketet
+      if (clientUuid && clientUuid !== playerData.uuid) {
+        if (playerData.uuid) {
+          uuidToPlayerId.delete(playerData.uuid);
+        }
+        playerData.uuid = clientUuid;
+      }
+      if (playerData.uuid) {
+        uuidToPlayerId.set(playerData.uuid, socket.id);
+      }
+
+      players[socket.id] = playerData;
+      ensurePlayerStats(playerData.uuid, playerData.name);
     } else {
-      const newSeat = Object.keys(players).length + 1;
+      // Generer vedvarende identitet for nye spillere
+      let playerUuid = clientUuid;
+      if (!playerUuid) {
+        try {
+          playerUuid = (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.randomUUID)
+            ? globalThis.crypto.randomUUID()
+            : null;
+        } catch (e) { playerUuid = null; }
+      }
+      if (!playerUuid) {
+        playerUuid = 'uuid-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+      }
+
+      const seatNumber = Object.keys(players).length + 1;
       players[socket.id] = {
         id: socket.id,
-        uuid: uuid,
-        name: name.trim(),
+        name: cleanName,
+        uuid: playerUuid,
+        seat: seatNumber,
         cards: [],
         folded: false,
         role: '',
-        seat: newSeat,
         connected: true
       };
+      uuidToPlayerId.set(playerUuid, socket.id);
+      ensurePlayerStats(playerUuid, cleanName);
     }
 
-    uuidToPlayerId.set(uuid, socket.id);
-    ensurePlayerStats(uuid, name.trim());
-
-    socket.join('game');
-    
-    maybeAutoStartHand();
-
-    io.emit('game_state', {
-      gameState,
-      players: Object.values(players)
-    });
+    // Send UUID tilbake til klienten slik at den kan lagres i localStorage
+    const joinedPlayer = players[socket.id];
+    socket.emit('joined', { uuid: joinedPlayer.uuid, name: joinedPlayer.name });
+    updateAll();
   });
 
-  socket.on('select_gamemode', (mode) => {
-    if (['TEXAS', 'OMAHA'].includes(mode)) {
-      gameState.gameMode = mode;
-      io.emit('game_state', {
-        gameState,
-        players: Object.values(players)
-      });
+  socket.on('set_game_mode', (mode) => {
+    gameState.gameMode = mode;
+    if (!mode) {
+      gameState.phase = 'VENTING';
+      gameState.board = [];
+      gameState.winnerInfo = null;
+    } else {
+      // Stokker plassene til alle spillere når en spilletype velges
+      randomizePlayerSeats();
     }
+    updateAll();
   });
 
-  socket.on('start_hand', () => {
-    if (!gameState.gameMode) return;
+  socket.on('start_new_hand', () => {
     startNewHandLogic();
-    io.emit('game_state', {
-      gameState,
-      players: Object.values(players)
-    });
+    updateAll();
   });
 
   socket.on('next_phase', () => {
-    if (gameState.phase === 'VENTING' || gameState.phase === 'FINISHED') return;
+    const activePlayers = Object.values(players).filter(p => !p.folded);
+
+    if (gameState.phase === 'FINISHED' || gameState.phase === 'SHOWDOWN') {
+      startNewHandLogic();
+      updateAll();
+      return;
+    }
+
+    if (activePlayers.length === 1 && gameState.phase !== 'VENTING') {
+      gameState.phase = 'FINISHED';
+      gameState.winnerInfo = {
+        winnerName: activePlayers[0].name,
+        descr: 'Alle andre kastet seg',
+        foldedWin: true
+      };
+      updateAll();
+      return;
+    }
 
     if (gameState.phase === 'PREFLOP') {
       gameState.phase = 'FLOP';
-      for (let i = 0; i < 3; i++) gameState.board.push(gameState.deck.pop());
+      gameState.board = [gameState.deck.pop(), gameState.deck.pop(), gameState.deck.pop()];
     } else if (gameState.phase === 'FLOP') {
       gameState.phase = 'TURN';
       gameState.board.push(gameState.deck.pop());
@@ -324,41 +472,40 @@ io.on('connection', (socket) => {
     } else if (gameState.phase === 'RIVER') {
       gameState.phase = 'SHOWDOWN';
       
-      const activePlayers = Object.values(players).filter(p => !p.folded);
-      if (activePlayers.length > 0) {
-        let bestSolved = [];
-        activePlayers.forEach(p => {
-          const solved = evaluatePlayerHand(p.cards, gameState.board, gameState.gameMode);
-          solved.playerName = p.name;
-          solved.playerCards = p.cards;
-          bestSolved.push(solved);
-        });
+      const solvedHands = activePlayers.map(p => ({
+        player: p,
+        solved: evaluatePlayerHand(p.cards, gameState.board, gameState.gameMode)
+      }));
 
-        const winners = Hand.winners(bestSolved);
-        const winnerNames = winners.map(w => w.playerName).join(' & ');
-        const descr = translateHandDescription(winners[0].descr);
-
-        gameState.winnerInfo = {
-          winnerName: winners.length > 1 ? `UAVGJOERT / DELING: ${winnerNames}` : winnerNames,
-          descr: descr,
-          foldedWin: false,
-          rawCards: winners[0].cards
-        };
+      const handsOnly = solvedHands.map(sh => sh.solved);
+      const winningHands = Hand.winners(handsOnly);
+      
+      const winners = solvedHands.filter(sh => winningHands.includes(sh.solved));
+      
+      let winnerText = '';
+      if (winners.length > 1) {
+        const names = winners.map(w => w.player.name).join(' & ');
+        winnerText = `UAVGJOERT / DELING: ${names}`;
+      } else {
+        winnerText = winners[0].player.name;
       }
-    } else if (gameState.phase === 'SHOWDOWN') {
-      gameState.phase = 'FINISHED';
-    }
 
-    io.emit('game_state', {
-      gameState,
-      players: Object.values(players)
-    });
+      const rawDescr = winners[0] ? winners[0].solved.descr : 'Ukjent hånd';
+
+      gameState.winnerInfo = {
+        winnerName: winnerText,
+        descr: translateHandDescription(rawDescr),
+        foldedWin: false,
+        rawCards: winners[0] ? winners[0].solved.cards : []
+      };
+    }
+    updateAll();
   });
 
-  socket.on('fold_player', (playerId) => {
-    if (players[playerId]) {
-      players[playerId].folded = true;
-
+  socket.on('player_fold', () => {
+    if (players[socket.id]) {
+      players[socket.id].folded = true;
+      
       const activePlayers = Object.values(players).filter(p => !p.folded);
       if (activePlayers.length === 1 && gameState.phase !== 'VENTING') {
         gameState.phase = 'FINISHED';
@@ -368,54 +515,113 @@ io.on('connection', (socket) => {
           foldedWin: true
         };
       }
-
-      io.emit('game_state', {
-        gameState,
-        players: Object.values(players)
-      });
+      updateAll();
     }
   });
 
-  socket.on('randomize_seats', () => {
-    randomizePlayerSeats();
-    io.emit('game_state', {
-      gameState,
-      players: Object.values(players)
-    });
+  socket.on('rejoin_game', (data) => {
+    const uuid = (data && data.uuid) || (typeof data === 'string' ? data : null);
+    if (!uuid) {
+      socket.emit('rejoin_failed', { reason: 'Mangler UUID. Last om siden og prøv igjen.' });
+      return;
+    }
+
+    const existingId = uuidToPlayerId.get(uuid);
+    if (!existingId) {
+      socket.emit('rejoin_failed', { reason: 'Ukjent UUID. Spilleren er kanskje fjernet fra bordet.' });
+      return;
+    }
+
+    const player = players[existingId];
+    if (!player) {
+      socket.emit('rejoin_failed', { reason: 'Spilleren finnes ikke lenger på bordet.' });
+      return;
+    }
+
+    if (existingId !== socket.id) {
+      // Clear any pending disconnect timeout
+      if (disconnectTimeouts[existingId]) {
+        clearTimeout(disconnectTimeouts[existingId]);
+        delete disconnectTimeouts[existingId];
+      }
+
+      // Rebind player to new socket
+      delete players[existingId];
+    }
+
+    player.connected = true;
+    player.uuid = uuid;
+    player.id = socket.id; // Viktig: updateAll() sender player_state til p.id
+    players[socket.id] = player;
+    uuidToPlayerId.set(uuid, socket.id);
+    ensurePlayerStats(uuid, player.name);
+
+    socket.emit('joined', { uuid: uuid, name: player.name });
+    updateAll();
   });
 
   socket.on('disconnect', () => {
-    const player = players[socket.id];
-    if (player) {
-      player.connected = false;
-      
-      disconnectTimeouts[player.uuid] = setTimeout(() => {
-        delete players[socket.id];
-        uuidToPlayerId.delete(player.uuid);
-        delete disconnectTimeouts[player.uuid];
+    if (players[socket.id]) {
+      players[socket.id].connected = false;
+      const disconnectedId = socket.id;
+      const playerUuid = players[socket.id].uuid;
 
-        if (Object.keys(players).length === 0) {
-          resetToWaiting();
+      // Clear any existing timeout for this socket
+      if (disconnectTimeouts[disconnectedId]) {
+        clearTimeout(disconnectTimeouts[disconnectedId]);
+      }
+
+      // 60-second grace period before permanently removing the player
+      disconnectTimeouts[disconnectedId] = setTimeout(() => {
+        delete players[disconnectedId];
+        delete disconnectTimeouts[disconnectedId];
+        if (playerUuid) {
+          uuidToPlayerId.delete(playerUuid);
         }
-
-        io.emit('game_state', {
-          gameState,
-          players: Object.values(players)
-        });
+        updateAll();
       }, 60000);
 
-      io.emit('game_state', {
-        gameState,
-        players: Object.values(players)
-      });
+      updateAll();
     }
   });
 });
 
-// Start serveren
+function updateAll() {
+  const playerList = Object.values(players);
+
+  const showCardsOnScreen = gameState.phase === 'SHOWDOWN' && 
+                            gameState.winnerInfo && 
+                            !gameState.winnerInfo.foldedWin;
+
+  io.emit('state_update', {
+    gameMode: gameState.gameMode,
+    phase: gameState.phase,
+    board: gameState.board,
+    winnerInfo: gameState.winnerInfo,
+    players: playerList.map(p => ({
+      name: p.name,
+      seat: p.seat,
+      role: p.role,
+      folded: p.folded,
+      connected: p.connected,
+      cards: showCardsOnScreen && !p.folded ? p.cards : []
+    }))
+  });
+
+  playerList.forEach(p => {
+    if (p.connected) {
+      io.to(p.id).emit('player_state', {
+        phase: gameState.phase,
+        cards: p.cards,
+        role: p.role,
+        folded: p.folded,
+        winnerInfo: gameState.winnerInfo
+      });
+    }
+  });
+}
+
 initDatabase();
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`[Server] Hybrid Poker kjører på port ${PORT}`);
-});
+server.listen(PORT, () => console.log(`Server kjører på port ${PORT}`));
