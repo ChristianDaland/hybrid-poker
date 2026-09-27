@@ -256,38 +256,24 @@ function ensurePlayerStats(uuid, name) {
   }).catch(err => console.error('[DB] Feil ved registrering av spiller:', err.message));
 }
 
-function parseWinnerNames(winnerInfo) {
-  if (!winnerInfo || !winnerInfo.winnerName) return [];
-  let raw = winnerInfo.winnerName;
-  if (raw.includes(':')) {
-    raw = raw.split(':')[1];
-  }
-  return raw.split('&').map(s => s.trim()).filter(Boolean);
-}
-
 async function persistHandResult() {
-  console.log('[DEBUG] Start persistHandResult...');
-  
-  if (!db) {
-    console.error('[DEBUG FAIL] Ingen databasetilkobling i persistHandResult');
-    return;
-  }
-
   const { winnerInfo, board, gameMode } = gameState;
 
-  if (!winnerInfo) {
-    console.error('[DEBUG FAIL] gameState.winnerInfo er null eller undefined');
+  if (!db) {
+    console.error('[DB ERROR] Ingen databasetilkobling.');
     return;
   }
 
-  console.log('[DEBUG] winnerInfo funnet:', JSON.stringify(winnerInfo));
+  if (!winnerInfo) {
+    console.error('[DB ERROR] winnerInfo mangler.');
+    return;
+  }
 
-  const winnerNames = parseWinnerNames(winnerInfo);
   const description = winnerInfo.descr || 'Ukjent hånd';
   const rankVal = getHandRankValue(description);
   const nowIso = new Date().toISOString();
 
-  // Step 1: Sjekk / Opprett session
+  // 1. Sørg for gyldig session_id
   if (!currentSessionId) {
     try {
       const ins = await db.execute({
@@ -295,33 +281,42 @@ async function persistHandResult() {
         args: [nowIso, gameMode || 'OMAHA']
       });
       currentSessionId = Number(ins.lastInsertRowid) || 1;
-      console.log('[DEBUG] Opprettet ny session ID:', currentSessionId);
     } catch (sErr) {
-      console.warn('[DEBUG WARN] Session-opprettelse feilet, bruker ID 1:', sErr.message);
+      console.warn('[DB WARN] Kunne ikke opprette sesjon, bruker fallback ID 1:', sErr.message);
       currentSessionId = 1;
     }
   }
 
-  // Step 2: Oppdater player_stats
-  for (const p of Object.values(players)) {
+  // 2. Finn vinnere direkte fra players-objektet basert på teksten
+  const activePlayersList = Object.values(players);
+  const winners = activePlayersList.filter(p => 
+    winnerInfo.winnerName && winnerInfo.winnerName.includes(p.name)
+  );
+
+  const winnerNamesStr = winners.length > 0 
+    ? winners.map(w => w.name).join(' & ') 
+    : (winnerInfo.winnerName || 'Ukjent Spiller');
+
+  const winnerUuidStr = winners.length > 0 
+    ? winners.map(w => w.uuid).join(', ') 
+    : 'ukjent-uuid';
+
+  // 3. Oppdater player_stats
+  for (const p of activePlayersList) {
     if (!p.uuid) continue;
-    const isWinner = winnerNames.includes(p.name);
+    const isWinner = winners.some(w => w.uuid === p.uuid);
     try {
       await db.execute({
         sql: "UPDATE player_stats SET hands_played = hands_played + 1, hands_won = hands_won + ? WHERE uuid = ?",
         args: [isWinner ? 1 : 0, String(p.uuid)]
       });
     } catch (pErr) {
-      console.error('[DEBUG ERROR] Feil i player_stats oppdatering:', pErr.message);
+      console.error('[DB ERROR] Feil ved oppdatering av player_stats:', pErr.message);
     }
   }
 
-  // Step 3: Skriv til winning_hands
+  // 4. Skriv direkte til winning_hands
   try {
-    const winnerPlayer = Object.values(players).find(p => winnerNames.includes(p.name));
-    const playerUuid = winnerPlayer ? String(winnerPlayer.uuid) : 'ukjent-uuid';
-    const playerNameStr = winnerNames.length > 0 ? winnerNames.join(' & ') : 'Ukjent Spiller';
-
     const cleanBoard = Array.isArray(board) ? board.map(c => String(c)) : [];
     const cleanWinningCards = Array.isArray(winnerInfo.rawCards) 
       ? winnerInfo.rawCards.map(c => (c && c.value && c.suit ? c.value + c.suit : String(c)))
@@ -330,29 +325,20 @@ async function persistHandResult() {
     const jsonPayload = JSON.stringify({
       board: cleanBoard,
       winningCards: cleanWinningCards,
-      cards: Object.values(players).map(p => ({
+      cards: activePlayersList.map(p => ({
         uuid: String(p.uuid || ''),
         name: String(p.name || ''),
         cards: Array.isArray(p.cards) ? p.cards.map(c => String(c)) : []
       }))
     });
 
-    console.log('[DEBUG] Sender følgende SQL til winning_hands:', {
-      currentSessionId,
-      playerUuid,
-      playerNameStr,
-      description,
-      rankVal,
-      nowIso
-    });
-
-    const dbRes = await db.execute({
+    const res = await db.execute({
       sql: `INSERT INTO winning_hands (session_id, player_uuid, player_name, hand_description, winning_cards, hand_rank, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)`,
       args: [
         Number(currentSessionId),
-        playerUuid,
-        playerNameStr,
+        String(winnerUuidStr),
+        String(winnerNamesStr),
         String(description),
         jsonPayload,
         Number(rankVal),
@@ -360,9 +346,9 @@ async function persistHandResult() {
       ]
     });
 
-    console.log('[DB SUCCESS] Skrevet til winning_hands! Rader påvirket:', dbRes.rowsAffected);
+    console.log('[DB SUCCESS] Skrevet til winning_hands! Rader satt inn:', res.rowsAffected);
   } catch (err) {
-    console.error('[DB CRITICAL ERROR] Feil ved INSERT INTO winning_hands:', err);
+    console.error('[DB CRITICAL ERROR] Feil under skriving til winning_hands:', err);
   }
 }
 
