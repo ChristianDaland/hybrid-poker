@@ -250,12 +250,12 @@ async function ensureTables() {
 
 function ensurePlayerStats(uuid, name) {
   if (!db || !uuid) return;
-  db.execute(
-    `INSERT INTO player_stats (uuid, name, hands_played, hands_won, total_chips)
-     VALUES (?, ?, 0, 0, 0)
-     ON CONFLICT(uuid) DO UPDATE SET name = excluded.name`,
-    [uuid, name]
-  ).catch(err => console.error('[DB] Feil ved registrering av spiller:', err.message));
+  db.execute({
+    sql: `INSERT INTO player_stats (uuid, name, hands_played, hands_won, total_chips)
+          VALUES (?, ?, 0, 0, 0)
+          ON CONFLICT(uuid) DO UPDATE SET name = excluded.name`,
+    args: [uuid, name]
+  }).catch(err => console.error('[DB] Feil ved registrering av spiller:', err.message));
 }
 
 function parseWinnerNames(winnerInfo) {
@@ -289,40 +289,49 @@ function persistHandResult() {
     });
   }
 
-  if (!db) return;
+  if (!db) {
+    console.warn('[DB] Databasetilkobling mangler – kan ikke lagre.');
+    return;
+  }
 
   const inHand = Object.values(players).filter(p => !p.folded);
   const winnerNames = parseWinnerNames(winnerInfo);
   const description = winnerInfo.descr || 'Ukjent hånd';
-  const rankVal = getHandRankValue(description, winnerInfo.rank);
+  const rankVal = Number(getHandRankValue(description, winnerInfo.rank)) || 0;
   const nowIso = new Date().toISOString();
 
   (async () => {
     try {
       let sessionId = currentSessionId;
       if (!sessionId) {
-        await db.execute("UPDATE poker_sessions SET ended_at = ? WHERE ended_at IS NULL", [nowIso]);
-        const ins = await db.execute(
-          "INSERT INTO poker_sessions (started_at, game_mode) VALUES (?, ?)",
-          [nowIso, gameMode || 'UNKNOWN']
-        );
+        await db.execute({
+          sql: "UPDATE poker_sessions SET ended_at = ? WHERE ended_at IS NULL",
+          args: [nowIso]
+        });
+        const ins = await db.execute({
+          sql: "INSERT INTO poker_sessions (started_at, game_mode) VALUES (?, ?)",
+          args: [nowIso, gameMode || 'UNKNOWN']
+        });
         sessionId = Number(ins.lastInsertRowid);
         currentSessionId = sessionId;
       } else {
-        await db.execute("UPDATE poker_sessions SET ended_at = ? WHERE id = ?", [nowIso, sessionId]);
+        await db.execute({
+          sql: "UPDATE poker_sessions SET ended_at = ? WHERE id = ?",
+          args: [nowIso, sessionId]
+        });
       }
 
       // 1. Oppdater generell spillerstatistikk for alle som spilte denne hånden
       for (const p of Object.values(players)) {
         if (!p.uuid) continue;
         const isWinner = winnerNames.includes(p.name);
-        await db.execute(
-          "UPDATE player_stats SET hands_played = hands_played + 1, hands_won = hands_won + ? WHERE uuid = ?",
-          [isWinner ? 1 : 0, p.uuid]
-        );
+        await db.execute({
+          sql: "UPDATE player_stats SET hands_played = hands_played + 1, hands_won = hands_won + ? WHERE uuid = ?",
+          args: [isWinner ? 1 : 0, p.uuid]
+        });
       }
 
-      // 2. Lagre i winning_hands (KUN DERSOM HÅNDEN GIKK TIL SHOWDOWN)
+      // 2. Lagre i winning_hands (KUN DERSOM HÅNDEN GIKK TIL SHOWDOWN OG IKKE FOLD)
       if (!winnerInfo.foldedWin) {
         const winningCardsStr = JSON.stringify({
           board: board || [],
@@ -331,16 +340,24 @@ function persistHandResult() {
         });
 
         const winnerPlayer = Object.values(players).find(p => winnerNames.includes(p.name));
-        const playerUuid = winnerPlayer ? winnerPlayer.uuid : (Object.values(players)[0]?.uuid || 'ukjent-uuid');
+        const playerUuid = winnerPlayer?.uuid || Object.values(players)[0]?.uuid || 'ukjent-uuid';
         const playerNameStr = winnerNames.length > 0 ? winnerNames.join(' & ') : 'Ukjent Spiller';
 
-        await db.execute(
-          `INSERT INTO winning_hands (session_id, player_uuid, player_name, hand_description, winning_cards, hand_rank, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [sessionId, playerUuid, playerNameStr, description, winningCardsStr, rankVal, nowIso]
-        );
+        await db.execute({
+          sql: `INSERT INTO winning_hands (session_id, player_uuid, player_name, hand_description, winning_cards, hand_rank, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          args: [
+            sessionId || null,
+            String(playerUuid),
+            String(playerNameStr),
+            String(description),
+            String(winningCardsStr),
+            rankVal,
+            nowIso
+          ]
+        });
 
-        console.log('[DB SUCCESS] Vinnerhånd lagret i Top 10:', playerNameStr, '|', description, '| Rangering:', rankVal);
+        console.log(`[DB SUCCESS] Vinnerhånd lagret i Top 10: ${playerNameStr} | ${description} (Rangering: ${rankVal})`);
       }
     } catch (err) {
       console.error('[DB ERROR] Kunne ikke lagre håndresultat:', err);
