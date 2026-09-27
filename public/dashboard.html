@@ -3,236 +3,179 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>🏆 Dagens beste hender – Løland Gård Poker</title>
+  <title>Poker Dashboard</title>
   <style>
-    * { box-sizing: border-box; }
-
     body {
-      font-family: Arial, sans-serif;
-      background-color: #1b4d2e;
-      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: #121212;
+      color: #e0e0e0;
       margin: 0;
-      padding: 10px 15px 40px 15px;
+      padding: 24px;
     }
-
-    h1 { text-align: center; margin: 5px 0 2px 0; font-size: 1.8rem; }
-
-    .subtitle { text-align: center; color: #cfe8d5; font-size: 0.95rem; margin-bottom: 14px; }
-    a { color: #ffd700; text-decoration: none; }
-    a:hover { text-decoration: underline; }
-
-    .toolbar { display: flex; justify-content: center; margin-bottom: 14px; }
-
-    .refresh-btn {
-      background: linear-gradient(45deg, #ff9800, #f44336);
-      color: white;
-      border: none;
-      padding: 10px 20px;
-      font-size: 1rem;
-      font-weight: bold;
-      border-radius: 10px;
-      cursor: pointer;
-      box-shadow: 0 3px 10px rgba(0,0,0,0.4);
-    }
-    .refresh-btn:active { transform: scale(0.97); }
-
-    .panel {
-      max-width: 950px;
+    .container {
+      max-width: 1200px;
       margin: 0 auto;
-      background: rgba(0, 0, 0, 0.55);
-      border: 8px solid #5c3a21;
-      border-radius: 20px;
-      padding: 12px;
-      box-shadow: 0 8px 25px rgba(0,0,0,0.5);
-      overflow-x: auto;
     }
-
-    table { width: 100%; border-collapse: collapse; min-width: 560px; }
-
+    h1 {
+      font-size: 1.8rem;
+      margin-bottom: 20px;
+      color: #ffffff;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .card {
+      background: #1e1e1e;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    }
+    h2 {
+      margin-top: 0;
+      font-size: 1.2rem;
+      color: #4caf50;
+      border-bottom: 1px solid #333;
+      padding-bottom: 10px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+    }
     th, td {
-      padding: 10px 12px;
+      padding: 10px 8px;
       text-align: left;
-      border-bottom: 1px solid rgba(255,255,255,0.15);
-      vertical-align: middle;
-    }
-
-    th {
-      background: rgba(0,0,0,0.45);
-      color: #ffd700;
-      font-size: 0.85rem;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-
-    tr:last-child td { border-bottom: none; }
-    tr:hover td { background: rgba(255, 255, 255, 0.05); }
-
-    .rank-cell { font-size: 1.3rem; font-weight: bold; white-space: nowrap; }
-    .rank-num { color: #cfe8d5; font-size: 1rem; }
-    .player-name { font-weight: bold; font-size: 1.05rem; }
-    .hand-desc { color: #ffe082; font-weight: bold; white-space: nowrap; }
-    .cards-cell { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
-
-    .cards-label {
-      font-size: 0.7rem;
-      color: #9fc4ab;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-right: 2px;
-    }
-
-    .card-chip {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      background: #ffffff;
-      color: #222;
-      border-radius: 6px;
-      min-width: 26px;
-      height: 34px;
-      padding: 0 6px;
-      font-weight: bold;
+      border-bottom: 1px solid #2a2a2a;
       font-size: 0.95rem;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.5);
     }
-    .card-chip.red { color: #d9534f; }
-    .card-chip.black { color: #222222; }
-
-    .time-cell { color: #cfe8d5; font-size: 0.9rem; white-space: nowrap; }
-
-    .empty-state { text-align: center; padding: 40px 20px; color: #cfe8d5; font-size: 1.1rem; }
-    .error-state { text-align: center; padding: 40px 20px; color: #ffab91; font-size: 1.05rem; }
-
-    @media (max-width: 600px) {
-      .card-chip { min-width: 22px; height: 30px; font-size: 0.85rem; }
-      th, td { padding: 8px; }
+    th {
+      color: #888;
+      font-weight: 600;
+    }
+    code {
+      background-color: #2b2b2b;
+      padding: 3px 6px;
+      border-radius: 4px;
+      color: #ffca28;
+      font-size: 0.85em;
+    }
+    .win-rate {
+      color: #81c784;
+      font-weight: bold;
     }
   </style>
 </head>
 <body>
+  <div class="container">
+    <h1>Poker Dashboard</h1>
+    
+    <div class="grid">
+      <!-- Spillstatistikk -->
+      <div class="card">
+        <h2>Spillerstatistikk</h2>
+        <table id="player-stats-table">
+          <thead>
+            <tr>
+              <th>Spiller</th>
+              <th>Hender Spilt</th>
+              <th>Hender Vunnet</th>
+              <th>Seiersprosent</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
 
-  <h1>🏆 Dagens beste hender</h1>
-  <div class="subtitle" id="date-label"></div>
-  <div style="text-align:center; margin-bottom: 8px;">
-    <a href="/">← Tilbake til spillet</a>
-  </div>
-
-  <div class="toolbar">
-    <button class="refresh-btn" id="refresh-btn" onclick="loadTopHands()">↻ Oppdater</button>
-  </div>
-
-  <div class="panel">
-    <div id="content">
-      <div class="empty-state">Laster dagens hender…</div>
+      <!-- Siste Viste Hender -->
+      <div class="card">
+        <h2>Siste Viste Hender</h2>
+        <table id="winning-hands-table">
+          <thead>
+            <tr>
+              <th>Tidspunkt</th>
+              <th>Vinner</th>
+              <th>Hånd</th>
+              <th>Visning / Kort</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
     </div>
   </div>
 
   <script>
-    const SUIT_SYMBOLS = { s: '♠', h: '♥', d: '♦', c: '♣' };
-    const RED_SUITS = ['h', 'd'];
-    const MEDALS = ['🥇', '🥈', '🥉'];
-
-    function escapeHtml(str) {
-      return String(str)
-        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-    }
-
-    // F.eks. "As" → { rank: "A", suit: "s" } ; "10h" → { rank: "10", suit: "h" }
-    function parseCardToken(token) {
-      const t = String(token).trim();
-      if (t.length < 2) return { rank: t, suit: '' };
-      const suit = t[t.length - 1].toLowerCase();
-      return { rank: t.slice(0, -1), suit };
-    }
-    function renderCardChip(token) {
-      const { rank, suit } = parseCardToken(token);
-      const cls = RED_SUITS.includes(suit) ? 'red' : 'black';
-      const sym = SUIT_SYMBOLS[suit] ? ' ' + SUIT_SYMBOLS[suit] : '';
-      return '<span class="card-chip ' + cls + '">' + escapeHtml(rank) + sym + '</span>';
-    }
-
-    // winning_cards er JSON: {"board":[...], "cards":[{"name":"Ola","cards":[...]}, ...]}
-    function formatCardsJson(raw) {
-      if (!raw) return '<span style="color:#9fc4ab;">—</span>';
-      let data;
-      try { data = JSON.parse(raw); } catch (e) { return '<span style="color:#9fc4ab;">—</span>'; }
-
-      let html = '';
-      if (Array.isArray(data.board) && data.board.length) {
-        html += '<span class="cards-label">Bord</span>';
-        html += data.board.map(renderCardChip).join('');
-      }
-      const winners = Array.isArray(data.cards) ? data.cards : [];
-      for (const w of winners) {
-        if (!w || !Array.isArray(w.cards)) continue;
-        html += '<span class="cards-label" style="margin-left:8px;">' + escapeHtml(w.name || 'Vinner') + '</span>';
-        html += w.cards.map(renderCardChip).join('');
-      }
-      return html || '<span style="color:#9fc4ab;">—</span>';
-    }
-
-    function formatTime(iso) {
-      if (!iso) return '';
-      const d = new Date(iso);
-      if (isNaN(d.getTime())) return iso;
-      return d.toLocaleTimeString('nb-NO', { hour: '2-digit', minute: '2-digit' });
-    }
-
-    function renderTable(rows) {
-      if (!rows.length) {
-        return '<div class="empty-state">🃏 Ingen vunne hender i dag ennå. Del en hånd på spilletabellen!</div>';
-      }
-
-      let html = '<table><thead><tr>'
-        + '<th style="width:70px;">Plass</th>'
-        + '<th>Spiller</th>'
-        + '<th>Hånd</th>'
-        + '<th>Kort</th>'
-        + '<th style="width:80px;">Tid</th>'
-        + '</tr></thead><tbody>';
-
-      rows.forEach((row, i) => {
-        const medal = i < 3 ? MEDALS[i] : '<span class="rank-num">' + (i + 1) + '.' + '</span>';
-        html += '<tr>'
-          + '<td class="rank-cell">' + medal + '</td>'
-          + '<td class="player-name">' + escapeHtml(row.player_name || 'Anonym') + '</td>'
-          + '<td class="hand-desc">' + escapeHtml(row.hand_description || '—') + '</td>'
-          + '<td><div class="cards-cell">' + formatCardsJson(row.winning_cards) + '</div></td>'
-          + '<td class="time-cell">' + formatTime(row.created_at) + '</td>'
-          + '</tr>';
-      });
-
-      html += '</tbody></table>';
-      return html;
-    }
-
-    async function loadTopHands() {
-      const content = document.getElementById('content');
-      content.innerHTML = '<div class="empty-state">Laster dagens hender…</div>';
-
-      let data;
+    async function loadDashboardData() {
       try {
-        const resp = await fetch('/api/top-hands');
-        if (!resp.ok) throw new Error('HTTP ' + resp.status);
-        data = await resp.json();
-      } catch (err) {
-        if (err.message === 'HTTP 503') {
-          content.innerHTML = '<div class="error-state">⚠️ Databasen er ikke tilkoblet på serveren.<br>Sjekk TURSO_DATABASE_URL og TURSO_AUTH_TOKEN.</div>';
-        } else {
-          content.innerHTML = '<div class="error-state">⚠️ Kunne ikke laste dagens hender: ' + escapeHtml(err.message) + '</div>';
-        }
-        return;
-      }
+        // 1. Spillerstatistikk fra /api/stats
+        const statsRes = await fetch('/api/stats');
+        if (statsRes.ok) {
+          const stats = await statsRes.json();
+          const statsBody = document.querySelector('#player-stats-table tbody');
+          statsBody.innerHTML = '';
+          
+          stats.forEach(p => {
+            const pct = p.hands_played > 0 
+              ? ((p.hands_won / p.hands_played) * 100).toFixed(1) + '%' 
+              : '0%';
 
-      content.innerHTML = renderTable(data);
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td><strong>${p.name}</strong></td>
+              <td>${p.hands_played}</td>
+              <td>${p.hands_won}</td>
+              <td><span class="win-rate">${pct}</span></td>
+            `;
+            statsBody.appendChild(row);
+          });
+        }
+
+        // 2. Viste hender fra /api/winning-hands
+        const handsRes = await fetch('/api/winning-hands');
+        if (handsRes.ok) {
+          const hands = await handsRes.json();
+          const handsBody = document.querySelector('#winning-hands-table tbody');
+          handsBody.innerHTML = '';
+
+          hands.forEach(h => {
+            let cardDetails = '-';
+            if (h.winning_cards) {
+              try {
+                const parsed = JSON.parse(h.winning_cards);
+                const boardStr = parsed.board ? `[${parsed.board.join(' ')}] ` : '';
+                const playersCards = parsed.cards 
+                  ? parsed.cards.map(c => `${c.name}: ${c.cards.join(',')}`).join(' | ') 
+                  : '';
+                cardDetails = `${boardStr}${playersCards}`;
+              } catch (e) {
+                cardDetails = h.winning_cards;
+              }
+            }
+
+            const timeStr = h.created_at 
+              ? new Date(h.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
+              : '-';
+
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${timeStr}</td>
+              <td><strong>${h.player_name}</strong></td>
+              <td>${h.hand_description}</td>
+              <td><code>${cardDetails}</code></td>
+            `;
+            handsBody.appendChild(row);
+          });
+        }
+
+      } catch (err) {
+        console.error('Feil ved oppdatering av dashboard:', err);
+      }
     }
 
-    // Dato i overskriften (lokal tid)
-    document.getElementById('date-label').textContent =
-      new Date().toLocaleDateString('nb-NO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-
-    loadTopHands();
+    loadDashboardData();
+    setInterval(loadDashboardData, 4000);
   </script>
 </body>
 </html>

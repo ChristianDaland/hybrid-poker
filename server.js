@@ -34,7 +34,7 @@ app.get('/api/winning-hands', async (req, res) => {
     return res.status(503).json({ error: 'Database ikke tilkoblet. Set TURSO_DATABASE_URL og TURSO_AUTH_TOKEN.' });
   }
   try {
-    const result = await db.execute("SELECT player_name, hand_description, winning_cards, created_at FROM winning_hands ORDER BY created_at DESC, id DESC LIMIT 10");
+    const result = await db.execute("SELECT player_name, hand_description, winning_cards, created_at FROM winning_hands ORDER BY id DESC LIMIT 20");
     res.json(result.rows);
   } catch (err) {
     console.error('[DB Error /api/winning-hands]:', err);
@@ -209,23 +209,23 @@ function ensurePlayerStats(uuid, name) {
   ).catch(err => console.error('[DB] Feil ved registrering av spiller:', err.message));
 }
 
-// Trekker ut vinnernavn fra winnerInfo (håndterer delte potter)
+// Trekker ut vinnernavn fra winnerInfo (håndterer delte potter trygt)
 function parseWinnerNames(winnerInfo) {
   if (!winnerInfo || !winnerInfo.winnerName) return [];
-  const raw = winnerInfo.winnerName;
-  if (raw.startsWith('UAVGJOERT / DELING:')) {
-    return raw.split(':', 2)[1].split('&').map(s => s.trim()).filter(Boolean);
+  let raw = winnerInfo.winnerName;
+  if (raw.includes(':')) {
+    raw = raw.split(':')[1];
   }
-  return [raw];
+  return raw.split('&').map(s => s.trim()).filter(Boolean);
 }
 
 // Sjekker om en oversatt håndbeskrivelse er en «monsterhånd» som fortjener feiring
 function isMonsterHand(descr) {
   if (!descr) return false;
   const d = descr.toLowerCase();
-  return d.includes('straight/flush') ||
-         d.includes('full house') ||
-         d.includes('four of a kind') ||
+  return d.includes('straight flush') ||
+         d.includes('fullt hus') ||
+         d.includes('fire like') ||
          d.includes('royal');
 }
 
@@ -252,9 +252,14 @@ function persistPreviousHand() {
   const inHand = Object.values(players).filter(p => !p.folded);
   const winnerNames = parseWinnerNames(winnerInfo);
   const description = winnerInfo.descr || '';
+  
+  // INKLUDERER BÅDE NAVN, UUID OG KORT DERSOM IKKE FOLDED WIN
   const winningCards = winnerInfo.foldedWin
     ? ''
-    : JSON.stringify({ board: board, cards: inHand.map(p => ({ name: p.name, cards: p.cards })) });
+    : JSON.stringify({
+        board: board,
+        cards: inHand.map(p => ({ uuid: p.uuid, name: p.name, cards: p.cards }))
+      });
 
   (async () => {
     // Åpne sesjon ved første hånd, eller forlenge den pågående
@@ -280,7 +285,7 @@ function persistPreviousHand() {
       );
     }
 
-    // Logg vinnerhånden
+    // Logg vinnerhånden med spillerens UUID
     const winnerPlayer = inHand.find(p => winnerNames.includes(p.name));
     await db.execute(
       `INSERT INTO winning_hands (session_id, player_uuid, player_name, hand_description, winning_cards, created_at)
@@ -346,7 +351,6 @@ function startNewHandLogic() {
 
 io.on('connection', (socket) => {
   socket.on('join_game', (nameOrPayload) => {
-    // Støtter både gammelt format (navn som string) og nytt format ({ name, uuid })
     let cleanName = 'Spiller';
     let clientUuid = null;
     if (nameOrPayload && typeof nameOrPayload === 'object') {
@@ -363,7 +367,6 @@ io.on('connection', (socket) => {
     if (existingPlayerKey) {
       const playerData = players[existingPlayerKey];
 
-      // Clear any pending disconnect timeout
       if (disconnectTimeouts[existingPlayerKey]) {
         clearTimeout(disconnectTimeouts[existingPlayerKey]);
         delete disconnectTimeouts[existingPlayerKey];
@@ -374,7 +377,6 @@ io.on('connection', (socket) => {
       playerData.id = socket.id;
       playerData.connected = true;
 
-      // FIX: Oppdater UUID-mappingen slik at identiteten følger med det nye socketet
       if (clientUuid && clientUuid !== playerData.uuid) {
         if (playerData.uuid) {
           uuidToPlayerId.delete(playerData.uuid);
@@ -388,7 +390,6 @@ io.on('connection', (socket) => {
       players[socket.id] = playerData;
       ensurePlayerStats(playerData.uuid, playerData.name);
     } else {
-      // Generer vedvarende identitet for nye spillere
       let playerUuid = clientUuid;
       if (!playerUuid) {
         try {
@@ -416,7 +417,6 @@ io.on('connection', (socket) => {
       ensurePlayerStats(playerUuid, cleanName);
     }
 
-    // Send UUID tilbake til klienten slik at den kan lagres i localStorage
     const joinedPlayer = players[socket.id];
     socket.emit('joined', { uuid: joinedPlayer.uuid, name: joinedPlayer.name });
     updateAll();
@@ -429,7 +429,6 @@ io.on('connection', (socket) => {
       gameState.board = [];
       gameState.winnerInfo = null;
     } else {
-      // Stokker plassene til alle spillere når en spilletype velges
       randomizePlayerSeats();
     }
     updateAll();
@@ -539,19 +538,16 @@ io.on('connection', (socket) => {
     }
 
     if (existingId !== socket.id) {
-      // Clear any pending disconnect timeout
       if (disconnectTimeouts[existingId]) {
         clearTimeout(disconnectTimeouts[existingId]);
         delete disconnectTimeouts[existingId];
       }
-
-      // Rebind player to new socket
       delete players[existingId];
     }
 
     player.connected = true;
     player.uuid = uuid;
-    player.id = socket.id; // Viktig: updateAll() sender player_state til p.id
+    player.id = socket.id;
     players[socket.id] = player;
     uuidToPlayerId.set(uuid, socket.id);
     ensurePlayerStats(uuid, player.name);
@@ -566,12 +562,10 @@ io.on('connection', (socket) => {
       const disconnectedId = socket.id;
       const playerUuid = players[socket.id].uuid;
 
-      // Clear any existing timeout for this socket
       if (disconnectTimeouts[disconnectedId]) {
         clearTimeout(disconnectTimeouts[disconnectedId]);
       }
 
-      // 60-second grace period before permanently removing the player
       disconnectTimeouts[disconnectedId] = setTimeout(() => {
         delete players[disconnectedId];
         delete disconnectTimeouts[disconnectedId];
