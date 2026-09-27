@@ -23,7 +23,7 @@
     }
     .grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1.2fr;
       gap: 20px;
     }
     .card {
@@ -54,16 +54,29 @@
       color: #888;
       font-weight: 600;
     }
-    code {
-      background-color: #2b2b2b;
-      padding: 3px 6px;
-      border-radius: 4px;
-      color: #ffca28;
-      font-size: 0.85em;
+    .rank-badge {
+      display: inline-block;
+      width: 24px;
+      height: 24px;
+      line-height: 24px;
+      text-align: center;
+      background-color: #333;
+      color: #fff;
+      border-radius: 50%;
+      font-size: 0.8rem;
+      font-weight: bold;
+    }
+    .top3 {
+      background-color: #ffb300;
+      color: #000;
     }
     .win-rate {
       color: #81c784;
       font-weight: bold;
+    }
+    .time-col {
+      color: #aaa;
+      font-size: 0.85rem;
     }
   </style>
 </head>
@@ -88,16 +101,16 @@
         </table>
       </div>
 
-      <!-- Siste Viste Hender -->
+      <!-- Top 10 beste vinnerhender -->
       <div class="card">
-        <h2>Siste Viste Hender</h2>
+        <h2>Top 10 Beste Vinnerhender (Spillekveld)</h2>
         <table id="winning-hands-table">
           <thead>
             <tr>
+              <th>#</th>
+              <th>Spiller</th>
+              <th>Vinnerhånd</th>
               <th>Tidspunkt</th>
-              <th>Vinner</th>
-              <th>Hånd</th>
-              <th>Visning / Kort</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -132,38 +145,26 @@
           });
         }
 
-        // 2. Viste hender fra /api/winning-hands
+        // 2. Top 10 Vinnerhender fra /api/winning-hands
         const handsRes = await fetch('/api/winning-hands');
         if (handsRes.ok) {
           const hands = await handsRes.json();
           const handsBody = document.querySelector('#winning-hands-table tbody');
           handsBody.innerHTML = '';
 
-          hands.forEach(h => {
-            let cardDetails = '-';
-            if (h.winning_cards) {
-              try {
-                const parsed = JSON.parse(h.winning_cards);
-                const boardStr = parsed.board ? `[${parsed.board.join(' ')}] ` : '';
-                const playersCards = parsed.cards 
-                  ? parsed.cards.map(c => `${c.name}: ${c.cards.join(',')}`).join(' | ') 
-                  : '';
-                cardDetails = `${boardStr}${playersCards}`;
-              } catch (e) {
-                cardDetails = h.winning_cards;
-              }
-            }
-
+          hands.forEach((h, index) => {
             const timeStr = h.created_at 
               ? new Date(h.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
               : '-';
 
+            const badgeClass = index < 3 ? 'rank-badge top3' : 'rank-badge';
+
             const row = document.createElement('tr');
             row.innerHTML = `
-              <td>${timeStr}</td>
+              <td><span class="${badgeClass}">${index + 1}</span></td>
               <td><strong>${h.player_name}</strong></td>
               <td>${h.hand_description}</td>
-              <td><code>${cardDetails}</code></td>
+              <td class="time-col">${timeStr}</td>
             `;
             handsBody.appendChild(row);
           });

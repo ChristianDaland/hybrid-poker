@@ -14,7 +14,7 @@ const io = new Server(server);
 app.use(express.static('public'));
 
 // ============================================================
-// API: Statistikk og vinnerhender
+// API: Statistikk og Topp 10 vinnerhender for denne spillekvelden
 // ============================================================
 app.get('/api/stats', async (req, res) => {
   if (!db) {
@@ -34,7 +34,15 @@ app.get('/api/winning-hands', async (req, res) => {
     return res.status(503).json({ error: 'Database ikke tilkoblet. Set TURSO_DATABASE_URL og TURSO_AUTH_TOKEN.' });
   }
   try {
-    const result = await db.execute("SELECT player_name, hand_description, winning_cards, created_at FROM winning_hands ORDER BY id DESC LIMIT 20");
+    // Hent hendene fra nåværende sesjon (eller den seneste sesjonen) sortert på rangering/vekt
+    const result = await db.execute(`
+      SELECT player_name, hand_description, winning_cards, hand_rank, created_at 
+      FROM winning_hands 
+      WHERE session_id = ? OR session_id = (SELECT MAX(id) FROM poker_sessions)
+      ORDER BY hand_rank DESC, id DESC 
+      LIMIT 10
+    `, [currentSessionId || 0]);
+    
     res.json(result.rows);
   } catch (err) {
     console.error('[DB Error /api/winning-hands]:', err);
@@ -88,6 +96,24 @@ function translateHandDescription(descr) {
   text = text.replace(/Clubs/g, 'Kløver');
 
   return text;
+}
+
+// Beregner en numerisk rangering for sortering av Topp 10 hender
+function getHandRankValue(descr, rankNum) {
+  if (rankNum) return rankNum;
+  if (!descr) return 0;
+  const d = descr.toLowerCase();
+  if (d.includes('royal')) return 10;
+  if (d.includes('straight flush')) return 9;
+  if (d.includes('fire like')) return 8;
+  if (d.includes('fullt hus')) return 7;
+  if (d.includes('flush')) return 6;
+  if (d.includes('straight')) return 5;
+  if (d.includes('tre like')) return 4;
+  if (d.includes('to par')) return 3;
+  if (d.includes('ett par')) return 2;
+  if (d.includes('høyt kort')) return 1;
+  return 0;
 }
 
 function evaluatePlayerHand(playerCards, boardCards, gameMode) {
@@ -194,11 +220,11 @@ async function ensureTables() {
     player_name TEXT,
     hand_description TEXT,
     winning_cards TEXT,
+    hand_rank INTEGER DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`);
 }
 
-// Registrerer spiller i player_stats (eller oppdaterer navnet hvis vedkommende allerede finnes)
 function ensurePlayerStats(uuid, name) {
   if (!db || !uuid) return;
   db.execute(
@@ -209,7 +235,6 @@ function ensurePlayerStats(uuid, name) {
   ).catch(err => console.error('[DB] Feil ved registrering av spiller:', err.message));
 }
 
-// Trekker ut vinnernavn fra winnerInfo (håndterer delte potter trygt)
 function parseWinnerNames(winnerInfo) {
   if (!winnerInfo || !winnerInfo.winnerName) return [];
   let raw = winnerInfo.winnerName;
@@ -219,7 +244,6 @@ function parseWinnerNames(winnerInfo) {
   return raw.split('&').map(s => s.trim()).filter(Boolean);
 }
 
-// Sjekker om en oversatt håndbeskrivelse er en «monsterhånd» som fortjener feiring
 function isMonsterHand(descr) {
   if (!descr) return false;
   const d = descr.toLowerCase();
@@ -229,14 +253,11 @@ function isMonsterHand(descr) {
          d.includes('royal');
 }
 
-// Lagrer forrige hånd i databasen. Kalles rett før en ny hånd deles,
-// slik at både folded-win (FINISHED) og showdown (SHOWDOWN) fanges nøyaktig én gang.
 function persistPreviousHand() {
   const { phase, winnerInfo, board, gameMode } = gameState;
   if (!winnerInfo) return;
   if (phase !== 'FINISHED' && phase !== 'SHOWDOWN') return;
 
-  // 🎉 Feiring ved monsterhånd (virker uavhengig av databasen)
   if (!winnerInfo.foldedWin && isMonsterHand(winnerInfo.descr) &&
       winnerInfo.winnerName && !winnerInfo.winnerName.startsWith('UAVGJOERT / DELING:')) {
     io.to('game').emit('celebrate_win', {
@@ -252,8 +273,8 @@ function persistPreviousHand() {
   const inHand = Object.values(players).filter(p => !p.folded);
   const winnerNames = parseWinnerNames(winnerInfo);
   const description = winnerInfo.descr || '';
+  const rankVal = getHandRankValue(description, winnerInfo.rank);
   
-  // INKLUDERER BÅDE NAVN, UUID OG KORT DERSOM IKKE FOLDED WIN
   const winningCards = winnerInfo.foldedWin
     ? ''
     : JSON.stringify({
@@ -262,7 +283,6 @@ function persistPreviousHand() {
       });
 
   (async () => {
-    // Åpne sesjon ved første hånd, eller forlenge den pågående
     let sessionId = currentSessionId;
     if (!sessionId) {
       await db.execute("UPDATE poker_sessions SET ended_at = datetime('now') WHERE ended_at IS NULL");
@@ -276,7 +296,6 @@ function persistPreviousHand() {
       await db.execute("UPDATE poker_sessions SET ended_at = datetime('now') WHERE id = ?", [sessionId]);
     }
 
-    // Oppdater statistikk for de spillere som var med i hånden
     for (const p of inHand) {
       const isWinner = winnerNames.includes(p.name);
       await db.execute(
@@ -285,18 +304,16 @@ function persistPreviousHand() {
       );
     }
 
-    // Logg vinnerhånden med spillerens UUID
     const winnerPlayer = inHand.find(p => winnerNames.includes(p.name));
     await db.execute(
-      `INSERT INTO winning_hands (session_id, player_uuid, player_name, hand_description, winning_cards, created_at)
-       VALUES (?, ?, ?, ?, ?, datetime('now'))`,
-      [sessionId, winnerPlayer ? winnerPlayer.uuid : null, winnerNames.join(' & '), description, winningCards]
+      `INSERT INTO winning_hands (session_id, player_uuid, player_name, hand_description, winning_cards, hand_rank, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
+      [sessionId, winnerPlayer ? winnerPlayer.uuid : null, winnerNames.join(' & '), description, winningCards, rankVal]
     );
     console.log('[DB] Håndresultat lagret (vinner:', winnerNames.join(' & ') + ')');
   })().catch(err => console.error('[DB] Kunne ikke lagre håndresultat:', err.message));
 }
 
-// Hjælpefunksjon for å stokke om rekkefølgen på spillerne i `players`-objektet
 function randomizePlayerSeats() {
   const playerArray = Object.values(players);
   if (playerArray.length <= 1) return;
@@ -310,14 +327,13 @@ function randomizePlayerSeats() {
   });
 
   players = newPlayersObj;
-  gameState.dealerIndex = 0; // Nullstill dealerknapp til første plass
+  gameState.dealerIndex = 0;
 }
 
 function startNewHandLogic() {
   const playerList = Object.values(players);
   if (playerList.length === 0 || !gameState.gameMode) return;
 
-  // Persist forrige hånd (hvis noen) i databasen før kortene nullstilles
   persistPreviousHand();
 
   gameState.deck = createDeck();
@@ -453,7 +469,8 @@ io.on('connection', (socket) => {
       gameState.winnerInfo = {
         winnerName: activePlayers[0].name,
         descr: 'Alle andre kastet seg',
-        foldedWin: true
+        foldedWin: true,
+        rank: 0
       };
       updateAll();
       return;
@@ -495,6 +512,7 @@ io.on('connection', (socket) => {
         winnerName: winnerText,
         descr: translateHandDescription(rawDescr),
         foldedWin: false,
+        rank: winners[0] ? winners[0].solved.rank : 0,
         rawCards: winners[0] ? winners[0].solved.cards : []
       };
     }
@@ -511,7 +529,8 @@ io.on('connection', (socket) => {
         gameState.winnerInfo = {
           winnerName: activePlayers[0].name,
           descr: 'Alle andre kastet seg',
-          foldedWin: true
+          foldedWin: true,
+          rank: 0
         };
       }
       updateAll();
