@@ -326,6 +326,7 @@ function persistHandResult() {
       if (!winnerInfo.foldedWin) {
         const winningCardsStr = JSON.stringify({
           board: board || [],
+          winningCards: winnerInfo.rawCards || [],
           cards: inHand.map(p => ({ uuid: p.uuid || '', name: p.name || '', cards: p.cards || [] }))
         });
 
