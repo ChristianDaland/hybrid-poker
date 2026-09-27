@@ -3,7 +3,6 @@ try { require('dotenv').config(); } catch (err) { /* dotenv ikke installert – 
 
 const express = require('express');
 const http = require('http');
-const crypto = require('crypto');
 const { Server } = require('socket.io');
 const Hand = require('pokersolver').Hand;
 
@@ -19,9 +18,7 @@ app.use(express.json());
 // ============================================================
 
 app.get('/api/stats', async (req, res) => {
-  if (!db) {
-    return res.status(503).json({ error: 'Database ikke tilkoblet.' });
-  }
+  if (!db) return res.status(503).json({ error: 'Database ikke tilkoblet.' });
   try {
     const result = await db.execute(`
       SELECT 
@@ -40,9 +37,7 @@ app.get('/api/stats', async (req, res) => {
 });
 
 app.get('/api/winning-hands', async (req, res) => {
-  if (!db) {
-    return res.status(503).json({ error: 'Database ikke tilkoblet.' });
-  }
+  if (!db) return res.status(503).json({ error: 'Database ikke tilkoblet.' });
   try {
     const result = await db.execute(`
       SELECT player_name, hand_description, winning_cards, hand_rank, created_at 
@@ -58,9 +53,7 @@ app.get('/api/winning-hands', async (req, res) => {
 });
 
 app.get('/api/debug-db', async (req, res) => {
-  if (!db) {
-    return res.status(503).json({ error: 'Database ikke tilkoblet.' });
-  }
+  if (!db) return res.status(503).json({ error: 'Database ikke tilkoblet.' });
   try {
     const hands = await db.execute("SELECT * FROM winning_hands ORDER BY id DESC");
     const stats = await db.execute("SELECT * FROM player_stats ORDER BY id DESC");
@@ -78,9 +71,7 @@ app.get('/api/debug-db', async (req, res) => {
 });
 
 app.post('/api/reset-db', async (req, res) => {
-  if (!db) {
-    return res.status(503).json({ error: 'Database ikke tilkoblet.' });
-  }
+  if (!db) return res.status(503).json({ error: 'Database ikke tilkoblet.' });
   try {
     await db.execute("DELETE FROM winning_hands");
     await db.execute("DELETE FROM player_stats");
@@ -114,10 +105,6 @@ function shuffle(array) {
     [deck[i], deck[j]] = [deck[j], deck[i]];
   }
   return deck;
-}
-
-function formatForSolver(card) {
-  return card;
 }
 
 function translateHandDescription(descr) {
@@ -154,29 +141,21 @@ function getHandRankValue(descr) {
   if (d.includes('tre like')) return 4;
   if (d.includes('to par')) return 3;
   if (d.includes('ett par') || d.includes('par')) return 2;
-  if (d.includes('høyt kort')) return 1;
   return 1;
 }
 
 function evaluatePlayerHand(playerCards, boardCards, gameMode) {
-  const formattedBoard = boardCards.map(formatForSolver);
-  const formattedPlayer = playerCards.map(formatForSolver);
-
   if (gameMode === 'TEXAS') {
-    const allCards = [...formattedPlayer, ...formattedBoard];
-    return Hand.solve(allCards);
+    return Hand.solve([...playerCards, ...boardCards]);
   } else {
     let bestHand = null;
-    for (let i = 0; i < formattedPlayer.length; i++) {
-      for (let j = i + 1; j < formattedPlayer.length; j++) {
-        const hand2 = [formattedPlayer[i], formattedPlayer[j]];
-
-        for (let b1 = 0; b1 < formattedBoard.length; b1++) {
-          for (let b2 = b1 + 1; b2 < formattedBoard.length; b2++) {
-            for (let b3 = b2 + 1; b3 < formattedBoard.length; b3++) {
-              const board3 = [formattedBoard[b1], formattedBoard[b2], formattedBoard[b3]];
-              const combo = Hand.solve([...hand2, ...board3]);
-              
+    for (let i = 0; i < playerCards.length; i++) {
+      for (let j = i + 1; j < playerCards.length; j++) {
+        const hand2 = [playerCards[i], playerCards[j]];
+        for (let b1 = 0; b1 < boardCards.length; b1++) {
+          for (let b2 = b1 + 1; b2 < boardCards.length; b2++) {
+            for (let b3 = b2 + 1; b3 < boardCards.length; b3++) {
+              const combo = Hand.solve([...hand2, boardCards[b1], boardCards[b2], boardCards[b3]]);
               if (!bestHand) {
                 bestHand = combo;
               } else {
@@ -286,99 +265,87 @@ function parseWinnerNames(winnerInfo) {
   return raw.split('&').map(s => s.trim()).filter(Boolean);
 }
 
-function isMonsterHand(descr) {
-  if (!descr) return false;
-  const d = descr.toLowerCase();
-  return d.includes('straight flush') ||
-         d.includes('fullt hus') ||
-         d.includes('fire like') ||
-         d.includes('royal');
-}
-
 async function persistHandResult() {
   const { winnerInfo, board, gameMode } = gameState;
   if (!winnerInfo) return;
-
-  if (!winnerInfo.foldedWin && isMonsterHand(winnerInfo.descr) &&
-      winnerInfo.winnerName && !winnerInfo.winnerName.startsWith('UAVGJOERT / DELING:')) {
-    io.to('game').emit('celebrate_win', {
-      playerName: winnerInfo.winnerName,
-      handDescription: winnerInfo.descr,
-      winningCards: winnerInfo.rawCards || []
-    });
-  }
 
   if (!db) {
     console.warn('[DB] Databasetilkobling mangler – kan ikke lagre.');
     return;
   }
 
-  const inHand = Object.values(players).filter(p => !p.folded);
   const winnerNames = parseWinnerNames(winnerInfo);
   const description = winnerInfo.descr || 'Ukjent hånd';
   const rankVal = getHandRankValue(description);
   const nowIso = new Date().toISOString();
 
-  try {
-    if (!currentSessionId) {
-      try {
-        const ins = await db.execute({
-          sql: "INSERT INTO poker_sessions (started_at, game_mode) VALUES (?, ?)",
-          args: [nowIso, gameMode || 'OMAHA']
-        });
-        currentSessionId = Number(ins.lastInsertRowid) || 1;
-      } catch (sErr) {
-        console.warn('[DB] Kunne ikke opprette sesjon, bruker fallback ID 1:', sErr.message);
-        currentSessionId = 1;
-      }
+  // 1. Sørg for at vi har en gyldig session_id
+  if (!currentSessionId) {
+    try {
+      const ins = await db.execute({
+        sql: "INSERT INTO poker_sessions (started_at, game_mode) VALUES (?, ?)",
+        args: [nowIso, gameMode || 'OMAHA']
+      });
+      currentSessionId = Number(ins.lastInsertRowid) || 1;
+    } catch (sErr) {
+      console.warn('[DB] Kunne ikke opprette sesjon, bruker fallback ID 1:', sErr.message);
+      currentSessionId = 1;
     }
+  }
 
-    // 1. Oppdater generell spillerstatistikk for alle spillere
-    for (const p of Object.values(players)) {
-      if (!p.uuid) continue;
-      const isWinner = winnerNames.includes(p.name);
+  // 2. Oppdater generell spillerstatistikk for alle spillere
+  for (const p of Object.values(players)) {
+    if (!p.uuid) continue;
+    const isWinner = winnerNames.includes(p.name);
+    try {
       await db.execute({
         sql: "UPDATE player_stats SET hands_played = hands_played + 1, hands_won = hands_won + ? WHERE uuid = ?",
-        args: [isWinner ? 1 : 0, p.uuid]
+        args: [isWinner ? 1 : 0, String(p.uuid)]
       });
+    } catch (pErr) {
+      console.error('[DB ERROR] Feil ved oppdatering av player_stats:', pErr.message);
     }
+  }
 
-    // 2. Lagre i winning_hands (Kjøres BÅDE ved Showdown og ved Fold dersom hånd beskrivelse finnes)
-    let safeRawCards = [];
-    if (Array.isArray(winnerInfo.rawCards)) {
-      safeRawCards = winnerInfo.rawCards.map(c => {
-        if (!c) return '';
-        return typeof c.toString === 'function' ? c.toString() : String(c);
-      });
-    }
-
-    const winningCardsStr = JSON.stringify({
-      board: board || [],
-      winningCards: safeRawCards,
-      cards: inHand.map(p => ({ uuid: p.uuid || '', name: p.name || '', cards: p.cards || [] }))
-    });
-
+  // 3. Lagre direkte i winning_hands med trygg streng-serialisering
+  try {
     const winnerPlayer = Object.values(players).find(p => winnerNames.includes(p.name));
-    const playerUuid = winnerPlayer?.uuid || Object.values(players)[0]?.uuid || 'ukjent-uuid';
+    const playerUuid = winnerPlayer ? String(winnerPlayer.uuid) : 'ukjent-uuid';
     const playerNameStr = winnerNames.length > 0 ? winnerNames.join(' & ') : 'Ukjent Spiller';
+
+    // Rensker kortene slik at kun enkle tekststrenger (f.eks. "Ah", "Kd") lagres i JSON
+    const cleanBoard = Array.isArray(board) ? board.map(c => String(c)) : [];
+    const cleanWinningCards = Array.isArray(winnerInfo.rawCards) 
+      ? winnerInfo.rawCards.map(c => (c && c.value && c.suit ? c.value + c.suit : String(c)))
+      : [];
+
+    const jsonPayload = JSON.stringify({
+      board: cleanBoard,
+      winningCards: cleanWinningCards,
+      cards: Object.values(players).map(p => ({
+        uuid: String(p.uuid || ''),
+        name: String(p.name || ''),
+        cards: Array.isArray(p.cards) ? p.cards.map(c => String(c)) : []
+      }))
+    });
 
     await db.execute({
       sql: `INSERT INTO winning_hands (session_id, player_uuid, player_name, hand_description, winning_cards, hand_rank, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)`,
       args: [
-        currentSessionId,
-        String(playerUuid),
-        String(playerNameStr),
+        Number(currentSessionId),
+        playerUuid,
+        playerNameStr,
         String(description),
-        String(winningCardsStr),
+        jsonPayload,
         Number(rankVal),
         nowIso
       ]
     });
 
-    console.log(`[DB SUCCESS] Vinnerhånd lagret i winning_hands: ${playerNameStr} | ${description} (Rank: ${rankVal})`);
+    console.log(`[DB SUCCESS] Lagret i winning_hands: ${playerNameStr} - ${description}`);
   } catch (err) {
-    console.error('[DB ERROR] Feil under lagring av håndresultat:', err);
+    console.error('[DB CRITICAL ERROR] Feil under skriving til winning_hands:', err);
   }
 }
 
@@ -630,7 +597,7 @@ io.on('connection', (socket) => {
     if (existingId !== socket.id) {
       if (disconnectTimeouts[existingId]) {
         clearTimeout(disconnectTimeouts[existingId]);
-        delete disconnectTimeouts[existingId];
+        delete disconnectTimeouts[existingPlayerKey];
       }
       delete players[existingId];
     }
