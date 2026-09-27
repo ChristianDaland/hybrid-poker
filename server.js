@@ -24,16 +24,16 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 
 // --- DATABASE OPPSETT ---
-// Bruker /tmp på Render/produksjon for å unngå "Read-only file system"-feil
-const dbPath = process.env.RENDER || process.env.NODE_ENV === 'production'
-  ? '/tmp/poker.db'
+// Bruker minnet (:memory:) på Render/sky for å unngå skrivefeil på skrivebeskyttet disk
+const dbPath = process.env.NODE_ENV === 'production' || process.env.RENDER
+  ? ':memory:'
   : path.join(__dirname, 'poker.db');
 
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
     console.error('Feil ved åpning av database:', err.message);
   } else {
-    console.log(`Tilkoblet SQLite-database på: ${dbPath}`);
+    console.log(`Tilkoblet SQLite-database (${dbPath})`);
   }
 });
 
@@ -109,7 +109,6 @@ function generateDeck() {
 
 function randomizePlayerSeats() {
   const playerList = Object.values(players);
-  // Fisher-Yates shuffle
   for (let i = playerList.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [playerList[i], playerList[j]] = [playerList[j], playerList[i]];
@@ -149,7 +148,6 @@ function evaluatePlayerHand(playerCards, boardCards, gameMode) {
   } else if (gameMode === 'OMAHA') {
     let bestHand = null;
 
-    // Generer alle kombinasjoner av 2 kort fra 4 på hånden
     const handCombos = [];
     for (let i = 0; i < playerCards.length; i++) {
       for (let j = i + 1; j < playerCards.length; j++) {
@@ -157,7 +155,6 @@ function evaluatePlayerHand(playerCards, boardCards, gameMode) {
       }
     }
 
-    // Generer alle kombinasjoner av 3 kort fra bordet
     const boardCombos = [];
     for (let i = 0; i < boardCards.length; i++) {
       for (let j = i + 1; j < boardCards.length; j++) {
@@ -167,7 +164,6 @@ function evaluatePlayerHand(playerCards, boardCards, gameMode) {
       }
     }
 
-    // Test alle kombinasjoner
     for (const hCombo of handCombos) {
       for (const bCombo of boardCombos) {
         const candidate = [...hCombo, ...bCombo];
