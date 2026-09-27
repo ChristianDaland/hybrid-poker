@@ -244,6 +244,13 @@ async function ensureTables() {
     hand_rank INTEGER DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`);
+
+  // Sikrer at hand_rank kolonnen finnes selv om tabellen fra før manglet den
+  try {
+    await db.execute(`ALTER TABLE winning_hands ADD COLUMN hand_rank INTEGER DEFAULT 0`);
+  } catch (e) {
+    // Kolonnen finnes allerede, ignoreres trygt
+  }
 }
 
 function ensurePlayerStats(uuid, name) {
@@ -315,7 +322,7 @@ async function persistHandResult() {
     }
   }
 
-  // 4. Skriv til winning_hands med utvidet feillogg
+  // 4. Skriv til winning_hands
   try {
     const cleanBoard = Array.isArray(board) ? board.map(c => String(c)) : [];
     const cleanWinningCards = Array.isArray(winnerInfo.rawCards) 
