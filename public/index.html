@@ -18,7 +18,7 @@
     }
 
     h1 {
-      margin: 5px 0 10px 0;
+      margin: 5px 0 15px 0;
       font-size: 1.8rem;
     }
 
@@ -148,6 +148,7 @@
       display: flex;
       gap: 10px;
       align-items: center;
+      flex-wrap: wrap;
     }
 
     .version-tag {
@@ -177,6 +178,8 @@
     .btn-change-mode { background-color: #607d8b; color: white; }
     .btn-action { background-color: #4caf50; color: white; }
     .btn-help { background-color: #009688; color: white; }
+    .btn-dashboard { background-color: #d84315; color: white; }
+    .btn-dashboard:hover { background-color: #bf360c; }
 
     /* Knappen for å åpne eget bordvindu */
     .btn-open-board {
@@ -216,9 +219,6 @@
 <body>
 
   <h1>Løland Gård Poker</h1>
-  <div style="margin: -4px 0 10px 0;">
-    <a href="/dashboard.html" style="color: #ffd700; font-size: 0.95rem; text-decoration: none;">🏆 Se dagens beste hender</a>
-  </div>
 
   <div id="winner-banner" class="winner-banner" style="display: none;"></div>
 
@@ -257,12 +257,15 @@
         <button id="btn-start-hand" class="btn-action" onclick="startNewHand()">Start Ny Hånd</button>
       </div>
 
+      <!-- Knapp for dashboard -->
+      <button class="btn-dashboard" onclick="openDashboardWindow()">🏆 Se Dashboard</button>
+
       <!-- Knapp for spilleveiledning -->
       <button class="btn-help" onclick="openHelpWindow()">📖 Spilleveiledning</button>
     </div>
 
     <!-- Versjonstekst nederst til høyre -->
-    <div class="version-tag">Versjon 2.10</div>
+    <div class="version-tag">Versjon 2.11</div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -273,7 +276,6 @@
     // 🎉 Feiring ved monsterhånd (celebrate_win)
     // ============================================================
     (function setupCelebration() {
-      // Last inn canvas-confetti via CDN
       const confettiScript = document.createElement('script');
       confettiScript.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js';
       document.head.appendChild(confettiScript);
@@ -369,6 +371,10 @@
 
     function openBoardWindow() {
       window.open('/board.html', 'PokerBoard', 'width=1200,height=800');
+    }
+
+    function openDashboardWindow() {
+      window.open('/dashboard.html', 'PokerDashboard', 'width=1200,height=800');
     }
 
     function openHelpWindow() {
