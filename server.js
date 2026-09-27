@@ -158,38 +158,78 @@ function startNewHandLogic() {
 }
 
 io.on('connection', (socket) => {
-  socket.on('join_game', (name) => {
-    const cleanName = name ? name.trim() : 'Spiller';
-    
+  socket.on('join_game', (nameOrPayload) => {
+    // Støtter både gammelt format (navn som string) og nytt format ({ name, uuid })
+    let cleanName = 'Spiller';
+    let clientUuid = null;
+    if (nameOrPayload && typeof nameOrPayload === 'object') {
+      cleanName = nameOrPayload.name ? String(nameOrPayload.name).trim() : 'Spiller';
+      clientUuid = nameOrPayload.uuid || null;
+    } else {
+      cleanName = nameOrPayload ? String(nameOrPayload).trim() : 'Spiller';
+    }
+
     let existingPlayerKey = Object.keys(players).find(
       key => players[key].name.toLowerCase() === cleanName.toLowerCase()
     );
 
     if (existingPlayerKey) {
       const playerData = players[existingPlayerKey];
-      delete players[existingPlayerKey];
-      
+
+      // Clear any pending disconnect timeout
       if (disconnectTimeouts[existingPlayerKey]) {
         clearTimeout(disconnectTimeouts[existingPlayerKey]);
         delete disconnectTimeouts[existingPlayerKey];
       }
 
+      delete players[existingPlayerKey];
+
       playerData.id = socket.id;
       playerData.connected = true;
+
+      // FIX: Oppdater UUID-mappingen slik at identiteten følger med det nye socketet
+      if (clientUuid && clientUuid !== playerData.uuid) {
+        if (playerData.uuid) {
+          uuidToPlayerId.delete(playerData.uuid);
+        }
+        playerData.uuid = clientUuid;
+      }
+      if (playerData.uuid) {
+        uuidToPlayerId.set(playerData.uuid, socket.id);
+      }
+
       players[socket.id] = playerData;
     } else {
+      // Generer vedvarende identitet for nye spillere
+      let playerUuid = clientUuid;
+      if (!playerUuid) {
+        try {
+          playerUuid = (typeof globalThis !== 'undefined' && globalThis.crypto && globalThis.crypto.randomUUID)
+            ? globalThis.crypto.randomUUID()
+            : null;
+        } catch (e) { playerUuid = null; }
+      }
+      if (!playerUuid) {
+        playerUuid = 'uuid-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
+      }
+
       const seatNumber = Object.keys(players).length + 1;
       players[socket.id] = {
         id: socket.id,
         name: cleanName,
+        uuid: playerUuid,
         seat: seatNumber,
         cards: [],
         folded: false,
         role: '',
         connected: true
       };
+      uuidToPlayerId.set(playerUuid, socket.id);
     }
 
+    // Send UUID tilbake til klienten slik at den kan lagres i localStorage
+    const joinedPlayer = players[socket.id];
+    socket.emit('joined', { uuid: joinedPlayer.uuid, name: joinedPlayer.name });
     updateAll();
   });
 
@@ -291,26 +331,36 @@ io.on('connection', (socket) => {
 
   socket.on('rejoin_game', (data) => {
     const uuid = (data && data.uuid) || (typeof data === 'string' ? data : null);
-    if (!uuid) return;
+    if (!uuid) {
+      socket.emit('rejoin_failed', { reason: 'Mangler UUID. Last om siden og prøv igjen.' });
+      return;
+    }
 
     const existingId = uuidToPlayerId.get(uuid);
-    if (!existingId || !players[existingId]) return;
+    if (!existingId) {
+      socket.emit('rejoin_failed', { reason: 'Ukjent UUID. Spilleren er kanskje fjernet fra bordet.' });
+      return;
+    }
 
     const player = players[existingId];
-
-    // Clear any pending disconnect timeout
-    if (disconnectTimeouts[existingId]) {
-      clearTimeout(disconnectTimeouts[existingId]);
-      delete disconnectTimeouts[existingId];
+    if (!player) {
+      socket.emit('rejoin_failed', { reason: 'Spilleren finnes ikke lenger på bordet.' });
+      return;
     }
-
-    // Rebind player to new socket
-    player.id = socket.id;
-    player.connected = true;
 
     if (existingId !== socket.id) {
+      // Clear any pending disconnect timeout
+      if (disconnectTimeouts[existingId]) {
+        clearTimeout(disconnectTimeouts[existingId]);
+        delete disconnectTimeouts[existingId];
+      }
+
+      // Rebind player to new socket
       delete players[existingId];
     }
+
+    player.connected = true;
+    player.uuid = uuid;
     players[socket.id] = player;
     uuidToPlayerId.set(uuid, socket.id);
 

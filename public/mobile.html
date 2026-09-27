@@ -293,6 +293,18 @@
       switchToGame();
     });
 
+    socket.on('rejoin_failed', (data) => {
+      console.log('[Mobile] Rejoin failed:', data);
+      isJoined = false;
+      clearJoinTimeout();
+      const reason = (data && data.reason) ? data.reason : 'Klarte ikke å gjenoppta spillet.';
+      setConnectionStatus('⚠️ ' + reason, '#f44336');
+      // Fjern lagret UUID for å unngå at samme feil gjentas
+      localStorage.removeItem('poker_uuid');
+      switchToLogin();
+      alert(reason);
+    });
+
     socket.on('player_state', (state) => {
       if (!isJoined) {
         isJoined = true;
