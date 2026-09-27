@@ -315,7 +315,7 @@ async function persistHandResult() {
     }
   }
 
-  // 4. Skriv til winning_hands
+  // 4. Skriv til winning_hands med utvidet feillogg
   try {
     const cleanBoard = Array.isArray(board) ? board.map(c => String(c)) : [];
     const cleanWinningCards = Array.isArray(winnerInfo.rawCards) 
@@ -348,7 +348,8 @@ async function persistHandResult() {
 
     console.log('[DB SUCCESS] Skrevet til winning_hands! Rader satt inn:', res.rowsAffected);
   } catch (err) {
-    console.error('[DB CRITICAL ERROR] Feil under skriving til winning_hands:', err);
+    console.error('[DB CRITICAL ERROR] Feil under skriving til winning_hands:', err.message);
+    console.error('[DB ERROR DETAILS]:', err);
   }
 }
 
