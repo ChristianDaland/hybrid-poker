@@ -152,7 +152,8 @@ function calculateHandScore(solved) {
   if (solved.cards && Array.isArray(solved.cards)) {
     cardValues = solved.cards.map(c => getCardNumericValue(c.value));
   }
-  let score = baseRank * 100000000;
+  // 10 milliarder som multiplikator sikrer at håndkategorien (baseRank) alltid veier tyngst
+  let score = baseRank * 10000000000;
   for (let i = 0; i < cardValues.length && i < 5; i++) {
     score += cardValues[i] * Math.pow(100, (4 - i));
   }
