@@ -121,7 +121,7 @@ function formatForSolver(card) {
 }
 
 function translateHandDescription(descr) {
-  let text = descr;
+  let text = descr || 'Ukjent hånd';
 
   text = text.replace(/\bT\b/g, '10');
   text = text.replace(/Straight Flush/g, 'Straight Flush');
@@ -295,7 +295,7 @@ function isMonsterHand(descr) {
          d.includes('royal');
 }
 
-function persistHandResult() {
+async function persistHandResult() {
   const { winnerInfo, board, gameMode } = gameState;
   if (!winnerInfo) return;
 
@@ -319,67 +319,67 @@ function persistHandResult() {
   const rankVal = getHandRankValue(description);
   const nowIso = new Date().toISOString();
 
-  (async () => {
-    try {
-      if (!currentSessionId) {
-        try {
-          const ins = await db.execute({
-            sql: "INSERT INTO poker_sessions (started_at, game_mode) VALUES (?, ?)",
-            args: [nowIso, gameMode || 'OMAHA']
-          });
-          currentSessionId = Number(ins.lastInsertRowid) || 1;
-        } catch (sErr) {
-          console.warn('[DB] Kunne ikke opprette sesjon, bruker fallback ID 1:', sErr.message);
-          currentSessionId = 1;
-        }
-      }
-
-      // 1. Oppdater generell spillerstatistikk
-      for (const p of Object.values(players)) {
-        if (!p.uuid) continue;
-        const isWinner = winnerNames.includes(p.name);
-        await db.execute({
-          sql: "UPDATE player_stats SET hands_played = hands_played + 1, hands_won = hands_won + ? WHERE uuid = ?",
-          args: [isWinner ? 1 : 0, p.uuid]
+  try {
+    if (!currentSessionId) {
+      try {
+        const ins = await db.execute({
+          sql: "INSERT INTO poker_sessions (started_at, game_mode) VALUES (?, ?)",
+          args: [nowIso, gameMode || 'OMAHA']
         });
+        currentSessionId = Number(ins.lastInsertRowid) || 1;
+      } catch (sErr) {
+        console.warn('[DB] Kunne ikke opprette sesjon, bruker fallback ID 1:', sErr.message);
+        currentSessionId = 1;
       }
-
-      // 2. Lagre i winning_hands hvis hånden gikk til showdown
-      if (!winnerInfo.foldedWin) {
-        const safeRawCards = Array.isArray(winnerInfo.rawCards)
-          ? winnerInfo.rawCards.map(c => (c && typeof c.toString === 'function' ? c.toString() : String(c)))
-          : [];
-
-        const winningCardsStr = JSON.stringify({
-          board: board || [],
-          winningCards: safeRawCards,
-          cards: inHand.map(p => ({ uuid: p.uuid || '', name: p.name || '', cards: p.cards || [] }))
-        });
-
-        const winnerPlayer = Object.values(players).find(p => winnerNames.includes(p.name));
-        const playerUuid = winnerPlayer?.uuid || Object.values(players)[0]?.uuid || 'ukjent-uuid';
-        const playerNameStr = winnerNames.length > 0 ? winnerNames.join(' & ') : 'Ukjent Spiller';
-
-        await db.execute({
-          sql: `INSERT INTO winning_hands (session_id, player_uuid, player_name, hand_description, winning_cards, hand_rank, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          args: [
-            currentSessionId,
-            String(playerUuid),
-            String(playerNameStr),
-            String(description),
-            String(winningCardsStr),
-            Number(rankVal),
-            nowIso
-          ]
-        });
-
-        console.log(`[DB SUCCESS] Vinnerhånd lagret i Top 10: ${playerNameStr} | ${description} (Rangering: ${rankVal})`);
-      }
-    } catch (err) {
-      console.error('[DB ERROR] Kunne ikke lagre håndresultat:', err);
     }
-  })();
+
+    // 1. Oppdater generell spillerstatistikk for alle spillere
+    for (const p of Object.values(players)) {
+      if (!p.uuid) continue;
+      const isWinner = winnerNames.includes(p.name);
+      await db.execute({
+        sql: "UPDATE player_stats SET hands_played = hands_played + 1, hands_won = hands_won + ? WHERE uuid = ?",
+        args: [isWinner ? 1 : 0, p.uuid]
+      });
+    }
+
+    // 2. Lagre i winning_hands (Kjøres BÅDE ved Showdown og ved Fold dersom hånd beskrivelse finnes)
+    let safeRawCards = [];
+    if (Array.isArray(winnerInfo.rawCards)) {
+      safeRawCards = winnerInfo.rawCards.map(c => {
+        if (!c) return '';
+        return typeof c.toString === 'function' ? c.toString() : String(c);
+      });
+    }
+
+    const winningCardsStr = JSON.stringify({
+      board: board || [],
+      winningCards: safeRawCards,
+      cards: inHand.map(p => ({ uuid: p.uuid || '', name: p.name || '', cards: p.cards || [] }))
+    });
+
+    const winnerPlayer = Object.values(players).find(p => winnerNames.includes(p.name));
+    const playerUuid = winnerPlayer?.uuid || Object.values(players)[0]?.uuid || 'ukjent-uuid';
+    const playerNameStr = winnerNames.length > 0 ? winnerNames.join(' & ') : 'Ukjent Spiller';
+
+    await db.execute({
+      sql: `INSERT INTO winning_hands (session_id, player_uuid, player_name, hand_description, winning_cards, hand_rank, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      args: [
+        currentSessionId,
+        String(playerUuid),
+        String(playerNameStr),
+        String(description),
+        String(winningCardsStr),
+        Number(rankVal),
+        nowIso
+      ]
+    });
+
+    console.log(`[DB SUCCESS] Vinnerhånd lagret i winning_hands: ${playerNameStr} | ${description} (Rank: ${rankVal})`);
+  } catch (err) {
+    console.error('[DB ERROR] Feil under lagring av håndresultat:', err);
+  }
 }
 
 function randomizePlayerSeats() {
@@ -521,7 +521,7 @@ io.on('connection', (socket) => {
     updateAll();
   });
 
-  socket.on('next_phase', () => {
+  socket.on('next_phase', async () => {
     const activePlayers = Object.values(players).filter(p => !p.folded);
 
     if (gameState.phase === 'FINISHED' || gameState.phase === 'SHOWDOWN') {
@@ -536,9 +536,10 @@ io.on('connection', (socket) => {
         winnerName: activePlayers[0].name,
         descr: 'Alle andre kastet seg',
         foldedWin: true,
+        rawCards: [],
         rank: 0
       };
-      persistHandResult();
+      await persistHandResult();
       updateAll();
       return;
     }
@@ -582,12 +583,12 @@ io.on('connection', (socket) => {
         rawCards: winners[0] ? winners[0].solved.cards : []
       };
 
-      persistHandResult();
+      await persistHandResult();
     }
     updateAll();
   });
 
-  socket.on('player_fold', () => {
+  socket.on('player_fold', async () => {
     if (players[socket.id]) {
       players[socket.id].folded = true;
       
@@ -598,9 +599,10 @@ io.on('connection', (socket) => {
           winnerName: activePlayers[0].name,
           descr: 'Alle andre kastet seg',
           foldedWin: true,
+          rawCards: [],
           rank: 0
         };
-        persistHandResult();
+        await persistHandResult();
       }
       updateAll();
     }
