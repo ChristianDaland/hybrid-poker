@@ -322,7 +322,7 @@ function persistHandResult() {
         );
       }
 
-      // 2. Lagre i winning_hands (KUN DERSOM HÅNDEN GIKK TIL SHOWDOWN, DVS IKKE FOLD)
+      // 2. Lagre i winning_hands (KUN DERSOM HÅNDEN GIKK TIL SHOWDOWN)
       if (!winnerInfo.foldedWin) {
         const winningCardsStr = JSON.stringify({
           board: board || [],
@@ -340,8 +340,6 @@ function persistHandResult() {
         );
 
         console.log('[DB SUCCESS] Vinnerhånd lagret i Top 10:', playerNameStr, '|', description, '| Rangering:', rankVal);
-      } else {
-        console.log('[DB INFO] Hånd vunnet via fold – lagres ikke i Top 10 Beste Vinnerhender.');
       }
     } catch (err) {
       console.error('[DB ERROR] Kunne ikke lagre håndresultat:', err);
