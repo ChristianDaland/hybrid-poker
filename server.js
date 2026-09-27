@@ -293,49 +293,60 @@ function persistHandResult() {
 
   const inHand = Object.values(players).filter(p => !p.folded);
   const winnerNames = parseWinnerNames(winnerInfo);
-  const description = winnerInfo.descr || 'Kastet seg';
+  const description = winnerInfo.descr || 'Ukjent hånd';
   const rankVal = getHandRankValue(description, winnerInfo.rank);
   const nowIso = new Date().toISOString();
-  
-  const winningCards = winnerInfo.foldedWin
-    ? ''
-    : JSON.stringify({
-        board: board,
-        cards: inHand.map(p => ({ uuid: p.uuid, name: p.name, cards: p.cards }))
-      });
 
   (async () => {
-    let sessionId = currentSessionId;
-    if (!sessionId) {
-      await db.execute("UPDATE poker_sessions SET ended_at = ? WHERE ended_at IS NULL", [nowIso]);
-      const ins = await db.execute(
-        "INSERT INTO poker_sessions (started_at, game_mode) VALUES (?, ?)",
-        [nowIso, gameMode || 'UNKNOWN']
-      );
-      sessionId = Number(ins.lastInsertRowid);
-      currentSessionId = sessionId;
-    } else {
-      await db.execute("UPDATE poker_sessions SET ended_at = ? WHERE id = ?", [nowIso, sessionId]);
-    }
+    try {
+      let sessionId = currentSessionId;
+      if (!sessionId) {
+        await db.execute("UPDATE poker_sessions SET ended_at = ? WHERE ended_at IS NULL", [nowIso]);
+        const ins = await db.execute(
+          "INSERT INTO poker_sessions (started_at, game_mode) VALUES (?, ?)",
+          [nowIso, gameMode || 'UNKNOWN']
+        );
+        sessionId = Number(ins.lastInsertRowid);
+        currentSessionId = sessionId;
+      } else {
+        await db.execute("UPDATE poker_sessions SET ended_at = ? WHERE id = ?", [nowIso, sessionId]);
+      }
 
-    // Oppdater spillerstatistikk
-    for (const p of Object.values(players)) {
-      const isWinner = winnerNames.includes(p.name);
-      await db.execute(
-        "UPDATE player_stats SET hands_played = hands_played + 1, hands_won = hands_won + ? WHERE uuid = ?",
-        [isWinner ? 1 : 0, p.uuid]
-      );
-    }
+      // 1. Oppdater generell spillerstatistikk for alle som spilte denne hånden
+      for (const p of Object.values(players)) {
+        if (!p.uuid) continue;
+        const isWinner = winnerNames.includes(p.name);
+        await db.execute(
+          "UPDATE player_stats SET hands_played = hands_played + 1, hands_won = hands_won + ? WHERE uuid = ?",
+          [isWinner ? 1 : 0, p.uuid]
+        );
+      }
 
-    // Lagre vinnerhånd (også om det var ett par/høyt kort osv)
-    const winnerPlayer = Object.values(players).find(p => winnerNames.includes(p.name));
-    await db.execute(
-      `INSERT INTO winning_hands (session_id, player_uuid, player_name, hand_description, winning_cards, hand_rank, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [sessionId, winnerPlayer ? winnerPlayer.uuid : null, winnerNames.join(' & '), description, winningCards, rankVal, nowIso]
-    );
-    console.log('[DB SUCCESS] Håndresultat lagret i winning_hands for:', winnerNames.join(' & '));
-  })().catch(err => console.error('[DB ERROR] Kunne ikke lagre håndresultat:', err.message));
+      // 2. Lagre i winning_hands (KUN DERSOM HÅNDEN GIKK TIL SHOWDOWN, DVS IKKE FOLD)
+      if (!winnerInfo.foldedWin) {
+        const winningCardsStr = JSON.stringify({
+          board: board || [],
+          cards: inHand.map(p => ({ uuid: p.uuid || '', name: p.name || '', cards: p.cards || [] }))
+        });
+
+        const winnerPlayer = Object.values(players).find(p => winnerNames.includes(p.name));
+        const playerUuid = winnerPlayer ? winnerPlayer.uuid : (Object.values(players)[0]?.uuid || 'ukjent-uuid');
+        const playerNameStr = winnerNames.length > 0 ? winnerNames.join(' & ') : 'Ukjent Spiller';
+
+        await db.execute(
+          `INSERT INTO winning_hands (session_id, player_uuid, player_name, hand_description, winning_cards, hand_rank, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [sessionId, playerUuid, playerNameStr, description, winningCardsStr, rankVal, nowIso]
+        );
+
+        console.log('[DB SUCCESS] Vinnerhånd lagret i Top 10:', playerNameStr, '|', description, '| Rangering:', rankVal);
+      } else {
+        console.log('[DB INFO] Hånd vunnet via fold – lagres ikke i Top 10 Beste Vinnerhender.');
+      }
+    } catch (err) {
+      console.error('[DB ERROR] Kunne ikke lagre håndresultat:', err);
+    }
+  })();
 }
 
 function randomizePlayerSeats() {
@@ -494,7 +505,7 @@ io.on('connection', (socket) => {
         foldedWin: true,
         rank: 0
       };
-      persistHandResult(); // Lagrer umiddelbart ved vinn via fold!
+      persistHandResult();
       updateAll();
       return;
     }
@@ -539,7 +550,7 @@ io.on('connection', (socket) => {
         rawCards: winners[0] ? winners[0].solved.cards : []
       };
 
-      persistHandResult(); // Lagrer umiddelbart ved SHOWDOWN!
+      persistHandResult();
     }
     updateAll();
   });
@@ -557,7 +568,7 @@ io.on('connection', (socket) => {
           foldedWin: true,
           rank: 0
         };
-        persistHandResult(); // Lagrer umiddelbart ved fold!
+        persistHandResult();
       }
       updateAll();
     }
