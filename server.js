@@ -42,7 +42,42 @@ app.get('/api/winning-hands', async (req, res) => {
   }
 });
 
-const SUITS = ['c', 'd', 'h', 's'];
+app.get('/api/top-hands', async (req, res) => {
+  if (!db) {
+    return res.status(503).json({ error: 'Database ikke tilkoblet. Set TURSO_DATABASE_URL og TURSO_AUTH_TOKEN.' });
+  }
+  try {
+    // Dagens vinnerhender, rangert etter håndstyrke (beste øverst), topp 10
+    const result = await db.execute(
+      "SELECT id, player_name, hand_description, winning_cards, created_at FROM winning_hands WHERE date(created_at) = date('now') ORDER BY id DESC"
+    );
+    const top = result.rows
+      .map(row => ({ ...row, _rank: handRank(row.hand_description) }))
+      .sort((a, b) => (b._rank - a._rank) || (b.id - a.id))
+      .slice(0, 10)
+      .map(({ id, _rank, ...rest }) => rest);
+    res.json(top);
+  } catch (err) {
+    console.error('[DB Error /api/top-hands]:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Rangerer en (norsk) håndbeskrivelse: 9 = Straight Flush (størst) … 0 = ukjent
+function handRank(descr) {
+  if (!descr) return 0;
+  if (descr.includes('Straight Flush')) return 9;
+  if (descr.includes('Fire like')) return 8;
+  if (descr.includes('Fullt Hus')) return 7;
+  if (descr.includes('Flush')) return 6;
+  if (descr.includes('Straight')) return 5;
+  if (descr.includes('Tre like')) return 4;
+  if (descr.includes('To Par')) return 3;
+  if (descr.includes('Ett Par')) return 2;
+  if (descr.includes('Høyt Kort')) return 1;
+  return 0;
+}
+
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
 
 function createDeck() {
