@@ -1,3 +1,6 @@
+// Laster miljøvariabler fra .env hvis tilgjengelig (kan også settes i systemet)
+try { require('dotenv').config(); } catch (err) { /* dotenv ikke installert – OK */ }
+
 const express = require('express');
 const http = require('http');
 const crypto = require('crypto');
@@ -9,6 +12,35 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 app.use(express.static('public'));
+
+// ============================================================
+// API: Statistikk og vinnerhender
+// ============================================================
+app.get('/api/stats', async (req, res) => {
+  if (!db) {
+    return res.status(503).json({ error: 'Database ikke tilkoblet. Set TURSO_DATABASE_URL og TURSO_AUTH_TOKEN.' });
+  }
+  try {
+    const result = await db.execute("SELECT name, hands_played, hands_won, total_chips FROM player_stats ORDER BY hands_won DESC, hands_played DESC");
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[DB Error /api/stats]:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/winning-hands', async (req, res) => {
+  if (!db) {
+    return res.status(503).json({ error: 'Database ikke tilkoblet. Set TURSO_DATABASE_URL og TURSO_AUTH_TOKEN.' });
+  }
+  try {
+    const result = await db.execute("SELECT player_name, hand_description, winning_cards, created_at FROM winning_hands ORDER BY created_at DESC, id DESC LIMIT 10");
+    res.json(result.rows);
+  } catch (err) {
+    console.error('[DB Error /api/winning-hands]:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
 
 const SUITS = ['c', 'd', 'h', 's'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
@@ -107,6 +139,158 @@ let players = {};
 const disconnectTimeouts = {};
 const uuidToPlayerId = new Map();
 
+// ============================================================
+// Turso (SQLite) database-integrasjon
+// ============================================================
+let db = null;
+let currentSessionId = null;
+
+function initDatabase() {
+  const url = process.env.TURSO_DATABASE_URL;
+  const authToken = process.env.TURSO_AUTH_TOKEN;
+
+  if (!url || !authToken) {
+    console.warn('[DB] TURSO_DATABASE_URL / TURSO_AUTH_TOKEN er ikke satt – serveren kjører uten database.');
+    return;
+  }
+
+  let createClient;
+  try {
+    createClient = require('@libsql/client').createClient;
+  } catch (err) {
+    console.error('[DB] Kunne ikke laste @libsql/client. Kjør: npm install');
+    return;
+  }
+
+  db = createClient({ url: url, authToken: authToken });
+
+  ensureTables()
+    .then(() => console.log('[DB] Tilkoblet Turso – tabeller er opprettet/verifisert.'))
+    .catch(err => {
+      console.error('[DB] Feil ved databaseinit:', err.message);
+      db = null;
+    });
+}
+
+async function ensureTables() {
+  await db.execute(`CREATE TABLE IF NOT EXISTS poker_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at TEXT NOT NULL DEFAULT (datetime('now')),
+    ended_at TEXT,
+    game_mode TEXT
+  )`);
+  await db.execute(`CREATE TABLE IF NOT EXISTS player_stats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    uuid TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    hands_played INTEGER NOT NULL DEFAULT 0,
+    hands_won INTEGER NOT NULL DEFAULT 0,
+    total_chips INTEGER NOT NULL DEFAULT 0
+  )`);
+  await db.execute(`CREATE TABLE IF NOT EXISTS winning_hands (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER,
+    player_uuid TEXT,
+    player_name TEXT,
+    hand_description TEXT,
+    winning_cards TEXT,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )`);
+}
+
+// Registrerer spiller i player_stats (eller oppdaterer navnet hvis vedkommende allerede finnes)
+function ensurePlayerStats(uuid, name) {
+  if (!db || !uuid) return;
+  db.execute(
+    `INSERT INTO player_stats (uuid, name, hands_played, hands_won, total_chips)
+     VALUES (?, ?, 0, 0, 0)
+     ON CONFLICT(uuid) DO UPDATE SET name = excluded.name`,
+    [uuid, name]
+  ).catch(err => console.error('[DB] Feil ved registrering av spiller:', err.message));
+}
+
+// Trekker ut vinnernavn fra winnerInfo (håndterer delte potter)
+function parseWinnerNames(winnerInfo) {
+  if (!winnerInfo || !winnerInfo.winnerName) return [];
+  const raw = winnerInfo.winnerName;
+  if (raw.startsWith('UAVGJOERT / DELING:')) {
+    return raw.split(':', 2)[1].split('&').map(s => s.trim()).filter(Boolean);
+  }
+  return [raw];
+}
+
+// Sjekker om en oversatt håndbeskrivelse er en «monsterhånd» som fortjener feiring
+function isMonsterHand(descr) {
+  if (!descr) return false;
+  const d = descr.toLowerCase();
+  return d.includes('straight/flush') ||
+         d.includes('full house') ||
+         d.includes('four of a kind') ||
+         d.includes('royal');
+}
+
+// Lagrer forrige hånd i databasen. Kalles rett før en ny hånd deles,
+// slik at både folded-win (FINISHED) og showdown (SHOWDOWN) fanges nøyaktig én gang.
+function persistPreviousHand() {
+  const { phase, winnerInfo, board, gameMode } = gameState;
+  if (!winnerInfo) return;
+  if (phase !== 'FINISHED' && phase !== 'SHOWDOWN') return;
+
+  // 🎉 Feiring ved monsterhånd (virker uavhengig av databasen)
+  if (!winnerInfo.foldedWin && isMonsterHand(winnerInfo.descr) &&
+      winnerInfo.winnerName && !winnerInfo.winnerName.startsWith('UAVGJOERT / DELING:')) {
+    io.to('game').emit('celebrate_win', {
+      playerName: winnerInfo.winnerName,
+      handDescription: winnerInfo.descr,
+      winningCards: winnerInfo.rawCards || []
+    });
+    console.log('[FEIRING] Monsterhånd!', winnerInfo.winnerName, '–', winnerInfo.descr);
+  }
+
+  if (!db) return;
+
+  const inHand = Object.values(players).filter(p => !p.folded);
+  const winnerNames = parseWinnerNames(winnerInfo);
+  const description = winnerInfo.descr || '';
+  const winningCards = winnerInfo.foldedWin
+    ? ''
+    : JSON.stringify({ board: board, cards: inHand.map(p => ({ name: p.name, cards: p.cards })) });
+
+  (async () => {
+    // Åpne sesjon ved første hånd, eller forlenge den pågående
+    let sessionId = currentSessionId;
+    if (!sessionId) {
+      await db.execute("UPDATE poker_sessions SET ended_at = datetime('now') WHERE ended_at IS NULL");
+      const ins = await db.execute(
+        "INSERT INTO poker_sessions (started_at, game_mode) VALUES (datetime('now'), ?)",
+        [gameMode || 'UNKNOWN']
+      );
+      sessionId = Number(ins.lastInsertRowid);
+      currentSessionId = sessionId;
+    } else {
+      await db.execute("UPDATE poker_sessions SET ended_at = datetime('now') WHERE id = ?", [sessionId]);
+    }
+
+    // Oppdater statistikk for de spillere som var med i hånden
+    for (const p of inHand) {
+      const isWinner = winnerNames.includes(p.name);
+      await db.execute(
+        "UPDATE player_stats SET hands_played = hands_played + 1, hands_won = hands_won + ? WHERE uuid = ?",
+        [isWinner ? 1 : 0, p.uuid]
+      );
+    }
+
+    // Logg vinnerhånden
+    const winnerPlayer = inHand.find(p => winnerNames.includes(p.name));
+    await db.execute(
+      `INSERT INTO winning_hands (session_id, player_uuid, player_name, hand_description, winning_cards, created_at)
+       VALUES (?, ?, ?, ?, ?, datetime('now'))`,
+      [sessionId, winnerPlayer ? winnerPlayer.uuid : null, winnerNames.join(' & '), description, winningCards]
+    );
+    console.log('[DB] Håndresultat lagret (vinner:', winnerNames.join(' & ') + ')');
+  })().catch(err => console.error('[DB] Kunne ikke lagre håndresultat:', err.message));
+}
+
 // Hjælpefunksjon for å stokke om rekkefølgen på spillerne i `players`-objektet
 function randomizePlayerSeats() {
   const playerArray = Object.values(players);
@@ -127,6 +311,9 @@ function randomizePlayerSeats() {
 function startNewHandLogic() {
   const playerList = Object.values(players);
   if (playerList.length === 0 || !gameState.gameMode) return;
+
+  // Persist forrige hånd (hvis noen) i databasen før kortene nullstilles
+  persistPreviousHand();
 
   gameState.deck = createDeck();
   gameState.board = [];
@@ -199,6 +386,7 @@ io.on('connection', (socket) => {
       }
 
       players[socket.id] = playerData;
+      ensurePlayerStats(playerData.uuid, playerData.name);
     } else {
       // Generer vedvarende identitet for nye spillere
       let playerUuid = clientUuid;
@@ -225,6 +413,7 @@ io.on('connection', (socket) => {
         connected: true
       };
       uuidToPlayerId.set(playerUuid, socket.id);
+      ensurePlayerStats(playerUuid, cleanName);
     }
 
     // Send UUID tilbake til klienten slik at den kan lagres i localStorage
@@ -306,7 +495,8 @@ io.on('connection', (socket) => {
       gameState.winnerInfo = {
         winnerName: winnerText,
         descr: translateHandDescription(rawDescr),
-        foldedWin: false
+        foldedWin: false,
+        rawCards: winners[0] ? winners[0].solved.cards : []
       };
     }
     updateAll();
@@ -364,6 +554,7 @@ io.on('connection', (socket) => {
     player.id = socket.id; // Viktig: updateAll() sender player_state til p.id
     players[socket.id] = player;
     uuidToPlayerId.set(uuid, socket.id);
+    ensurePlayerStats(uuid, player.name);
 
     socket.emit('joined', { uuid: uuid, name: player.name });
     updateAll();
@@ -429,6 +620,8 @@ function updateAll() {
     }
   });
 }
+
+initDatabase();
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Server kjører på port ${PORT}`));

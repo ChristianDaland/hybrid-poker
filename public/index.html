@@ -266,6 +266,75 @@
   <script>
     const socket = io();
 
+    // ============================================================
+    // 🎉 Feiring ved monsterhånd (celebrate_win)
+    // ============================================================
+    (function setupCelebration() {
+      // Last inn canvas-confetti via CDN
+      const confettiScript = document.createElement('script');
+      confettiScript.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js';
+      document.head.appendChild(confettiScript);
+
+      const style = document.createElement('style');
+      style.textContent = `
+        .celebration-overlay {
+          position: fixed; inset: 0;
+          background: radial-gradient(circle at center, rgba(255,215,0,0.25), rgba(0,0,0,0.8));
+          display: flex; align-items: center; justify-content: center;
+          z-index: 9999; opacity: 0; pointer-events: none;
+          transition: opacity 0.4s ease;
+        }
+        .celebration-overlay.active { opacity: 1; }
+        .celebration-content {
+          text-align: center; color: #fff;
+          background: rgba(0,0,0,0.55);
+          border: 2px solid rgba(255,215,0,0.7); border-radius: 20px;
+          padding: 40px 60px;
+          box-shadow: 0 0 60px rgba(255,215,0,0.4);
+          transform: scale(0.5);
+          transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .celebration-overlay.active .celebration-content { transform: scale(1); }
+        .celebration-icon { font-size: 4rem; animation: celebrate-bounce 0.8s ease infinite alternate; }
+        .celebration-player { font-size: 2rem; margin: 10px 0 4px; color: #ffd700; }
+        .celebration-hand { font-size: 1.2rem; margin: 0; text-transform: uppercase; letter-spacing: 2px; }
+        @keyframes celebrate-bounce { from { transform: translateY(0); } to { transform: translateY(-14px); } }
+      `;
+      document.head.appendChild(style);
+
+      const overlay = document.createElement('div');
+      overlay.className = 'celebration-overlay';
+      overlay.innerHTML =
+        '<div class="celebration-content">' +
+        '<div class="celebration-icon">🎉</div>' +
+        '<h2 class="celebration-player"></h2>' +
+        '<p class="celebration-hand"></p>' +
+        '</div>';
+      document.body.appendChild(overlay);
+
+      let hideTimer = null;
+      function triggerCelebration(data) {
+        overlay.querySelector('.celebration-player').innerText = (data && data.playerName) || '';
+        overlay.querySelector('.celebration-hand').innerText = (data && data.handDescription) || '';
+        overlay.classList.add('active');
+
+        if (typeof window.confetti === 'function') {
+          const end = Date.now() + 2500;
+          (function frame() {
+            window.confetti({ particleCount: 4, angle: 60, spread: 70, origin: { x: 0, y: 0.7 } });
+            window.confetti({ particleCount: 4, angle: 120, spread: 70, origin: { x: 1, y: 0.7 } });
+            if (Date.now() < end) requestAnimationFrame(frame);
+          })();
+        }
+
+        clearTimeout(hideTimer);
+        hideTimer = setTimeout(() => overlay.classList.remove('active'), 5000);
+      }
+
+      socket.on('celebrate_win', triggerCelebration);
+    })();
+
+
     const mobileUrl = window.location.origin + '/mobile.html';
     new QRCode(document.getElementById("qrcode"), {
       text: mobileUrl,
