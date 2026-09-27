@@ -281,9 +281,10 @@ function isMonsterHand(descr) {
 }
 
 function persistPreviousHand() {
-  const { phase, winnerInfo, board, gameMode } = gameState;
+  const { winnerInfo, board, gameMode } = gameState;
+  
+  // Sjekker kun at det faktisk finnes en winnerInfo før lagring
   if (!winnerInfo) return;
-  if (phase !== 'FINISHED' && phase !== 'SHOWDOWN') return;
 
   if (!winnerInfo.foldedWin && isMonsterHand(winnerInfo.descr) &&
       winnerInfo.winnerName && !winnerInfo.winnerName.startsWith('UAVGJOERT / DELING:')) {
@@ -300,6 +301,7 @@ function persistPreviousHand() {
   const winnerNames = parseWinnerNames(winnerInfo);
   const description = winnerInfo.descr || '';
   const rankVal = getHandRankValue(description, winnerInfo.rank);
+  const nowIso = new Date().toISOString();
   
   const winningCards = winnerInfo.foldedWin
     ? ''
@@ -311,15 +313,15 @@ function persistPreviousHand() {
   (async () => {
     let sessionId = currentSessionId;
     if (!sessionId) {
-      await db.execute("UPDATE poker_sessions SET ended_at = datetime('now') WHERE ended_at IS NULL");
+      await db.execute("UPDATE poker_sessions SET ended_at = ? WHERE ended_at IS NULL", [nowIso]);
       const ins = await db.execute(
-        "INSERT INTO poker_sessions (started_at, game_mode) VALUES (datetime('now'), ?)",
-        [gameMode || 'UNKNOWN']
+        "INSERT INTO poker_sessions (started_at, game_mode) VALUES (?, ?)",
+        [nowIso, gameMode || 'UNKNOWN']
       );
       sessionId = Number(ins.lastInsertRowid);
       currentSessionId = sessionId;
     } else {
-      await db.execute("UPDATE poker_sessions SET ended_at = datetime('now') WHERE id = ?", [sessionId]);
+      await db.execute("UPDATE poker_sessions SET ended_at = ? WHERE id = ?", [nowIso, sessionId]);
     }
 
     for (const p of inHand) {
@@ -333,10 +335,10 @@ function persistPreviousHand() {
     const winnerPlayer = inHand.find(p => winnerNames.includes(p.name));
     await db.execute(
       `INSERT INTO winning_hands (session_id, player_uuid, player_name, hand_description, winning_cards, hand_rank, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
-      [sessionId, winnerPlayer ? winnerPlayer.uuid : null, winnerNames.join(' & '), description, winningCards, rankVal]
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [sessionId, winnerPlayer ? winnerPlayer.uuid : null, winnerNames.join(' & '), description, winningCards, rankVal, nowIso]
     );
-    console.log('[DB] Håndresultat lagret (vinner:', winnerNames.join(' & ') + ')');
+    console.log('[DB] Håndresultat lagret i winning_hands for:', winnerNames.join(' & '));
   })().catch(err => console.error('[DB] Kunne ikke lagre håndresultat:', err.message));
 }
 
