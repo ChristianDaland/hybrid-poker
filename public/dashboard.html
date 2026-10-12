@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Poker Dashboard</title>
+  <style>
+    body {
+      background-color: #121212;
+      color: #ffffff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 30px;
+    }
+    h1 {
+      margin-bottom: 30px;
+      font-size: 28px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 900px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: #1e1e1e;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    }
+    .card h2 {
+      margin-top: 0;
+      font-size: 18px;
+    }
+    .green-title { color: #4caf50; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 15px;
+    }
+    th, td {
+      text-align: left;
+      padding: 10px;
+      border-bottom: 1px solid #333;
+      font-size: 14px;
+    }
+    th {
+      color: #aaa;
+      font-weight: 600;
+    }
+    .percent {
+      color: #4caf50;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Poker Dashboard</h1>
+
+  <div class="grid">
+    <!-- Spillerstatistikk -->
+    <div class="card">
+      <h2 class="green-title">Spillerstatistikk</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Spiller</th>
+            <th>Hender Spilt</th>
+            <th>Hender Vunnet</th>
+            <th>Seiersprosent</th>
+          </tr>
+        </thead>
+        <tbody id="stats-body">
+          <tr><td colspan="4">Laster statistikk...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Top 10 Beste Vinnerhender -->
+    <div class="card">
+      <h2 class="green-title">Top 10 Beste Vinnerhender (Spillekveld)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Spiller</th>
+            <th>Vinnerhånd</th>
+            <th>Tidspunkt</th>
+          </tr>
+        </thead>
+        <tbody id="top-body">
+          <tr><td colspan="4">Laster topphender...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    async function loadDashboardData() {
+      try {
+        // 1. Hent Spillerstatistikk
+        const resStats = await fetch('/api/stats');
+        const stats = await resStats.json();
+        const statsBody = document.getElementById('stats-body');
+        
+        if (Array.isArray(stats) && stats.length > 0) {
+          statsBody.innerHTML = stats.map(s => {
+            const played = s.hands_played || s.handsPlayed || 0;
+            const won = s.hands_won || s.handsWon || 0;
+            const pct = played > 0 ? ((won / played) * 100).toFixed(1) : '0.0';
+            return `
+              <tr>
+                <td><strong>${s.name || s.player_name || 'Ukjent'}</strong></td>
+                <td>${played}</td>
+                <td>${won}</td>
+                <td class="percent">${pct}%</td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          statsBody.innerHTML = '<tr><td colspan="4">Ingen data ennå.</td></tr>';
+        }
+
+        // 2. Hent Top 10 Vinnerhender
+        const resHands = await fetch('/api/winning-hands');
+        const hands = await resHands.json();
+        const topBody = document.getElementById('top-body');
+
+        if (Array.isArray(hands) && hands.length > 0) {
+          topBody.innerHTML = hands.map((h, index) => {
+            const playerName = h.player_name || h.playerName || h.name || 'Ukjent';
+            const handDescr = h.hand_description || h.handDescr || h.descr || 'Vinnerhånd';
+            const createdAt = h.created_at || h.createdAt;
+            const timeStr = createdAt ? new Date(createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-';
+
+            return `
+              <tr>
+                <td>${index + 1}</td>
+                <td><strong>${playerName}</strong></td>
+                <td>${handDescr}</td>
+                <td>${timeStr}</td>
+              </tr>
+            `;
+          }).join('');
+        } else {
+          topBody.innerHTML = '<tr><td colspan="4">Ingen vinnerhender registrert til showdown ennå.</td></tr>';
+        }
+
+      } catch (err) {
+        console.error('Feil ved oppdatering av dashboard:', err);
+      }
+    }
+
+    // Oppdaterer data med en gang, og deretter hvert 3. sekund
+    loadDashboardData();
+    setInterval(loadDashboardData, 3000);
+  </script>
+</body>
+</html>
