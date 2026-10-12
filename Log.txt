@@ -665,3 +665,17 @@ Testet i Chrome (DevTools-protokollen): innstillinger synlige ved
 åpning og skjult etter 4 sek, klikk viser dem, forblir synlige med
 musa over, peker skjules i ro, + øker størrelsen, dobbeltklikk gir
 fullskjerm. Skjermbilder med og uten innstillinger.
+
+------------------------------------------------------------
+2026-10-12 – Firefarget kortstokk (bedre lesbarhet)
+------------------------------------------------------------
+Bakgrunn: Spillerne har litt redusert syn og sliter med å skille
+spar/kløver og ruter/hjerter.
+- Ny fil public/cards.css: ♠ sort, ♥ rød, ♦ blå, ♣ grønn
+  (klassene suit-s/h/d/c). Standard «four-color deck» fra nettpoker.
+- Brukt overalt der kort vises: board.html (projektor), index.html
+  (bord + spillerhender), mobile.html og dashboard.html (minikort).
+- board.html: større hjørnetegn (verdi 1.8rem, farge 1.7rem).
+- veiledning.html: ny seksjon «Kortfargene».
+Testet: skjermbilder av projektor, statusskjerm og dashboard med
+alle fire farger.

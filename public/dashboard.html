@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Poker Dashboard</title>
+  <link rel="stylesheet" href="/cards.css">
   <style>
     body {
       background-color: #121212;
@@ -107,8 +108,7 @@
       font-weight: bold;
       font-size: 13px;
     }
-    .mini-card.red { color: #d32f2f; }
-    .mini-card.black { color: #222; }
+    /* Fargene på kortene: se cards.css (firefarget kortstokk) */
     .rank-1 td:first-child { color: #ffd700; font-weight: bold; }
     .rank-2 td:first-child { color: #c0c0c0; font-weight: bold; }
     .rank-3 td:first-child { color: #cd7f32; font-weight: bold; }
@@ -226,7 +226,8 @@
 
     function miniCards(cards) {
       if (!Array.isArray(cards) || cards.length === 0) return '<span class="muted">–</span>';
-      const suits = { h: ['♥', 'red'], d: ['♦', 'red'], c: ['♣', 'black'], s: ['♠', 'black'] };
+      // Firefarget kortstokk (se cards.css)
+      const suits = { h: ['♥', 'suit-h'], d: ['♦', 'suit-d'], c: ['♣', 'suit-c'], s: ['♠', 'suit-s'] };
       return cards.map(c => {
         const code = String(c);
         let val = code.slice(0, -1).toUpperCase();

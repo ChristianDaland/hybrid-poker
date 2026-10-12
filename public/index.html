@@ -6,6 +6,7 @@
   <title>Løland Gård Poker</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <link rel="stylesheet" href="/felt.css">
+  <link rel="stylesheet" href="/cards.css">
   <style>
     * { box-sizing: border-box; }
 
@@ -117,8 +118,7 @@
       box-shadow: 0 3px 8px rgba(0,0,0,0.5);
       font-weight: bold;
     }
-    .card.red { color: #d9534f; }
-    .card.black { color: #222222; }
+    /* Fargene på kortene: se cards.css (firefarget kortstokk) */
     .card-val { font-size: 1.4rem; line-height: 1; }
     .card-suit { font-size: 1.6rem; line-height: 1; }
 
@@ -476,10 +476,11 @@
       const suitChar = cardCode.slice(-1).toLowerCase();
       
       const suits = {
-        'h': { symbol: '♥', color: 'red' },
-        'd': { symbol: '♦', color: 'red' },
-        'c': { symbol: '♣', color: 'black' },
-        's': { symbol: '♠', color: 'black' }
+        // Firefarget kortstokk (se cards.css)
+        'h': { symbol: '♥', color: 'suit-h' },
+        'd': { symbol: '♦', color: 'suit-d' },
+        'c': { symbol: '♣', color: 'suit-c' },
+        's': { symbol: '♠', color: 'suit-s' }
       };
       
       const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };

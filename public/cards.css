@@ -1,0 +1,16 @@
+/* ============================================================
+   Firefarget kortstokk – lettere å skille fargene med redusert syn
+   ♠ spar = sort · ♥ hjerter = rød · ♦ ruter = blå · ♣ kløver = grønn
+   Brukes av board.html, index.html, mobile.html og dashboard.html.
+   ============================================================ */
+:root {
+  --suit-spades: #111111;
+  --suit-hearts: #d32f2f;
+  --suit-diamonds: #1565c0;
+  --suit-clubs: #1b7a2e;
+}
+
+.suit-s { color: var(--suit-spades) !important; }
+.suit-h { color: var(--suit-hearts) !important; }
+.suit-d { color: var(--suit-diamonds) !important; }
+.suit-c { color: var(--suit-clubs) !important; }

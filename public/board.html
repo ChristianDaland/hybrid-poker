@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Løland Gård Poker - Bordvisning</title>
   <link rel="stylesheet" href="/felt.css">
+  <link rel="stylesheet" href="/cards.css">
   <style>
     * { box-sizing: border-box; }
 
@@ -133,8 +134,7 @@
       animation: cardFlip 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
     }
 
-    .card.red { color: #d9534f; }
-    .card.black { color: #222222; }
+    /* Fargene på kortene: se cards.css (firefarget kortstokk) */
 
     .card-corner {
       position: absolute;
@@ -146,8 +146,9 @@
     .card-corner.top-left { top: 10px; left: 10px; }
     .card-corner.bottom-right { bottom: 10px; right: 10px; transform: rotate(180deg); }
 
-    .card-corner .val { font-size: 1.5rem; font-weight: bold; }
-    .card-corner .suit { font-size: 1.2rem; margin-top: 2px; }
+    /* Store hjørnetegn – lettere å lese på bordet */
+    .card-corner .val { font-size: 1.8rem; font-weight: bold; }
+    .card-corner .suit { font-size: 1.7rem; margin-top: 0; }
 
     .card-center-graphic {
       width: 80px;
@@ -441,10 +442,11 @@
       const suitChar = cardCode.slice(-1).toLowerCase();
       
       const suits = {
-        'h': { symbol: '♥', color: 'red' },
-        'd': { symbol: '♦', color: 'red' },
-        'c': { symbol: '♣', color: 'black' },
-        's': { symbol: '♠', color: 'black' }
+        // Firefarget kortstokk (se cards.css)
+        'h': { symbol: '♥', color: 'suit-h' },
+        'd': { symbol: '♦', color: 'suit-d' },
+        'c': { symbol: '♣', color: 'suit-c' },
+        's': { symbol: '♠', color: 'suit-s' }
       };
       
       const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
