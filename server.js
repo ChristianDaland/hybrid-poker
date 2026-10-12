@@ -3,6 +3,7 @@ try { require('dotenv').config(); } catch (err) { /* dotenv ikke installert – 
 
 const express = require('express');
 const http = require('http');
+const os = require('os');
 const { Server } = require('socket.io');
 const Hand = require('pokersolver').Hand;
 
@@ -36,6 +37,27 @@ app.get('/api/stats', async (req, res) => {
     console.error('[DB Error /api/stats]:', err);
     res.status(500).json({ error: err.message });
   }
+});
+
+// Serverens adresser på lokalnettet – brukes til QR-koden når statusskjermen
+// er åpnet via localhost (telefonene kan ikke nå «localhost»)
+function getLanAddresses() {
+  const addresses = [];
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const net of list || []) {
+      if (net.family === 'IPv4' && !net.internal) addresses.push(net.address);
+    }
+  }
+  // Vanlige hjemmenett først (192.168.x, 10.x, 172.16–31.x); VPN o.l. (f.eks. 100.x) sist
+  const rank = ip => ip.startsWith('192.168.') ? 0
+    : ip.startsWith('10.') ? 1
+    : /^172\.(1[6-9]|2\d|3[01])\./.test(ip) ? 2
+    : 3;
+  return addresses.sort((a, b) => rank(a) - rank(b));
+}
+
+app.get('/api/server-info', (req, res) => {
+  res.json({ lanAddresses: getLanAddresses(), port: Number(PORT) });
 });
 
 // ------------------------------------------------------------

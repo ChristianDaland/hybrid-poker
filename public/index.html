@@ -79,6 +79,13 @@
       width: 100%;
     }
 
+    .qr-url {
+      margin-top: 6px;
+      font-size: 0.65rem;
+      color: #ccc;
+      word-break: break-all;
+    }
+
     .cards-container {
       display: flex;
       justify-content: center;
@@ -322,6 +329,7 @@
       <div class="qr-box">
         <p style="margin: 0 0 8px 0; font-size: 0.85rem; font-weight: bold;">Skann for å bli med:</p>
         <div id="qrcode"></div>
+        <div id="qr-url" class="qr-url"></div>
       </div>
 
       <!-- 2. Knapp for å åpne nytt bordvindu -->
@@ -432,12 +440,24 @@
     })();
 
 
-    const mobileUrl = window.location.origin + '/mobile.html';
-    new QRCode(document.getElementById("qrcode"), {
-      text: mobileUrl,
-      width: 95,
-      height: 95
-    });
+    // QR-kode til mobilsiden. Er statusskjermen åpnet via localhost, kan ikke
+    // telefonene bruke den adressen – da brukes serverens adresse på lokalnettet.
+    async function setupQrCode() {
+      let origin = window.location.origin;
+      const isLocalhost = ['localhost', '127.0.0.1', '::1', '[::1]'].includes(window.location.hostname);
+      if (isLocalhost) {
+        try {
+          const info = await (await fetch('/api/server-info')).json();
+          if (info.lanAddresses && info.lanAddresses.length > 0) {
+            origin = `${window.location.protocol}//${info.lanAddresses[0]}:${window.location.port || info.port}`;
+          }
+        } catch (e) { /* bruk origin som den er */ }
+      }
+      const mobileUrl = origin + '/mobile.html';
+      new QRCode(document.getElementById("qrcode"), { text: mobileUrl, width: 95, height: 95 });
+      document.getElementById('qr-url').innerText = mobileUrl.replace(/^https?:\/\//, '');
+    }
+    setupQrCode();
 
     function formatCard(cardCode) {
       if (!cardCode) return '';

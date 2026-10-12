@@ -505,3 +505,18 @@ Fiks (server.js):
 - Delt pott: «UAVGJORT – DELT POTT: A & B» (var «UAVGJOERT / DELING»).
 Testet: alle 10 håndtyper (inkl. wheel, 10-ere, royal) og gamle
 lagrede tekster.
+
+------------------------------------------------------------
+2026-10-12 – Opprydding 13: QR-kode når statusskjermen er på localhost
+------------------------------------------------------------
+Problem: QR-koden brukte window.location.origin. Åpnes statusskjermen
+via http://localhost:3000, pekte QR-koden til localhost, som
+telefonene ikke kan nå.
+Fiks:
+- server.js: /api/server-info gir serverens IPv4-adresser på
+  lokalnettet, sortert med vanlige hjemmenett først (192.168.x, 10.x,
+  172.16–31.x) og VPN o.l. (f.eks. Tailscale 100.x) sist.
+- index.html: på localhost/127.0.0.1 brukes første LAN-adresse i
+  QR-koden. Adressen vises også som tekst under QR-koden.
+Testet: /api/server-info på utviklermaskinen (10.0.0.34 før
+100.102.79.32), skjermbilde av statusskjermen via localhost.
