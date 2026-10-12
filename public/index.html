@@ -23,27 +23,17 @@
     }
 
     /* ------------------------------------------------------------
-       Tittel: treskilt med bokstaver i messing/gull.
-       Treverket matcher rammen rundt bordet. Ren CSS (ingen bilder).
+       Tittel i casinostil («Monte Carlo»): vinrød plakett med doble
+       gullstreker, gullbokstaver og kortsymboler i gull.
        ------------------------------------------------------------ */
     .title-sign {
-      display: inline-block;
-      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 18px;
       margin: 0 0 12px 0;
-      padding: 6px 54px 4px 54px;
-      border-radius: 10px;
-      border: 2px solid #4a2c12;
-      /* Messingskruer + eiketre (samme treverk som bordrammen, se felt.css) */
-      background-image:
-        radial-gradient(circle at 20px 50%, #fff2b8 0 2px, #e2b64a 2.5px 5px, #6a4a10 5.5px 6.5px, transparent 7px),
-        radial-gradient(circle at calc(100% - 20px) 50%, #fff2b8 0 2px, #e2b64a 2.5px 5px, #6a4a10 5.5px 6.5px, transparent 7px),
-        var(--oak-image);
-      background-size: auto, auto, var(--oak-size);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 230, 190, 0.35),
-        inset 0 -2px 4px rgba(0, 0, 0, 0.5),
-        0 6px 14px rgba(0, 0, 0, 0.55);
+      padding: 6px 30px 4px 30px;
     }
+    .title-orn { display: inline-flex; gap: 6px; font-size: 1.3rem; }
 
     h1 {
       margin: 0;
@@ -52,15 +42,27 @@
       font-size: 2rem;
       letter-spacing: 2px;
       line-height: 1.25;
-      /* Messing/gull: gradient i bokstavene */
+    }
+
+    .title-sign.casino {
+      border-radius: 8px;
+      border: 2px solid #d4af37;
+      background:
+        radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.10), transparent 65%),
+        linear-gradient(180deg, #5a0f19 0%, #3a0910 55%, #250509 100%);
+      box-shadow:
+        inset 0 0 0 3px #2a060b,
+        inset 0 0 0 4px rgba(212, 175, 55, 0.75),
+        0 6px 16px rgba(0, 0, 0, 0.6);
+    }
+    .title-sign.casino h1 {
       background: linear-gradient(180deg, #fff6d0 0%, #f4cf62 30%, #c08f2c 55%, #f7dc85 75%, #9a6d1c 100%);
       -webkit-background-clip: text;
       background-clip: text;
       color: transparent;
-      /* Preget effekt: mørk skygge under bokstavene */
-      /* Mørk kontur + skygge, så messingen synes godt mot det lysere eiketreet */
-      filter: drop-shadow(0 0 1px rgba(30, 14, 2, 0.95)) drop-shadow(0 2px 0 rgba(40, 20, 5, 0.9)) drop-shadow(0 0 6px rgba(0, 0, 0, 0.4));
+      filter: drop-shadow(0 2px 0 rgba(20, 2, 5, 0.9)) drop-shadow(0 0 6px rgba(0, 0, 0, 0.4));
     }
+    .title-sign.casino .title-orn { color: #e0b84a; filter: drop-shadow(0 1px 0 rgba(0,0,0,0.8)); }
 
     .winner-banner {
       background: linear-gradient(45deg, #ff9800, #f44336);
@@ -420,7 +422,11 @@
 </head>
 <body class="felt-dark">
 
-  <div class="title-sign"><h1>Løland Gård Poker</h1></div>
+  <div class="title-sign casino">
+    <span class="title-orn" data-suits="sh"></span>
+    <h1>Løland Gård Poker</h1>
+    <span class="title-orn" data-suits="dc"></span>
+  </div>
 
   <div id="winner-banner" class="winner-banner empty">&nbsp;</div>
 
@@ -591,6 +597,11 @@
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     }
+
+    // Pyntesymboler ved siden av tittelen (tydelige SVG-symboler fra suits.js)
+    document.querySelectorAll('.title-orn').forEach(el => {
+      el.innerHTML = el.dataset.suits.split('').map(s => suitIcon(s)).join('');
+    });
 
     function setMode(mode) { socket.emit('set_game_mode', mode); }
     function resetMode() { socket.emit('set_game_mode', null); }

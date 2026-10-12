@@ -839,3 +839,14 @@ Testet: skjermbilder av alle ti nedlastede bildekort + reserve.
 - Kløver konge (Kc.svg) og ruter konge (Kd.svg) lastet ned etter at
   Wikimedia sin begrensning ble opphevet. Sjekket for skript (ingen).
   Alle 12 bildekort er nå tradisjonelle. Skjermbilde av alle fire konger.
+
+------------------------------------------------------------
+2026-10-12 – Tittel i casinostil (Monte Carlo) i stedet for eikeskilt
+------------------------------------------------------------
+Eikeskiltet ble ikke så bra som tittel. Bordrammen beholder eik.
+- index.html: tittelen står på en vinrød plakett med doble gullstreker
+  (border + inset box-shadow), gullbokstaver (Cinzel, gradient) og
+  ♠ ♥ … ♦ ♣ i gull på hver side (SVG-symboler fra suits.js).
+- Samme høyde som før – resten av siden flytter seg ikke.
+- Vurdert og forkastet: Las Vegas-neon (brukeren valgte Monte Carlo).
+Testet: skjermbilder av begge variantene, valgt variant i 1280x720.
