@@ -783,3 +783,17 @@ index.html:
 Testet i Chrome: spilletype-boksen og den store knappen er begge
 160x140 på samme plass; klikk på Omaha velger spilletype og viser
 grønn «▶ Start Ny Hånd».
+
+------------------------------------------------------------
+2026-10-12 – Tittel som treskilt med messingbokstaver (forslag 4)
+------------------------------------------------------------
+index.html:
+- «Løland Gård Poker» står på et treskilt i samme treverk som
+  bordrammen: årer (repeating-linear-gradient), fin struktur
+  (felt-noise), lys ovenfra, to messingskruer (radial-gradient).
+- Bokstavene i messing/gull (gradient med background-clip: text) med
+  preget skygge. Skrift: Cinzel 900 (Google Fonts), reserve Georgia.
+- Ren CSS, ingen bildefiler. Skiltet er ca. 12–15 px høyere enn den
+  gamle tittelen.
+Testet: skjermbilder i 1280x720 og 1920x1080.
+Kan enkelt rulles tilbake (git revert) om dere ikke liker det.

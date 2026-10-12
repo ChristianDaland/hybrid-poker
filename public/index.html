@@ -7,6 +7,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   <link rel="stylesheet" href="/felt.css">
   <link rel="stylesheet" href="/cards.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap">
   <style>
     * { box-sizing: border-box; }
 
@@ -19,9 +22,51 @@
       padding: 10px 15px 90px 15px;
     }
 
+    /* ------------------------------------------------------------
+       Tittel: treskilt med bokstaver i messing/gull.
+       Treverket matcher rammen rundt bordet. Ren CSS (ingen bilder).
+       ------------------------------------------------------------ */
+    .title-sign {
+      display: inline-block;
+      position: relative;
+      margin: 0 0 12px 0;
+      padding: 6px 54px 4px 54px;
+      border-radius: 10px;
+      border: 2px solid #2b1a0e;
+      background:
+        /* Messingskruer til venstre og høyre */
+        radial-gradient(circle at 20px 50%, #fff2b8 0 2px, #e2b64a 2.5px 5px, #7a5612 5.5px 6.5px, transparent 7px),
+        radial-gradient(circle at calc(100% - 20px) 50%, #fff2b8 0 2px, #e2b64a 2.5px 5px, #7a5612 5.5px 6.5px, transparent 7px),
+        /* Lys fra lampa over bordet */
+        radial-gradient(ellipse at 50% 0%, rgba(255, 220, 160, 0.18), transparent 70%),
+        /* Fin struktur i treet */
+        var(--felt-noise),
+        /* Årer i treet */
+        repeating-linear-gradient(178deg, rgba(0,0,0,0.10) 0 1px, transparent 1px 6px, rgba(255,255,255,0.05) 6px 7px, transparent 7px 11px),
+        repeating-linear-gradient(182deg, rgba(0,0,0,0.07) 0 2px, transparent 2px 15px),
+        /* Grunnfarge (samme tre som bordrammen) */
+        linear-gradient(180deg, #8a5a32 0%, #6a3f1e 40%, #4e2d14 100%);
+      background-size: auto, auto, auto, 240px 240px, auto, auto, auto;
+      box-shadow:
+        inset 0 1px 0 rgba(255, 230, 190, 0.35),
+        inset 0 -2px 4px rgba(0, 0, 0, 0.5),
+        0 6px 14px rgba(0, 0, 0, 0.55);
+    }
+
     h1 {
-      margin: 5px 0 15px 0;
-      font-size: 1.8rem;
+      margin: 0;
+      font-family: 'Cinzel', Georgia, 'Times New Roman', serif;
+      font-weight: 900;
+      font-size: 2rem;
+      letter-spacing: 2px;
+      line-height: 1.25;
+      /* Messing/gull: gradient i bokstavene */
+      background: linear-gradient(180deg, #fff6d0 0%, #f4cf62 30%, #c08f2c 55%, #f7dc85 75%, #9a6d1c 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      /* Preget effekt: mørk skygge under bokstavene */
+      filter: drop-shadow(0 2px 0 rgba(40, 20, 5, 0.9)) drop-shadow(0 0 6px rgba(0, 0, 0, 0.35));
     }
 
     .winner-banner {
@@ -379,7 +424,7 @@
 </head>
 <body class="felt-dark">
 
-  <h1>Løland Gård Poker</h1>
+  <div class="title-sign"><h1>Løland Gård Poker</h1></div>
 
   <div id="winner-banner" class="winner-banner empty">&nbsp;</div>
 
