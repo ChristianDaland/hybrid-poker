@@ -224,3 +224,19 @@ Testet: kast + angre i samme fase, angre avvises etter flopp,
 siste spiller kan ikke kaste, angre etter at vinner er kåret
 avvises, dealer kårer vinner. Eldre tester oppdatert (dealer må nå
 trykke for å kåre vinner) og kjørt: OK. Skjermbilde av «Kår vinner».
+
+------------------------------------------------------------
+2026-10-12 – Ønske 1/5 justert: ingen bekreftelse fra dealer
+------------------------------------------------------------
+Brukeren ønsket at dealer IKKE skal måtte trykke «Kår vinner».
+Ny regel:
+- Et kast kan angres fram til neste kort åpnes (som før).
+- Står bare én spiller igjen etter et kast, avsluttes hånden med
+  en gang og kastet kan IKKE angres («bad luck»).
+Endringer:
+- server.js: player_fold og host_fold_player kaller igjen
+  finishIfOnlyOneLeft. Fjernet lastPlayerStanding/getLastPlayerStanding.
+- index.html: fjernet grått «Alle andre har kastet seg»-banner og
+  «Kår vinner»-tekst på knappen.
+Testet: angre i samme fase, angre avvist etter flopp, to igjen +
+kast -> vinner med en gang og angre avvist. Alle tidligere tester OK.

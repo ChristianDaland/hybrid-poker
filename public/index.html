@@ -35,13 +35,6 @@
       animation: pulse 1.5s infinite alternate;
     }
 
-    /* Venter på at dealer bekrefter vinneren */
-    .winner-banner.pending {
-      background: linear-gradient(45deg, #546e7a, #37474f);
-      font-size: 1.15rem;
-      animation: none;
-    }
-
     @keyframes pulse {
       0% { transform: scale(0.98); }
       100% { transform: scale(1.01); }
@@ -464,10 +457,7 @@
       changeModeBtn.disabled = isRoundActive;
       startHandBtn.disabled = isRoundActive;
 
-      if (state.lastPlayerStanding) {
-        // Alle andre har kastet seg – dealer bekrefter (kast kan fortsatt angres før dette)
-        nextBtn.innerText = `Kår vinner: ${state.lastPlayerStanding}`;
-      } else if (state.phase === 'PREFLOP') {
+      if (state.phase === 'PREFLOP') {
         nextBtn.innerText = 'Åpne Flopp';
       } else if (state.phase === 'FLOP') {
         nextBtn.innerText = 'Åpne Turn';
@@ -486,11 +476,6 @@
       const banner = document.getElementById('winner-banner');
       if (state.winnerInfo) {
         banner.innerHTML = `🏆 VINNER: ${escapeHtml(state.winnerInfo.winnerName)} (${escapeHtml(state.winnerInfo.descr)})`;
-        banner.classList.remove('pending');
-        banner.style.display = 'block';
-      } else if (state.lastPlayerStanding) {
-        banner.innerHTML = `✋ Alle andre har kastet seg – trykk «Kår vinner» for å gi potten til ${escapeHtml(state.lastPlayerStanding)}`;
-        banner.classList.add('pending');
         banner.style.display = 'block';
       } else {
         banner.style.display = 'none';
@@ -510,7 +495,7 @@
             ${p.waiting ? '⏳ VENTER PÅ NESTE HÅND' : (p.folded ? '🔴 FOLDET' : '🟢 INNE')}
           </div>
           ${!p.connected ? `<div style="font-size: 0.8rem; color: #ffb74d; margin-top: 4px;">📵 Frakoblet</div>` : ''}
-          ${!p.connected && isRoundActive && !p.folded && !p.waiting && !state.lastPlayerStanding ? `
+          ${!p.connected && isRoundActive && !p.folded && !p.waiting ? `
             <button class="btn-fold-for" onclick="foldForPlayer(${Number(p.seat)})">Kast kort for spilleren</button>
           ` : ''}
           ${p.cards && p.cards.length > 0 ? `

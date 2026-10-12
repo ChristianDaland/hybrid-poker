@@ -235,18 +235,12 @@ function canFold(p) {
   return Object.values(players).filter(isInHand).length > 1;
 }
 
-// Et kast kan angres fram til neste kort åpnes (samme fase)
+// Et kast kan angres fram til neste kort åpnes (samme fase).
+// Avsluttet kastet hånden (bare én igjen), er fasen FINISHED og angre er ikke mulig.
 function canUndoFold(p) {
   return isHandInProgress() && p.folded && !p.waiting &&
          Array.isArray(p.cards) && p.cards.length > 0 &&
          p.foldedInPhase === gameState.phase;
-}
-
-// Navnet på den eneste gjenværende spilleren, hvis alle andre har kastet seg
-function getLastPlayerStanding() {
-  if (!isHandInProgress()) return null;
-  const remaining = Object.values(players).filter(isInHand);
-  return remaining.length === 1 ? remaining[0].name : null;
 }
 
 function removePlayer(playerId) {
@@ -713,12 +707,12 @@ io.on('connection', (socket) => {
   socket.on('player_fold', safeHandler('player_fold', async () => {
     const player = players[socket.id];
     // Fold er kun lov midt i en hånd, og kun for spillere som faktisk er med.
-    // Hånden avsluttes IKKE her – dealer kårer vinneren med «neste»-knappen,
-    // slik at et feiltrykk kan angres.
+    // Står bare én igjen etter kastet, avsluttes hånden med en gang (kan ikke angres).
     if (!player || !canFold(player)) return;
 
     player.folded = true;
     player.foldedInPhase = gameState.phase;
+    await finishIfOnlyOneLeft();
     updateAll();
   }));
 
@@ -739,6 +733,7 @@ io.on('connection', (socket) => {
 
     player.folded = true;
     player.foldedInPhase = gameState.phase;
+    await finishIfOnlyOneLeft();
     updateAll();
   }));
 
@@ -822,7 +817,6 @@ function getPublicState() {
     phase: gameState.phase,
     board: gameState.board,
     winnerInfo: gameState.winnerInfo,
-    lastPlayerStanding: getLastPlayerStanding(),
     players: playerList.map(p => ({
       name: p.name,
       seat: p.seat,
