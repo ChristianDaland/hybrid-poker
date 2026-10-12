@@ -1,6 +1,10 @@
 // Laster miljøvariabler fra .env hvis tilgjengelig
 try { require('dotenv').config(); } catch (err) { /* dotenv ikke installert – OK */ }
 
+// All dato-logikk (dagens hender, omgangsnummer) skal følge norsk tid, også når
+// serveren kjører i skyen (Render går i UTC). Kan overstyres med APP_TZ.
+process.env.TZ = process.env.APP_TZ || 'Europe/Oslo';
+
 const express = require('express');
 const http = require('http');
 const os = require('os');

@@ -276,14 +276,16 @@
     }
 
     /* Knappen for å åpne eget bordvindu */
+    /* Smale skjermer: mindre knapper, så knappelinja holder seg på én rad */
+    @media (max-width: 1200px) {
+      .controls { padding: 10px 14px; }
+      .controls-left { gap: 6px; }
+      .controls-left button { padding: 8px 10px; font-size: 0.8rem; }
+    }
+
     .btn-open-board {
       background-color: #ff9800;
       color: white;
-      font-size: 0.85rem;
-      padding: 10px 8px;
-      width: 100%;
-      border-radius: 10px;
-      box-shadow: 0 3px 8px rgba(0,0,0,0.4);
     }
     .btn-open-board:hover {
       background-color: #f57c00;
@@ -332,10 +334,7 @@
         <div id="qr-url" class="qr-url"></div>
       </div>
 
-      <!-- 2. Knapp for å åpne nytt bordvindu -->
-      <button class="btn-open-board" onclick="openBoardWindow()">🖥️ Åpne Bordvisning</button>
-
-      <!-- 3. Stor, høy knapp for neste fase/kort -->
+      <!-- 2. Stor, høy knapp for neste fase/kort -->
       <button id="btn-next-phase" class="btn-next-large" onclick="nextPhase()" style="display: none;">Åpne Flopp</button>
     </div>
   </div>
@@ -355,6 +354,9 @@
 
       <!-- Nytt spill: kast ut alle spillere -->
       <button class="btn-kick-all" onclick="kickAllPlayers()">🚪 Nytt spill</button>
+
+      <!-- Knapp for å åpne eget bordvindu (projektor) -->
+      <button class="btn-open-board" onclick="openBoardWindow()">🖥️ Åpne Bordvisning</button>
 
       <!-- Knapp for dashboard -->
       <button class="btn-dashboard" onclick="openDashboardWindow()">🏆 Se Dashboard</button>

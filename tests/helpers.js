@@ -1,4 +1,6 @@
 // Felles hjelpere for testene: starter en egen server per test og lager simulerte klienter.
+// Testene regner datoer i norsk tid, som serveren
+process.env.TZ = 'Europe/Oslo';
 const { spawn } = require('child_process');
 const net = require('net');
 const fs = require('fs');

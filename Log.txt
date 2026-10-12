@@ -577,3 +577,23 @@ Ikke med: nettlesertesten av kortsortering på mobil (krever Chrome).
   sortering av kort, angre kast, ute/ny omgang/nytt spill,
   dashboard/all time, at bløffkort ikke lagres.
 - Versjon på statusskjermen: 2.11 -> 3.0.
+
+------------------------------------------------------------
+2026-10-12 – «Åpne Bordvisning» i knappelinja
+------------------------------------------------------------
+- index.html: knappen er flyttet fra høyre kolonne ned i knappelinja,
+  ved siden av de andre knappene.
+- Under 1200px bredde blir knappene litt mindre, så linja holder seg
+  på én rad (testet i 1280x720 og 1024x600).
+
+------------------------------------------------------------
+2026-10-12 – Norsk tid også på Render
+------------------------------------------------------------
+Oppdaget: spillet kjører på Render (hybrid-poker-9uc7.onrender.com),
+som går i UTC. «Dagens hender» og omgangsnummer regnes ut fra
+serverens tidssone, så hender mellom 00:00 og 02:00 norsk tid havnet
+på feil dato.
+Fiks: server.js setter process.env.TZ = 'Europe/Oslo' ved oppstart
+(kan overstyres med APP_TZ).
+Testet: dashboard-testen starter nå serveren med TZ=UTC. Den feiler
+uten fiksen og består med den. Hele testpakken: 25/25.

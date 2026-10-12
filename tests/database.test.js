@@ -117,7 +117,8 @@ test('Dashboard-API: datofilter, omgangsnummer og all time', async (t) => {
   await H(b1, iso(2026, 10, 12, 0, 30), 'Kristoffer', 'Flush, Ah High', 60000000000);
   db.close();
 
-  const srv = await startServer({ dbFile });
+  // Serveren startes i UTC, som på Render – den skal likevel regne dager i norsk tid
+  const srv = await startServer({ dbFile, env: { TZ: 'UTC' } });
   t.after(() => srv.stop());
 
   const all = await srv.getJson('/api/winning-hands');
@@ -128,7 +129,9 @@ test('Dashboard-API: datofilter, omgangsnummer og all time', async (t) => {
   assert.strictEqual(flush.omgang_nr, 1);
   assert.strictEqual(flush.omgang_date, '2026-10-11', 'hånd etter midnatt hører til omgangen fra dagen før');
 
+  // Hånden kl. 00:30 norsk tid 12.10 er kl. 22:30 UTC 11.10 – skal likevel høre til 12.10
   assert.strictEqual((await srv.getJson('/api/winning-hands?date=2026-10-12')).length, 1);
+  assert.strictEqual((await srv.getJson('/api/hands?date=2026-10-11')).length, 0);
   assert.strictEqual((await srv.getJson('/api/hands?date=2026-10-10')).length, 3, 'alle tre hender den dagen, også «kastet seg»');
   const rounds = await srv.getJson('/api/rounds?date=2026-10-10');
   assert.deepStrictEqual(rounds.map(r => r.omgang_nr), [1, 2]);
