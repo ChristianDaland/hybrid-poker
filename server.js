@@ -496,6 +496,9 @@ async function finishIfOnlyOneLeft() {
 }
 
 io.on('connection', (socket) => {
+  // Skjermer som lastes inn på nytt får dagens tilstand med en gang
+  socket.emit('state_update', getPublicState());
+
   socket.on('join_game', safeHandler('join_game', async (nameOrPayload) => {
     let rawName = '';
     let clientUuid = null;
@@ -773,14 +776,15 @@ io.on('connection', (socket) => {
   });
 });
 
-function updateAll() {
+// Offentlig tilstand for statusskjerm og projektor (ingen private kort før showdown)
+function getPublicState() {
   const playerList = getSeatedPlayers();
 
   const showCardsOnScreen = gameState.phase === 'SHOWDOWN' && 
                             gameState.winnerInfo && 
                             !gameState.winnerInfo.foldedWin;
 
-  io.emit('state_update', {
+  return {
     gameMode: gameState.gameMode,
     phase: gameState.phase,
     board: gameState.board,
@@ -794,9 +798,13 @@ function updateAll() {
       connected: p.connected,
       cards: showCardsOnScreen && !p.folded ? p.cards : []
     }))
-  });
+  };
+}
 
-  playerList.forEach(p => {
+function updateAll() {
+  io.emit('state_update', getPublicState());
+
+  getSeatedPlayers().forEach(p => {
     if (p.connected) {
       io.to(p.id).emit('player_state', {
         phase: gameState.phase,

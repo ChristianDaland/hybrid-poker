@@ -160,3 +160,35 @@ Merk: index.html har CRLF-linjeskift (Windows); de er bevart.
 Testet: heads-up-roller, dealer kan ikke kaste for tilkoblet
 spiller, kan kaste for frakoblet, hånden avsluttes riktig.
 Alle tidligere tester kjørt på nytt: OK.
+
+============================================================
+ØNSKELISTE – rekkefølge avtalt 2026-10-12
+============================================================
+(3) plass til 5 spillere -> (1/5) angre kast -> (6) «ute»-markering
+-> (4) nytt spill/kast ut alle -> (2) endre plassering
+-> (9) sortere kort på mobil -> (7+8) dashboard -> opprydding.
+Valg: dealer bekrefter vinner (angre mulig), kalenderdato for
+«dagens hender», trekning + piler for plassering, dashboard med
+dagens topp 10 + alle dagens hender.
+
+------------------------------------------------------------
+2026-10-12 – Ønske 3: Plass til 5 spillere på statusskjermen
+------------------------------------------------------------
+Problem: Med 5 spillere i Omaha havnet spillerne på to rader, og
+andre rad ble skjult bak knappelinja nederst (gjenskapt i 1280x720).
+Fiks (index.html):
+- Alle spillere vises på én rad over hele bredden (maks 1800px i
+  stedet for 1150px). Spillerboksene deler plassen likt.
+- Kortene i spillerboksene skalerer med plassen (aspect-ratio +
+  container query-enheter), så 4 Omaha-kort alltid får plass.
+- Over 6 spillere: to rader.
+- Rollelinja har fast høyde, så kortene står på linje.
+- Lange navn kuttes med «…».
+- Opprydding 15: navn/roller/vinnertekst escapes (escapeHtml), så
+  et navn med HTML-tegn ikke kan ødelegge visningen.
+Fiks (server.js):
+- Skjermer som lastes inn på nytt (statusskjerm/projektor) får
+  gjeldende tilstand med en gang (getPublicState ved tilkobling).
+  Før var de tomme til noe skjedde i spillet.
+Testet: skjermbilder i headless Chrome i 1920x1080, 1280x720 og
+1024x600 med 5 spillere i Omaha-showdown. Alle tidligere tester OK.
