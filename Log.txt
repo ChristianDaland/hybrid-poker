@@ -520,3 +520,21 @@ Fiks:
   QR-koden. Adressen vises også som tekst under QR-koden.
 Testet: /api/server-info på utviklermaskinen (10.0.0.34 før
 100.102.79.32), skjermbilde av statusskjermen via localhost.
+
+------------------------------------------------------------
+2026-10-12 – Opprydding 14: Beskytte admin-endepunkter
+------------------------------------------------------------
+Problem: Alle på nettet kunne tømme databasen (POST /api/reset-db)
+og hente rådata via /api/debug-db – inkludert spiller-UUID-er, som
+fungerer som innloggingsnøkkel (rejoin_game) og dermed gir tilgang
+til andres kort.
+Fiks (server.js): middleware localOnly – /api/debug-db og
+/api/reset-db svarer 403 med mindre forespørselen kommer fra maskinen
+som kjører serveren (127.0.0.1/::1). Overstyres med
+ALLOW_REMOTE_ADMIN=1. database.html viser en forklarende melding.
+Dashboard-API-ene (stats, topp 10, hender, omganger) er fortsatt
+åpne – de inneholder ingen UUID-er.
+Testet med curl: localhost 200, LAN-adresse 403 (debug og reset),
+dashboard-API 200 fra LAN, ALLOW_REMOTE_ADMIN=1 gir 200.
+Kjent begrensning: styringshendelsene fra statusskjermen (neste fase,
+ute-markering, nytt spill osv.) er fortsatt åpne for alle tilkoblede.

@@ -124,6 +124,9 @@
     async function fetchData() {
       try {
         const res = await fetch('/api/debug-db');
+        if (res.status === 403) {
+          throw new Error('Databaseinspektøren kan bare brukes på maskinen som kjører serveren (http://localhost:…).');
+        }
         if (!res.ok) {
           throw new Error(`Server svarte med status ${res.status}`);
         }
@@ -158,6 +161,8 @@
           const res = await fetch('/api/reset-db', { method: 'POST' });
           if (res.ok) {
             fetchData();
+          } else if (res.status === 403) {
+            alert('Databasen kan bare tømmes fra maskinen som kjører serveren.');
           } else {
             alert('Kunne ikke nullstille databasen.');
           }

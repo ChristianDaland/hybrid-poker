@@ -15,6 +15,17 @@ const io = new Server(server, { pingInterval: 25000, pingTimeout: 60000 });
 app.use(express.static('public'));
 app.use(express.json());
 
+// Admin-endepunkter (tømme databasen, se rådata inkl. spiller-UUID-er) er kun
+// tilgjengelige fra maskinen som kjører serveren. UUID fungerer som innloggingsnøkkel,
+// så den skal ikke kunne hentes fra telefonene på nettet.
+// Kan overstyres med miljøvariabelen ALLOW_REMOTE_ADMIN=1.
+function localOnly(req, res, next) {
+  const addr = req.socket.remoteAddress || '';
+  const isLocal = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(addr);
+  if (isLocal || process.env.ALLOW_REMOTE_ADMIN === '1') return next();
+  res.status(403).json({ error: 'Kun tilgjengelig på maskinen som kjører serveren.' });
+}
+
 // ============================================================
 // API: Statistikk, Topp 10 vinnerhender, DB-nullstilling og Inspeksjon
 // ============================================================
@@ -201,7 +212,7 @@ app.get('/api/rounds', async (req, res) => {
   }
 });
 
-app.get('/api/debug-db', async (req, res) => {
+app.get('/api/debug-db', localOnly, async (req, res) => {
   if (!db) return res.status(503).json({ error: 'Database ikke tilkoblet.' });
   try {
     const hands = await db.execute("SELECT * FROM winning_hands ORDER BY id DESC");
@@ -221,7 +232,7 @@ app.get('/api/debug-db', async (req, res) => {
   }
 });
 
-app.post('/api/reset-db', async (req, res) => {
+app.post('/api/reset-db', localOnly, async (req, res) => {
   if (!db) return res.status(503).json({ error: 'Database ikke tilkoblet.' });
   try {
     await db.execute("DELETE FROM winning_hands");
