@@ -23,12 +23,13 @@ app.get('/api/stats', async (req, res) => {
   try {
     const result = await db.execute(`
       SELECT 
-        name, 
-        SUM(hands_played) as hands_played, 
-        SUM(hands_won) as hands_won 
-      FROM player_stats 
-      GROUP BY LOWER(name)
-      ORDER BY hands_won DESC, hands_played DESC
+        ps.name, 
+        SUM(ps.hands_played) as hands_played, 
+        SUM(ps.hands_won) as hands_won,
+        (SELECT COUNT(*) FROM omganger o WHERE LOWER(o.winner_name) = LOWER(ps.name)) as rounds_won
+      FROM player_stats ps
+      GROUP BY LOWER(ps.name)
+      ORDER BY rounds_won DESC, hands_won DESC, hands_played DESC
     `);
     res.json(result.rows);
   } catch (err) {
@@ -42,9 +43,9 @@ app.get('/api/winning-hands', async (req, res) => {
   if (!db) return res.status(503).json({ error: 'Database ikke tilkoblet.' });
   try {
     const result = await db.execute(`
-      SELECT player_name, hand_description, winning_cards, hand_rank, created_at 
+      SELECT player_name, hand_description, winning_cards, hand_rank, created_at, omgang_id 
       FROM (
-        SELECT player_name, hand_description, winning_cards, hand_rank, created_at, id
+        SELECT player_name, hand_description, winning_cards, hand_rank, created_at, id, omgang_id
         FROM winning_hands
         ORDER BY hand_rank DESC, id DESC
         LIMIT 10
@@ -64,11 +65,13 @@ app.get('/api/debug-db', async (req, res) => {
     const hands = await db.execute("SELECT * FROM winning_hands ORDER BY id DESC");
     const stats = await db.execute("SELECT * FROM player_stats ORDER BY id DESC");
     const sessions = await db.execute("SELECT * FROM poker_sessions ORDER BY id DESC");
+    const rounds = await db.execute("SELECT * FROM omganger ORDER BY omgang_id DESC");
 
     res.json({
       winning_hands: hands.rows,
       player_stats: stats.rows,
-      poker_sessions: sessions.rows
+      poker_sessions: sessions.rows,
+      omganger: rounds.rows
     });
   } catch (err) {
     console.error('[DB Error /api/debug-db]:', err);
@@ -82,7 +85,9 @@ app.post('/api/reset-db', async (req, res) => {
     await db.execute("DELETE FROM winning_hands");
     await db.execute("DELETE FROM player_stats");
     await db.execute("DELETE FROM poker_sessions");
+    await db.execute("DELETE FROM omganger");
     currentSessionId = null;
+    currentRoundId = null;
     console.log('[DB] Databasen er tømt for testdata!');
     res.json({ message: 'Databasen er tømt for all data.' });
   } catch (err) {
@@ -196,6 +201,8 @@ let gameState = {
   board: [],
   deck: [],
   winnerInfo: null,
+  roundStartedAt: null,  // Når første hånd i pågående omgang startet
+  roundFinished: false,  // Omgangen er avgjort (vinner funnet)
   winnerUuids: [], // Kun på serveren – UUID gir tilgang til kortene og må ikke sendes ut
   dealerSeat: 0 // Setenummeret til forrige dealer (0 = ingen ennå)
 };
@@ -276,6 +283,8 @@ function safeHandler(eventName, fn) {
 // ============================================================
 let db = null;
 let currentSessionId = null;
+let currentRoundId = null;        // omgang_id i databasen for pågående omgang
+let roundRowPromise = null;       // hindrer at to samtidige kall oppretter to rader
 
 function initDatabase() {
   const url = process.env.TURSO_DATABASE_URL;
@@ -311,6 +320,16 @@ async function ensureTables() {
     ended_at TEXT,
     game_mode TEXT
   )`);
+  // En omgang = fra alle er med til alle unntatt én er ute. Flere omganger per kveld.
+  await db.execute(`CREATE TABLE IF NOT EXISTS omganger (
+    omgang_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER,
+    started_at TEXT NOT NULL,
+    ended_at TEXT,
+    game_mode TEXT,
+    winner_uuid TEXT,
+    winner_name TEXT
+  )`);
   await db.execute(`CREATE TABLE IF NOT EXISTS player_stats (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     uuid TEXT UNIQUE NOT NULL,
@@ -329,6 +348,84 @@ async function ensureTables() {
     hand_rank INTEGER DEFAULT 0,
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   )`);
+
+  // Migrering: eldre databaser mangler omgang_id i winning_hands
+  const cols = await db.execute("PRAGMA table_info(winning_hands)");
+  if (!cols.rows.some(c => c.name === 'omgang_id')) {
+    await db.execute("ALTER TABLE winning_hands ADD COLUMN omgang_id INTEGER");
+    console.log('[DB] La til kolonnen omgang_id i winning_hands.');
+  }
+}
+
+async function ensureSession(nowIso) {
+  if (currentSessionId) return currentSessionId;
+  try {
+    const ins = await db.execute({
+      sql: "INSERT INTO poker_sessions (started_at, game_mode) VALUES (?, ?)",
+      args: [nowIso, gameState.gameMode || 'OMAHA']
+    });
+    currentSessionId = Number(ins.lastInsertRowid) || 1;
+  } catch (sErr) {
+    console.warn('[DB WARN] Kunne ikke opprette sesjon, bruker fallback ID 1:', sErr.message);
+    currentSessionId = 1;
+  }
+  return currentSessionId;
+}
+
+// Oppretter raden for pågående omgang første gang den trengs
+async function ensureRoundRow() {
+  if (!db) return null;
+  if (currentRoundId) return currentRoundId;
+  if (!roundRowPromise) {
+    roundRowPromise = (async () => {
+      const nowIso = new Date().toISOString();
+      const sessionId = await ensureSession(nowIso);
+      const ins = await db.execute({
+        sql: "INSERT INTO omganger (session_id, started_at, game_mode) VALUES (?, ?, ?)",
+        args: [Number(sessionId), gameState.roundStartedAt || nowIso, gameState.gameMode || null]
+      });
+      currentRoundId = Number(ins.lastInsertRowid);
+      console.log('[DB] Ny omgang startet, omgang_id =', currentRoundId);
+      return currentRoundId;
+    })().finally(() => { roundRowPromise = null; });
+  }
+  return roundRowPromise;
+}
+
+// Omgangen er avgjort (alle unntatt én er ute)
+async function finishRound(winner) {
+  gameState.roundFinished = true;
+  if (!db) return;
+  try {
+    const roundId = await ensureRoundRow();
+    await db.execute({
+      sql: "UPDATE omganger SET ended_at = ?, winner_uuid = ?, winner_name = ? WHERE omgang_id = ?",
+      args: [new Date().toISOString(), String(winner.uuid || ''), String(winner.name), Number(roundId)]
+    });
+  } catch (err) {
+    console.error('[DB] Feil ved avslutning av omgang:', err.message);
+  }
+}
+
+// Dealeren angret «ute»-markeringen som avgjorde omgangen
+async function reopenRound() {
+  gameState.roundFinished = false;
+  if (!db || !currentRoundId) return;
+  try {
+    await db.execute({
+      sql: "UPDATE omganger SET ended_at = NULL, winner_uuid = NULL, winner_name = NULL WHERE omgang_id = ?",
+      args: [Number(currentRoundId)]
+    });
+  } catch (err) {
+    console.error('[DB] Feil ved gjenåpning av omgang:', err.message);
+  }
+}
+
+// «Ny omgang»: neste hånd hører til en ny omgang
+function startNewRound() {
+  currentRoundId = null;
+  gameState.roundStartedAt = null;
+  gameState.roundFinished = false;
 }
 
 async function ensurePlayerStats(uuid, name) {
@@ -365,17 +462,12 @@ async function persistHandResult() {
   const rankVal = winnerInfo.rankVal !== undefined ? winnerInfo.rankVal : 0;
   const nowIso = new Date().toISOString();
 
-  if (!currentSessionId) {
-    try {
-      const ins = await db.execute({
-        sql: "INSERT INTO poker_sessions (started_at, game_mode) VALUES (?, ?)",
-        args: [nowIso, gameMode || 'OMAHA']
-      });
-      currentSessionId = Number(ins.lastInsertRowid) || 1;
-    } catch (sErr) {
-      console.warn('[DB WARN] Kunne ikke opprette sesjon, bruker fallback ID 1:', sErr.message);
-      currentSessionId = 1;
-    }
+  await ensureSession(nowIso);
+  let roundId = null;
+  try {
+    roundId = await ensureRoundRow();
+  } catch (rErr) {
+    console.error('[DB ERROR] Kunne ikke opprette omgang:', rErr.message);
   }
 
   // Vinnere identifiseres på UUID (ikke navn – «Ola» skal ikke matche «Olav»)
@@ -421,10 +513,11 @@ async function persistHandResult() {
     });
 
     const res = await db.execute({
-      sql: `INSERT INTO winning_hands (session_id, player_uuid, player_name, hand_description, winning_cards, hand_rank, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO winning_hands (session_id, omgang_id, player_uuid, player_name, hand_description, winning_cards, hand_rank, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         Number(currentSessionId),
+        roundId ? Number(roundId) : null,
         String(winnerUuidStr),
         String(winnerNamesStr),
         String(rawDescr),
@@ -453,11 +546,16 @@ function getActiveSeatedPlayers() {
   return getSeatedPlayers().filter(p => !p.out);
 }
 
-// Når alle unntatt én er markert «ute», har den ene vunnet kvelden
-function getTournamentWinner() {
+// Når alle unntatt én er markert «ute», har den ene vunnet omgangen
+function getRoundWinnerPlayer() {
   const all = Object.values(players);
   const remaining = all.filter(p => !p.out);
-  return (remaining.length === 1 && all.length > 1) ? remaining[0].name : null;
+  return (remaining.length === 1 && all.length > 1) ? remaining[0] : null;
+}
+
+function getRoundWinner() {
+  const p = getRoundWinnerPlayer();
+  return p ? p.name : null;
 }
 
 function startNewHandLogic() {
@@ -465,11 +563,15 @@ function startNewHandLogic() {
 
   removePlayersMarkedForRemoval();
 
-  // Ingen ny hånd når turneringen er avgjort
-  if (getTournamentWinner()) return;
+  // Ingen ny hånd når omgangen er avgjort – dealer må trykke «Ny omgang»
+  if (getRoundWinner()) return;
 
   const playerList = getActiveSeatedPlayers();
   if (playerList.length === 0) return;
+
+  // Første hånd i en (ny) omgang
+  if (gameState.roundFinished) startNewRound();
+  if (!gameState.roundStartedAt) gameState.roundStartedAt = new Date().toISOString();
 
   // Spillere som er ute nullstilles og står over
   getSeatedPlayers().filter(p => p.out).forEach(p => {
@@ -769,21 +871,25 @@ io.on('connection', (socket) => {
     const player = Object.values(players).find(p => p.seat === seat);
     if (!player) return;
 
-    const winnerBefore = getTournamentWinner();
+    const winnerBefore = getRoundWinnerPlayer();
     player.out = !!(data && data.out);
     if (player.out) player.role = '';
-    const winnerAfter = getTournamentWinner();
+    const winnerAfter = getRoundWinnerPlayer();
+    updateAll();
 
     if (winnerAfter && winnerAfter !== winnerBefore) {
-      io.emit('celebrate_win', { playerName: winnerAfter, handDescription: 'Vinner av kvelden!' });
+      io.emit('celebrate_win', { playerName: winnerAfter.name, handDescription: 'Vinner av omgangen!' });
+      await finishRound(winnerAfter);
+    } else if (!winnerAfter && winnerBefore) {
+      await reopenRound();
     }
-    updateAll();
   }));
 
-  // Ny turnering: alle er med igjen
+  // Ny omgang: alle er med igjen, og neste hånd hører til en ny omgang
   socket.on('host_reset_out', safeHandler('host_reset_out', async () => {
     if (isHandInProgress()) return;
     Object.values(players).forEach(p => { p.out = false; });
+    startNewRound();
     updateAll();
   }));
 
@@ -867,7 +973,7 @@ function getPublicState() {
     phase: gameState.phase,
     board: gameState.board,
     winnerInfo: gameState.winnerInfo,
-    tournamentWinner: getTournamentWinner(),
+    roundWinner: getRoundWinner(),
     players: playerList.map(p => ({
       name: p.name,
       seat: p.seat,

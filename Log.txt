@@ -276,3 +276,47 @@ kort/rolle over tre hender, dealer roterer riktig forbi, heads-up
 blant de to siste, vinner av kvelden + feiring, ingen ny hånd etter
 avgjort, angre markering, ny turnering. Skjermbilder i 1280x720.
 Alle tidligere tester OK.
+
+------------------------------------------------------------
+2026-10-12 – Omganger (justering av ønske 6)
+------------------------------------------------------------
+Bakgrunn: Det spilles 3–8 omganger per kveld. Den siste som ikke
+er «ute» vinner OMGANGEN, ikke kvelden. Omgangsvinnere skal med i
+statistikken, og beste hender skal knyttes til omgang.
+
+Database (server.js, ensureTables):
+- Ny tabell omganger: omgang_id (unik, autoincrement), session_id,
+  started_at, ended_at, game_mode, winner_uuid, winner_name.
+- winning_hands har ny kolonne omgang_id. Migrering: kolonnen
+  legges til automatisk ved oppstart (ALTER TABLE) hvis den mangler.
+  Eksisterende rader beholdes (omgang_id = NULL).
+
+Logikk:
+- En omgang starter med første hånd etter serverstart / «Ny omgang».
+  Raden opprettes første gang den trengs (ensureRoundRow, beskyttet
+  mot dobbel opprettelse).
+- Når alle unntatt én er markert ute: omgangen avsluttes (ended_at,
+  vinner lagres) og 'celebrate_win' sendes («Vinner av omgangen!»).
+- Angres markeringen, gjenåpnes omgangen (vinner/slutt nullstilles).
+- «🔄 Ny omgang (alle inn igjen)»: alle inn, neste hånd = ny omgang.
+- Hver lagret hånd i winning_hands får omgang_id.
+- Refaktorert: ensureSession() trukket ut av persistHandResult.
+- Omdøpt: getTournamentWinner -> getRoundWinner(Player),
+  tournamentWinner -> roundWinner i state_update.
+
+API:
+- /api/stats: ny kolonne rounds_won (omganger vunnet, per navn),
+  sortert på omganger vunnet først.
+- /api/winning-hands: inkluderer omgang_id.
+- /api/debug-db: inkluderer omganger. /api/reset-db tømmer omganger.
+
+Frontend:
+- index.html: «HAR VUNNET OMGANGEN!», knapp «Ny omgang».
+- dashboard.html: kolonne «Omganger Vunnet».
+- database.html: viser tabellen omganger.
+
+Testet mot lokal SQLite-fil laget med GAMMELT skjema: migrering,
+to omganger med riktig omgang_id på hendene, vinner lagret,
+angre gjenåpner omgang, rounds_won i statistikken, omgang_id i
+topp 10. Alle tidligere tester OK.
+Merk: Turso-databasen migreres automatisk neste gang serveren startes.

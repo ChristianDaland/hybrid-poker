@@ -84,6 +84,9 @@
   <h2>3. Tabell: <code>poker_sessions</code> <span id="count-sessions" class="badge">0 rader</span></h2>
   <div id="container-sessions">Laster data...</div>
 
+  <h2>4. Tabell: <code>omganger</code> <span id="count-rounds" class="badge">0 rader</span></h2>
+  <div id="container-rounds">Laster data...</div>
+
   <script>
     function renderTable(data) {
       if (!data || data.length === 0) {
@@ -137,6 +140,11 @@
         // 3. Poker Sessions
         document.getElementById('count-sessions').innerText = `${json.poker_sessions.length} rader`;
         document.getElementById('container-sessions').innerHTML = renderTable(json.poker_sessions);
+
+        // 4. Omganger
+        const rounds = json.omganger || [];
+        document.getElementById('count-rounds').innerText = `${rounds.length} rader`;
+        document.getElementById('container-rounds').innerHTML = renderTable(rounds);
 
       } catch (err) {
         console.error('Feil ved henting av DB-data:', err);

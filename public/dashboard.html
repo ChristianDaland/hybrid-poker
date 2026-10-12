@@ -68,13 +68,14 @@
         <thead>
           <tr>
             <th>Spiller</th>
+            <th>Omganger Vunnet</th>
             <th>Hender Spilt</th>
             <th>Hender Vunnet</th>
             <th>Seiersprosent</th>
           </tr>
         </thead>
         <tbody id="stats-body">
-          <tr><td colspan="4">Laster statistikk...</td></tr>
+          <tr><td colspan="5">Laster statistikk...</td></tr>
         </tbody>
       </table>
     </div>
@@ -114,6 +115,7 @@
             return `
               <tr>
                 <td><strong>${s.name || s.player_name || 'Ukjent'}</strong></td>
+                <td>${s.rounds_won || 0}</td>
                 <td>${played}</td>
                 <td>${won}</td>
                 <td class="percent">${pct}%</td>
@@ -121,7 +123,7 @@
             `;
           }).join('');
         } else {
-          statsBody.innerHTML = '<tr><td colspan="4">Ingen data ennå.</td></tr>';
+          statsBody.innerHTML = '<tr><td colspan="5">Ingen data ennå.</td></tr>';
         }
 
         // 2. Hent Top 10 Vinnerhender

@@ -319,7 +319,7 @@
       <div id="game-controls" style="display: none; gap: 10px;">
         <button id="btn-change-mode" class="btn-change-mode" onclick="resetMode()">Bytt Spilletype</button>
         <button id="btn-start-hand" class="btn-action" onclick="startNewHand()">Start Ny Hånd</button>
-        <button id="btn-reset-out" class="btn-change-mode" onclick="resetOut()" style="display: none;">🔄 Ny turnering (alle inn igjen)</button>
+        <button id="btn-reset-out" class="btn-change-mode" onclick="resetOut()" style="display: none;">🔄 Ny omgang (alle inn igjen)</button>
       </div>
 
       <!-- Knapp for dashboard -->
@@ -447,7 +447,7 @@
       socket.emit('host_set_out', { seat: seat, out: out });
     }
     function resetOut() {
-      if (confirm('Starte ny turnering? Alle spillere blir med igjen.')) socket.emit('host_reset_out');
+      if (confirm('Starte ny omgang? Alle spillere blir med igjen.')) socket.emit('host_reset_out');
     }
     function foldForPlayer(seat) {
       const p = lastState && lastState.players.find(pl => pl.seat === seat);
@@ -489,8 +489,8 @@
 
       const isRoundActive = ['PREFLOP', 'FLOP', 'TURN', 'RIVER'].includes(state.phase);
       changeModeBtn.disabled = isRoundActive;
-      startHandBtn.disabled = isRoundActive || !!state.tournamentWinner;
-      nextBtn.disabled = !!state.tournamentWinner;
+      startHandBtn.disabled = isRoundActive || !!state.roundWinner;
+      nextBtn.disabled = !!state.roundWinner;
       document.getElementById('btn-reset-out').style.display =
         state.players.some(p => p.out) && !isRoundActive ? 'inline-block' : 'none';
 
@@ -511,8 +511,8 @@
       }
 
       const banner = document.getElementById('winner-banner');
-      if (state.tournamentWinner) {
-        banner.innerHTML = `🏆 ${escapeHtml(state.tournamentWinner)} HAR VUNNET KVELDEN! 🏆`;
+      if (state.roundWinner) {
+        banner.innerHTML = `🏆 ${escapeHtml(state.roundWinner)} HAR VUNNET OMGANGEN! 🏆`;
         banner.style.display = 'block';
       } else if (state.winnerInfo) {
         banner.innerHTML = `🏆 VINNER: ${escapeHtml(state.winnerInfo.winnerName)} (${escapeHtml(state.winnerInfo.descr)})`;
