@@ -481,3 +481,27 @@ Merk: Eldre rader i Turso inneholder fortsatt alle kort.
 Testet: gamle rader (fold-seier med bløffkort, showdown med kastede
 kort, rad uten data) ryddet; ny v2-rad urørt; andre oppstart gjør
 ingenting. Alle databasetester OK.
+
+============================================================
+OPPRYDDING
+============================================================
+------------------------------------------------------------
+2026-10-12 – Opprydding 17: Norske håndbeskrivelser
+------------------------------------------------------------
+Problem: Oversettelsen erstattet bare enkeltord, så tekster som
+«Flush, Qd High», «Straight Flush, 9h High», «To Par, A's & 2's» og
+«A High» ble halvt engelske.
+Fiks (server.js):
+- translateHandDescription() tolker hvert pokersolver-format med
+  regex og bygger norsk tekst med kortnavn (Ess, Konge, Dame, Knekt,
+  10 …) og farge (hjerter, ruter, kløver, spar). Eksempler:
+  Flush, Dame-høy i ruter · Fullt hus, Konger over 2-ere ·
+  To par, Ess og 2-ere · Ett par, 10-ere · Høyt kort, Ess ·
+  Straight Flush, 9-høy i hjerter · Royal Flush.
+  Ukjent format vises uendret.
+- retranslateStoredDescription(): eldre rader i databasen med gammel
+  halvoversatt tekst oversettes på nytt når dashboardet viser dem
+  (lagret tekst endres ikke).
+- Delt pott: «UAVGJORT – DELT POTT: A & B» (var «UAVGJOERT / DELING»).
+Testet: alle 10 håndtyper (inkl. wheel, 10-ere, royal) og gamle
+lagrede tekster.

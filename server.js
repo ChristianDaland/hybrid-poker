@@ -102,7 +102,7 @@ async function decorateHands(rows) {
     return {
       id: r.id,
       player_name: r.player_name,
-      hand_description: r.hand_description,
+      hand_description: retranslateStoredDescription(r.hand_description),
       hand_rank: r.hand_rank,
       created_at: normalizeTimestamp(r.created_at),
       omgang_id: r.omgang_id,
@@ -238,26 +238,62 @@ function shuffle(array) {
   return deck;
 }
 
+// Kortverdier på norsk: entall («Konge-høy») og flertall («Konger»)
+const VALUE_NAMES = {
+  A: ['Ess', 'Ess'], K: ['Konge', 'Konger'], Q: ['Dame', 'Damer'], J: ['Knekt', 'Knekter'], T: ['10', '10-ere']
+};
+const SUIT_NAMES = { h: 'hjerter', d: 'ruter', c: 'kløver', s: 'spar' };
+
+function valueName(v, plural) {
+  const key = String(v).toUpperCase() === '10' ? 'T' : String(v).toUpperCase();
+  if (VALUE_NAMES[key]) return VALUE_NAMES[key][plural ? 1 : 0];
+  return plural ? `${key}-ere` : key;
+}
+
+// Oversetter pokersolver sine beskrivelser, f.eks.
+// «Flush, Qd High» -> «Flush, Dame-høy i ruter», «Two Pair, A's & 2's» -> «To par, Ess og 2-ere»
 function translateHandDescription(descr) {
-  let text = descr || 'Ukjent hånd';
+  const text = String(descr || '').trim();
+  if (!text) return 'Ukjent hånd';
+  const V = '(10|[2-9TJQKA])';
+  let m;
 
-  text = text.replace(/\bT\b/g, '10');
-  text = text.replace(/Straight Flush/g, 'Straight Flush');
-  text = text.replace(/Four of a Kind/g, 'Fire like');
-  text = text.replace(/Full House/g, 'Fullt Hus');
-  text = text.replace(/Flush/g, 'Flush');
-  text = text.replace(/Straight/g, 'Straight');
-  text = text.replace(/Three of a Kind/g, 'Tre like');
-  text = text.replace(/Two Pair/g, 'To Par');
-  text = text.replace(/Pair/g, 'Ett Par');
-  text = text.replace(/High Card/g, 'Høyt Kort');
+  if (/^(Wild )?Royal Flush$/.test(text)) return 'Royal Flush';
+  if ((m = new RegExp(`^Straight Flush, ${V}([cdhs]) High$`).exec(text))) {
+    return `Straight Flush, ${valueName(m[1])}-høy i ${SUIT_NAMES[m[2]]}`;
+  }
+  if ((m = new RegExp(`^Four of a Kind, ${V}'s$`).exec(text))) return `Fire like, ${valueName(m[1], true)}`;
+  if ((m = new RegExp(`^Full House, ${V}'s over ${V}'s$`).exec(text))) {
+    return `Fullt hus, ${valueName(m[1], true)} over ${valueName(m[2], true)}`;
+  }
+  if ((m = new RegExp(`^Flush, ${V}([cdhs]) High$`).exec(text))) {
+    return `Flush, ${valueName(m[1])}-høy i ${SUIT_NAMES[m[2]]}`;
+  }
+  if (/^Straight, Wheel$/.test(text)) return 'Straight, 5-høy';
+  if ((m = new RegExp(`^Straight, ${V} High$`).exec(text))) return `Straight, ${valueName(m[1])}-høy`;
+  if ((m = new RegExp(`^Three of a Kind, ${V}'s$`).exec(text))) return `Tre like, ${valueName(m[1], true)}`;
+  if ((m = new RegExp(`^Two Pair, ${V}'s & ${V}'s$`).exec(text))) {
+    return `To par, ${valueName(m[1], true)} og ${valueName(m[2], true)}`;
+  }
+  if ((m = new RegExp(`^Pair, ${V}'s$`).exec(text))) return `Ett par, ${valueName(m[1], true)}`;
+  if ((m = new RegExp(`^${V} High$`).exec(text))) return `Høyt kort, ${valueName(m[1])}`;
 
-  text = text.replace(/Spades/g, 'Spar');
-  text = text.replace(/Hearts/g, 'Hjerter');
-  text = text.replace(/Diamonds/g, 'Ruter');
-  text = text.replace(/Clubs/g, 'Kløver');
-
+  // Ukjent format: vis teksten som den er
   return text;
+}
+
+// Eldre rader i databasen har en halvoversatt tekst (f.eks. «To Par, A's & 2's»).
+// Den gjøres om til pokersolver-format og oversettes på nytt ved visning.
+function retranslateStoredDescription(descr) {
+  const text = String(descr || '');
+  const english = text
+    .replace(/^Fire like/, 'Four of a Kind')
+    .replace(/^Fullt Hus/, 'Full House')
+    .replace(/^Tre like/, 'Three of a Kind')
+    .replace(/^To Par/, 'Two Pair')
+    .replace(/^Ett Par/, 'Pair');
+  const translated = translateHandDescription(english);
+  return translated === english ? text : translated;
 }
 
 function getCardNumericValue(v) {
@@ -994,7 +1030,7 @@ io.on('connection', (socket) => {
       let winnerText = '';
       if (winners.length > 1) {
         const names = winners.map(w => w.player.name).join(' & ');
-        winnerText = `UAVGJOERT / DELING: ${names}`;
+        winnerText = `UAVGJORT – DELT POTT: ${names}`;
       } else {
         winnerText = winners[0].player.name;
       }
