@@ -632,17 +632,23 @@ async function persistHandResult() {
 
   try {
     const cleanBoard = Array.isArray(board) ? board.map(c => String(c)) : [];
-    const cleanWinningCards = Array.isArray(winnerInfo.rawCards) 
+    // Kun kort som faktisk ble vist ved bordet lagres:
+    // - Alle andre kastet seg: INGEN kort lagres (vinneren kan ha bløffet).
+    // - Showdown: kun kortene til spillerne som var med helt til showdown.
+    //   Kort fra spillere som kastet seg tidligere lagres ikke.
+    const isFoldedWin = !!winnerInfo.foldedWin;
+    const cleanWinningCards = (!isFoldedWin && Array.isArray(winnerInfo.rawCards))
       ? winnerInfo.rawCards.map(c => (c && c.value && c.suit ? c.value + c.suit : String(c)))
       : [];
+    const shownPlayers = isFoldedWin ? [] : activePlayersList.filter(isInHand);
 
     const jsonPayload = JSON.stringify({
       board: cleanBoard,
       winningCards: cleanWinningCards,
-      cards: activePlayersList.map(p => ({
+      cards: shownPlayers.map(p => ({
         uuid: String(p.uuid || ''),
         name: String(p.name || ''),
-        cards: Array.isArray(p.cards) ? p.cards.map(c => String(c)) : []
+        cards: p.cards.map(c => String(c))
       }))
     });
 

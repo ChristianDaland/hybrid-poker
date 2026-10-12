@@ -444,3 +444,22 @@ spillflyt -> riktige omgangsnummer i /api/hands. Skjermbilder av
 dagsvisning og all time. Alle tidligere tester OK.
 
 Funnet: «Flush, Qd High» – halvoversatt beskrivelse (opprydding 17).
+
+------------------------------------------------------------
+2026-10-12 – Ingen lagring av kort som ikke ble vist ved bordet
+------------------------------------------------------------
+Krav: Når alle andre kaster seg, skal vinnerens kort ikke
+registreres noe sted – spilleren kan ha bløffet.
+Før: persistHandResult lagret kortene til ALLE spillere i
+winning_hands.winning_cards (synlig i database.html), også ved
+«alle andre kastet seg» og for spillere som hadde kastet seg.
+Nå (server.js, persistHandResult):
+- Alle andre kastet seg: kun bordkortene lagres; ingen spillerkort,
+  ingen vinnerkort.
+- Showdown: kun kortene til spillerne som var med til showdown
+  (de som ble vist ved bordet), pluss vinnerhånden.
+- Hånden telles fortsatt i statistikken (hender vunnet/spilt) og
+  vises i «Alle hender» som «Alle andre kastet seg», uten kort.
+Testet: bløffkort finnes ingen steder i databasen, kastede kort ved
+showdown ikke lagret, vinnerhånd ved showdown lagret.
+Merk: Eldre rader i Turso inneholder fortsatt alle kort.
