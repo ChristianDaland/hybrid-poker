@@ -113,14 +113,16 @@
       justify-content: center;
       background-color: #ffffff;
       border-radius: 8px;
-      width: 60px;
-      height: 85px;
+      width: 64px;
+      height: 90px;
+      gap: 4px;
       box-shadow: 0 3px 8px rgba(0,0,0,0.5);
       font-weight: bold;
     }
     /* Fargene og symbolene på kortene: se cards.css og suits.js */
-    .card-val { font-size: 1.4rem; line-height: 1; }
-    .card-suit { font-size: 1.8rem; line-height: 1; }
+    /* Tall og symbol omtrent like store (SVG-symbolet fyller hele 1em) */
+    .card-val { font-size: 1.9rem; line-height: 1; }
+    .card-suit { font-size: 1.5rem; line-height: 1; }
 
     /* Alle spillere på én rad – kortene krymper når det er mange spillere */
     .players-container {
@@ -210,8 +212,8 @@
       height: auto;
       aspect-ratio: 60 / 85;
     }
-    .player-hand .card-val { font-size: clamp(0.7rem, 9cqw, 1.7rem); }
-    .player-hand .card-suit { font-size: clamp(0.8rem, 10cqw, 1.9rem); }
+    .player-hand .card-val { font-size: clamp(0.8rem, 11cqw, 2rem); }
+    .player-hand .card-suit { font-size: clamp(0.7rem, 8.5cqw, 1.6rem); }
 
     .badge {
       display: inline-block;

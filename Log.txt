@@ -698,3 +698,13 @@ I stedet:
 - veiledning.html: «Kortfargene» beskriver symbolformene.
 Testet: skjermbilder av projektor (10♣, 10♠, 9♣, A♠, J♥, 8♦, 8♥, A♦,
 Q♣, K♠), statusskjerm og dashboard.
+
+------------------------------------------------------------
+2026-10-12 – Balanse mellom tall og symbol på kortene
+------------------------------------------------------------
+Tallene så små ut i forhold til de nye SVG-symbolene.
+- index.html: fellesskort 64x90 (var 60x85), tall 1.9rem (var 1.4),
+  symbol 1.5rem (var 1.8). Spillerhender: tall opptil 2rem, symbol
+  opptil 1.6rem (skalerer med plassen).
+- mobile.html: tall 2.3rem (var 1.8), symbol 2rem (var 2.4).
+Testet: skjermbilder av statusskjerm (5 spillere, Omaha) og mobil.
