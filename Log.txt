@@ -836,3 +836,6 @@ Merk: Kløver konge og ruter konge ble ikke lastet ned (Wikimedia
 svarte 429 – for mange forespørsler); de viser foreløpig den gamle
 tegningen.
 Testet: skjermbilder av alle ti nedlastede bildekort + reserve.
+- Kløver konge (Kc.svg) og ruter konge (Kd.svg) lastet ned etter at
+  Wikimedia sin begrensning ble opphevet. Sjekket for skript (ingen).
+  Alle 12 bildekort er nå tradisjonelle. Skjermbilde av alle fire konger.
