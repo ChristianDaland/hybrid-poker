@@ -448,13 +448,37 @@ function randomizePlayerSeats() {
   gameState.dealerSeat = 0;
 }
 
+// Spillere som er tomme for sjetonger («ute») får ikke kort og hoppes over av dealerknappen
+function getActiveSeatedPlayers() {
+  return getSeatedPlayers().filter(p => !p.out);
+}
+
+// Når alle unntatt én er markert «ute», har den ene vunnet kvelden
+function getTournamentWinner() {
+  const all = Object.values(players);
+  const remaining = all.filter(p => !p.out);
+  return (remaining.length === 1 && all.length > 1) ? remaining[0].name : null;
+}
+
 function startNewHandLogic() {
   if (!gameState.gameMode) return;
 
   removePlayersMarkedForRemoval();
 
-  const playerList = getSeatedPlayers();
+  // Ingen ny hånd når turneringen er avgjort
+  if (getTournamentWinner()) return;
+
+  const playerList = getActiveSeatedPlayers();
   if (playerList.length === 0) return;
+
+  // Spillere som er ute nullstilles og står over
+  getSeatedPlayers().filter(p => p.out).forEach(p => {
+    p.folded = true;
+    p.foldedInPhase = null;
+    p.waiting = false;
+    p.cards = [];
+    p.role = '';
+  });
 
   gameState.deck = createDeck();
   gameState.board = [];
@@ -737,6 +761,32 @@ io.on('connection', (socket) => {
     updateAll();
   }));
 
+  // Dealeren markerer at en spiller er ute (tom for sjetonger) – eller angrer markeringen.
+  // Kun lov mellom hender, så ingen blir tatt ut midt i en hånd.
+  socket.on('host_set_out', safeHandler('host_set_out', async (data) => {
+    if (isHandInProgress()) return;
+    const seat = data && Number(data.seat);
+    const player = Object.values(players).find(p => p.seat === seat);
+    if (!player) return;
+
+    const winnerBefore = getTournamentWinner();
+    player.out = !!(data && data.out);
+    if (player.out) player.role = '';
+    const winnerAfter = getTournamentWinner();
+
+    if (winnerAfter && winnerAfter !== winnerBefore) {
+      io.emit('celebrate_win', { playerName: winnerAfter, handDescription: 'Vinner av kvelden!' });
+    }
+    updateAll();
+  }));
+
+  // Ny turnering: alle er med igjen
+  socket.on('host_reset_out', safeHandler('host_reset_out', async () => {
+    if (isHandInProgress()) return;
+    Object.values(players).forEach(p => { p.out = false; });
+    updateAll();
+  }));
+
   socket.on('rejoin_game', safeHandler('rejoin_game', async (data) => {
     const uuid = (data && data.uuid) || (typeof data === 'string' ? data : null);
     if (!uuid) {
@@ -817,12 +867,14 @@ function getPublicState() {
     phase: gameState.phase,
     board: gameState.board,
     winnerInfo: gameState.winnerInfo,
+    tournamentWinner: getTournamentWinner(),
     players: playerList.map(p => ({
       name: p.name,
       seat: p.seat,
       role: p.role,
       folded: p.folded,
       waiting: !!p.waiting,
+      out: !!p.out,
       connected: p.connected,
       cards: showCardsOnScreen && !p.folded ? p.cards : []
     }))
@@ -840,6 +892,7 @@ function updateAll() {
         role: p.role,
         folded: p.folded,
         waiting: !!p.waiting,
+        out: !!p.out,
         canFold: canFold(p),
         canUndoFold: canUndoFold(p),
         winnerInfo: gameState.winnerInfo

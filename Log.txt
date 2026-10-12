@@ -240,3 +240,39 @@ Endringer:
   «Kår vinner»-tekst på knappen.
 Testet: angre i samme fase, angre avvist etter flopp, to igjen +
 kast -> vinner med en gang og angre avvist. Alle tidligere tester OK.
+
+------------------------------------------------------------
+2026-10-12 – Ønske 6: Marker spiller som «ute»
+------------------------------------------------------------
+Sjetongene er fysiske, så dealer markerer selv når noen er tomme.
+
+server.js:
+- Nytt felt player.out. Hendelse 'host_set_out' {seat, out} –
+  kun lov mellom hender (ikke PREFLOP–RIVER). Kan angres.
+- Hendelse 'host_reset_out': alle inn igjen (ny turnering).
+- startNewHandLogic: spillere som er ute får ingen kort/rolle og
+  hoppes over av dealerknappen og blindene (getActiveSeatedPlayers).
+  Heads-up-regelen gjelder når to er igjen.
+- getTournamentWinner(): når alle unntatt én er ute, har den ene
+  vunnet kvelden. Feltet tournamentWinner sendes i state_update.
+  Ny hånd kan ikke startes da.
+- 'celebrate_win' sendes når vinneren av kvelden avgjøres. Dette
+  tar i bruk feiringen (konfetti) som lå ferdig i index.html og
+  board.html men aldri ble utløst (opprydding 12).
+
+index.html:
+- Avkrysningsboks «Ute» på hver spiller (sperret under en hånd).
+- Spiller som er ute: dempet med stort rødt ✕ og status «❌ UTE».
+- Banner «🏆 X HAR VUNNET KVELDEN! 🏆»; «Start ny hånd» og den
+  store knappen sperres.
+- Knapp «🔄 Ny turnering (alle inn igjen)» vises når noen er ute
+  (med bekreftelse).
+
+mobile.html:
+- Viser «❌ Du er ute», fold-knappen viser «Ute» (sperret).
+
+Testet: kan ikke markeres midt i en hånd, ute-spiller får ingen
+kort/rolle over tre hender, dealer roterer riktig forbi, heads-up
+blant de to siste, vinner av kvelden + feiring, ingen ny hånd etter
+avgjort, angre markering, ny turnering. Skjermbilder i 1280x720.
+Alle tidligere tester OK.

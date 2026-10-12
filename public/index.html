@@ -127,6 +127,33 @@
       container-type: inline-size;
     }
     .role-row { min-height: 22px; }
+
+    /* Spiller som er ute: dempet med stort rødt kryss */
+    .player-card { position: relative; }
+    .player-card.out > *:not(.out-toggle) { opacity: 0.35; }
+    .player-card.out::after {
+      content: '✕';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ff1744;
+      font-size: 7rem;
+      font-weight: bold;
+      line-height: 1;
+      text-shadow: 0 0 12px rgba(0,0,0,0.8);
+      pointer-events: none;
+    }
+    .out-toggle {
+      position: relative;
+      z-index: 2;
+      display: inline-block;
+      margin-top: 6px;
+      font-size: 0.8rem;
+      color: #ddd;
+      cursor: pointer;
+    }
     .player-name {
       white-space: nowrap;
       overflow: hidden;
@@ -292,6 +319,7 @@
       <div id="game-controls" style="display: none; gap: 10px;">
         <button id="btn-change-mode" class="btn-change-mode" onclick="resetMode()">Bytt Spilletype</button>
         <button id="btn-start-hand" class="btn-action" onclick="startNewHand()">Start Ny Hånd</button>
+        <button id="btn-reset-out" class="btn-change-mode" onclick="resetOut()" style="display: none;">🔄 Ny turnering (alle inn igjen)</button>
       </div>
 
       <!-- Knapp for dashboard -->
@@ -415,6 +443,12 @@
 
     // Dealeren kaster kortene for en frakoblet spiller, så hånden ikke blir hengende
     let lastState = null;
+    function setPlayerOut(seat, out) {
+      socket.emit('host_set_out', { seat: seat, out: out });
+    }
+    function resetOut() {
+      if (confirm('Starte ny turnering? Alle spillere blir med igjen.')) socket.emit('host_reset_out');
+    }
     function foldForPlayer(seat) {
       const p = lastState && lastState.players.find(pl => pl.seat === seat);
       if (p && confirm(`Kaste kortene for ${p.name}?`)) socket.emit('host_fold_player', seat);
@@ -455,7 +489,10 @@
 
       const isRoundActive = ['PREFLOP', 'FLOP', 'TURN', 'RIVER'].includes(state.phase);
       changeModeBtn.disabled = isRoundActive;
-      startHandBtn.disabled = isRoundActive;
+      startHandBtn.disabled = isRoundActive || !!state.tournamentWinner;
+      nextBtn.disabled = !!state.tournamentWinner;
+      document.getElementById('btn-reset-out').style.display =
+        state.players.some(p => p.out) && !isRoundActive ? 'inline-block' : 'none';
 
       if (state.phase === 'PREFLOP') {
         nextBtn.innerText = 'Åpne Flopp';
@@ -474,7 +511,10 @@
       }
 
       const banner = document.getElementById('winner-banner');
-      if (state.winnerInfo) {
+      if (state.tournamentWinner) {
+        banner.innerHTML = `🏆 ${escapeHtml(state.tournamentWinner)} HAR VUNNET KVELDEN! 🏆`;
+        banner.style.display = 'block';
+      } else if (state.winnerInfo) {
         banner.innerHTML = `🏆 VINNER: ${escapeHtml(state.winnerInfo.winnerName)} (${escapeHtml(state.winnerInfo.descr)})`;
         banner.style.display = 'block';
       } else {
@@ -487,17 +527,21 @@
       const playersContainer = document.getElementById('players-list');
       playersContainer.classList.toggle('many', state.players.length > 6);
       playersContainer.innerHTML = state.players.map(p => `
-        <div class="player-card">
+        <div class="player-card ${p.out ? 'out' : ''}">
           <div class="player-name"><strong>${escapeHtml(p.name)}</strong></div>
           <div style="font-size: 0.8rem; color: #ccc;">Plass ${p.seat}</div>
           <div class="role-row">${p.role ? `<span class="badge">${escapeHtml(p.role)}</span>` : ''}</div>
           <div style="font-size: 0.8rem; margin-top: 4px;">
-            ${p.waiting ? '⏳ VENTER PÅ NESTE HÅND' : (p.folded ? '🔴 FOLDET' : '🟢 INNE')}
+            ${p.out ? '❌ UTE' : (p.waiting ? '⏳ VENTER PÅ NESTE HÅND' : (p.folded ? '🔴 FOLDET' : '🟢 INNE'))}
           </div>
           ${!p.connected ? `<div style="font-size: 0.8rem; color: #ffb74d; margin-top: 4px;">📵 Frakoblet</div>` : ''}
           ${!p.connected && isRoundActive && !p.folded && !p.waiting ? `
             <button class="btn-fold-for" onclick="foldForPlayer(${Number(p.seat)})">Kast kort for spilleren</button>
           ` : ''}
+          <label class="out-toggle" title="${isRoundActive ? 'Kan endres mellom hender' : 'Spilleren er tom for sjetonger'}">
+            <input type="checkbox" ${p.out ? 'checked' : ''} ${isRoundActive ? 'disabled' : ''}
+                   onchange="setPlayerOut(${Number(p.seat)}, this.checked)"> Ute
+          </label>
           ${p.cards && p.cards.length > 0 ? `
             <div class="player-hand">
               ${p.cards.map(c => formatCard(c)).join('')}

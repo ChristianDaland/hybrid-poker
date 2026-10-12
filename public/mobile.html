@@ -357,7 +357,10 @@
       }
       document.getElementById('phase-label').innerText = state.phase;
       const roleBadge = document.getElementById('role-label');
-      if (state.role) {
+      if (state.out) {
+        roleBadge.innerText = '\u274C Du er ute';
+        roleBadge.style.display = 'inline-block';
+      } else if (state.role) {
         roleBadge.innerText = state.role;
         roleBadge.style.display = 'inline-block';
       } else {
@@ -368,7 +371,10 @@
       const foldBtn = document.getElementById('btn-fold');
       foldBtn.classList.remove('undo');
       foldButtonMode = 'fold';
-      if (state.waiting) {
+      if (state.out) {
+        foldBtn.disabled = true;
+        foldBtn.innerText = 'Ute';
+      } else if (state.waiting) {
         foldBtn.disabled = true;
         foldBtn.innerText = 'Venter p\u00E5 neste h\u00E5nd';
       } else if (state.folded && state.canUndoFold) {
