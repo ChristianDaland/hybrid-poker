@@ -273,6 +273,20 @@
     .btn-mode { background-color: #ffffff; color: #333; }
     .btn-change-mode { background-color: #607d8b; color: white; }
     .btn-action { background-color: #4caf50; color: white; }
+
+    /* «Start ny hånd» oppe til høyre, under den store blå knappen */
+    .btn-start-hand {
+      background: linear-gradient(135deg, #43a047, #2e7d32);
+      color: white;
+      font-size: 1.05rem;
+      width: 100%;
+      min-height: 60px;
+      border-radius: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-start-hand:hover { background: linear-gradient(135deg, #4caf50, #388e3c); }
     .btn-help { background-color: #009688; color: white; }
     .btn-dashboard { background-color: #d84315; color: white; }
     .btn-dashboard:hover { background-color: #bf360c; }
@@ -347,6 +361,9 @@
 
       <!-- 2. Stor, høy knapp for neste fase/kort -->
       <button id="btn-next-phase" class="btn-next-large" onclick="nextPhase()" style="display: none;">Åpne Flopp</button>
+
+      <!-- 3. Start ny hånd – vises kun når den kan brukes -->
+      <button id="btn-start-hand" class="btn-start-hand" onclick="startNewHand()" style="display: none;">▶ Start Ny Hånd</button>
     </div>
   </div>
 
@@ -359,7 +376,6 @@
 
       <div id="game-controls" style="display: none; gap: 10px;">
         <button id="btn-change-mode" class="btn-change-mode" onclick="resetMode()">Bytt Spilletype</button>
-        <button id="btn-start-hand" class="btn-action" onclick="startNewHand()">Start Ny Hånd</button>
         <button id="btn-reset-out" class="btn-change-mode" onclick="resetOut()" style="display: none;">🔄 Ny omgang (alle inn igjen)</button>
       </div>
 
@@ -547,6 +563,8 @@
       const startHandBtn = document.getElementById('btn-start-hand');
       const nextBtn = document.getElementById('btn-next-phase');
 
+      const isRoundActive = ['PREFLOP', 'FLOP', 'TURN', 'RIVER'].includes(state.phase);
+
       if (!state.gameMode) {
         modeSelection.style.display = 'flex';
         gameControls.style.display = 'none';
@@ -555,13 +573,15 @@
       } else {
         modeSelection.style.display = 'none';
         gameControls.style.display = 'flex';
-        nextBtn.style.display = 'flex';
+        // Den store knappen har ingen funksjon før første hånd (VENTING) – da brukes «Start ny hånd»
+        nextBtn.style.display = state.phase === 'VENTING' ? 'none' : 'flex';
         gameInfo.innerText = `Modus: ${state.gameMode} | Fase: ${state.phase}`;
       }
 
-      const isRoundActive = ['PREFLOP', 'FLOP', 'TURN', 'RIVER'].includes(state.phase);
       changeModeBtn.disabled = isRoundActive;
-      startHandBtn.disabled = isRoundActive || !!state.roundWinner;
+      // «Start ny hånd» vises kun når den kan brukes
+      const canStartHand = !!state.gameMode && !isRoundActive && !state.roundWinner;
+      startHandBtn.style.display = canStartHand ? 'flex' : 'none';
       nextBtn.disabled = !!state.roundWinner;
       document.getElementById('btn-reset-out').style.display =
         state.players.some(p => p.out) && !isRoundActive ? 'inline-block' : 'none';

@@ -724,3 +724,16 @@ Fiks (mobile.html, @media landscape og maks 520 px høy):
   'block'), så liggende oppsett kan bruke flex.
 Testet i Chrome (mobilemulering): 926x330 og 667x290 liggende og
 375x700 stående – kortene er helt synlige; dra-og-slipp-testen OK.
+
+------------------------------------------------------------
+2026-10-12 – «Start ny hånd» oppe til høyre, kun når den kan brukes
+------------------------------------------------------------
+index.html:
+- «▶ Start Ny Hånd» er flyttet fra knappelinja til høyre kolonne,
+  rett under den store blå knappen (grønn, full bredde).
+- Vises kun når den kan brukes: spilletype valgt, ingen hånd pågår
+  og omgangen ikke avgjort. Ellers skjult (ikke bare grå).
+- Den store blå knappen skjules i VENTING (før første hånd), der den
+  viste «Neste fase» uten å gjøre noe.
+Testet: skjermbilder i VENTING (kun Start), FLOP (kun «Åpne Turn»)
+og SHOWDOWN (begge).
