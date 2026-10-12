@@ -172,6 +172,7 @@
     </div>
   </div>
 
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/nosleep/0.12.0/NoSleep.min.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script>    const socket = io();
     let myCardsData = [];
@@ -181,7 +182,18 @@
     let isJoined = false;
 
     let savedUuid = localStorage.getItem('poker_uuid');
-    const savedName = localStorage.getItem('poker_name');
+    let savedName = localStorage.getItem('poker_name');
+
+    // Hindrer at skjermen låser seg (som kobler fra spillet).
+    // Må aktiveres fra et trykk, derfor kalles den ved innlogging og ved trykk på kortene.
+    const noSleep = (typeof NoSleep === 'function') ? new NoSleep() : null;
+    function keepScreenAwake() {
+      if (!noSleep) return;
+      try {
+        const res = noSleep.enable();
+        if (res && typeof res.catch === 'function') res.catch(() => {});
+      } catch (e) { /* ikke støttet – ignorer */ }
+    }
 
     function setConnectionStatus(text, color) {
       const el = document.getElementById('connection-status');
@@ -216,8 +228,9 @@
     function joinGame() {
       const name = document.getElementById('player-name').value.trim();
       if (!name) return alert('Vennligst skriv inn et navn!');
+      keepScreenAwake();
       setConnectionStatus('\u23F3 Kobler til...', '#4caf50');
-      socket.emit('join_game', name);
+      socket.emit('join_game', { name: name, uuid: savedUuid });
       startJoinTimeout();
     }
 
@@ -226,6 +239,7 @@
     }
 
     function showAllCards() {
+      keepScreenAwake();
       isShowingCards = true;
       renderCards();
       if (revealTimer) { clearTimeout(revealTimer); revealTimer = null; }
@@ -270,7 +284,6 @@
       if (savedUuid) {
         console.log('[Mobile] Attempting rejoin with UUID:', savedUuid);
         socket.emit('rejoin_game', { uuid: savedUuid });
-        startJoinTimeout();
       }
     });
 
@@ -286,7 +299,7 @@
       if (data && data.uuid) {
         savedUuid = data.uuid;
         localStorage.setItem('poker_uuid', data.uuid);
-        if (data.name) localStorage.setItem('poker_name', data.name);
+        if (data.name) { savedName = data.name; localStorage.setItem('poker_name', data.name); }
       }
       isJoined = true;
       clearJoinTimeout();
@@ -296,17 +309,25 @@
 
     socket.on('rejoin_failed', (data) => {
       console.log('[Mobile] Rejoin failed:', data);
-      const wasInGame = isJoined;
+      // Serveren kjenner ikke igjen økten (f.eks. etter omstart). Har vi et lagret
+      // navn, logger vi stille inn igjen i stedet for å kaste spilleren ut.
+      if (savedName) {
+        setConnectionStatus('\u23F3 Kobler til p\u00E5 nytt...', '#ff9800');
+        socket.emit('join_game', { name: savedName, uuid: savedUuid });
+        return;
+      }
       isJoined = false;
-      savedUuid = null;
       clearJoinTimeout();
-      const reason = (data && data.reason) ? data.reason : 'Klarte ikke å gjenoppta spillet.';
-      setConnectionStatus('⚠️ ' + reason, '#f44336');
-      // Fjern lagret UUID for å unngå at samme feil gjentas
-      localStorage.removeItem('poker_uuid');
+      const reason = (data && data.reason) ? data.reason : 'Klarte ikke \u00E5 gjenoppta spillet.';
+      setConnectionStatus('\u26A0\uFE0F ' + reason, '#f44336');
       switchToLogin();
-      if (wasInGame) {
-        alert(reason);
+    });
+
+    // N\u00E5r telefonen v\u00E5kner / fanen blir synlig igjen: koble til umiddelbart
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && isJoined && !socket.connected) {
+        setConnectionStatus('\u23F3 Kobler til p\u00E5 nytt...', '#ff9800');
+        socket.connect();
       }
     });
 

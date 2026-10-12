@@ -8,7 +8,8 @@ const Hand = require('pokersolver').Hand;
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+// Lengre pingTimeout gir telefoner med ustabilt wifi / kort dvale tid til å svare før de regnes som frakoblet
+const io = new Server(server, { pingInterval: 25000, pingTimeout: 60000 });
 
 app.use(express.static('public'));
 app.use(express.json());

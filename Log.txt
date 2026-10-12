@@ -66,3 +66,38 @@ sete, frakoblet spiller fjernes først ved neste hånd.
 Gjenstår (neste steg): punkt 5–11 fra gjennomgangen
 (vinner-matching på navn, UUID ved innlogging, navnekapring,
 heads-up dealer, FINISHED-knapper, frakoblede får kort).
+
+------------------------------------------------------------
+2026-10-12 – Steg 2b: Hindre at spillere blir kastet ut
+------------------------------------------------------------
+Bakgrunn: Én fast spiller ble ofte kastet ut, og noen ganger
+krasjet hele spillet når han koblet på igjen.
+
+Sannsynlig årsak til krasjet (fikset i steg 2):
+Telefonen låste seg -> frakoblet > 60 sek -> spilleren ble slettet
+midt i hånden -> «rejoin» feilet -> han logget inn på nytt med
+navn -> ble ny spiller uten kort -> Omaha-showdown krasjet.
+
+Tiltak mot utkasting:
+1. Skjermen holdes våken (mobile.html)
+   - NoSleep.js (cdnjs, v0.12.0). Bruker native Wake Lock der det
+     støttes, ellers en usynlig video – virker også over vanlig
+     http på lokalnettet. Aktiveres ved innlogging og ved trykk
+     på kortfeltet (nettleseren krever et brukertrykk).
+2. Stille ny innlogging (mobile.html)
+   - Hvis serveren ikke kjenner igjen økten (rejoin_failed), logger
+     mobilen automatisk inn igjen med lagret navn + UUID i stedet
+     for å vise innloggingsskjerm og varsel.
+   - UUID slettes ikke lenger, og sendes med ved innlogging, så
+     statistikken knyttes til samme spiller.
+   - Fjernet 8-sek-tidsavbrudd ved automatisk reconnect (det kastet
+     spilleren til innloggingsskjermen ved tregt wifi).
+3. Rask reconnect når telefonen våkner (mobile.html)
+   - visibilitychange: kobler til umiddelbart når fanen blir synlig.
+4. Mer tålmodig server (server.js)
+   - Socket.IO pingTimeout økt fra 20 til 60 sek, så korte wifi-brudd
+     ikke regnes som frakobling.
+
+Testet: syntakssjekk av mobilskript, simulert «server-omstart ->
+stille innlogging beholder UUID», reconnect med UUID, og alle
+tester fra steg 2 på nytt.
