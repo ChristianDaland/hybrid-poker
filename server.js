@@ -460,7 +460,8 @@ function startNewHandLogic() {
     const relativePos = (idx - dealerPos + playerList.length) % playerList.length;
 
     if (playerList.length === 2) {
-      p.role = relativePos === 0 ? 'Lilleblind' : 'Storeblind';
+      // Heads-up: dealer er også lilleblind
+      p.role = relativePos === 0 ? 'Dealer / Lilleblind' : 'Storeblind';
     } else {
       if (relativePos === 0) p.role = 'Dealer';
       else if (relativePos === 1) p.role = 'Lilleblind';
@@ -688,6 +689,17 @@ io.on('connection', (socket) => {
     const player = players[socket.id];
     // Fold er kun lov midt i en hånd, og kun for spillere som faktisk er med
     if (!player || !isHandInProgress() || !isInHand(player)) return;
+
+    player.folded = true;
+    await finishIfOnlyOneLeft();
+    updateAll();
+  }));
+
+  // Dealeren kaster kortene for en frakoblet spiller (fra statusskjermen),
+  // slik at hånden ikke blir hengende på en telefon som er borte
+  socket.on('host_fold_player', safeHandler('host_fold_player', async (seat) => {
+    const player = Object.values(players).find(p => p.seat === Number(seat));
+    if (!player || player.connected || !isHandInProgress() || !isInHand(player)) return;
 
     player.folded = true;
     await finishIfOnlyOneLeft();

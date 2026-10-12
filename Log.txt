@@ -135,3 +135,28 @@ ingen UUID i state_update. Tidligere tester kjørt på nytt: OK.
 Merk: Eldre rader i player_stats kan ha flere UUID-er per spiller
 (fra før denne endringen). Dashboardet grupperer på navn, så
 totalsummene blir fortsatt riktige.
+
+------------------------------------------------------------
+2026-10-12 – Steg 3b: Spillogikk (punkt 8–11)
+------------------------------------------------------------
+8.  Heads-up (2 spillere): dealer får rollen «Dealer / Lilleblind»
+    (før stod det bare «Lilleblind»), den andre «Storeblind».
+9.  Dupliserte setenumre – allerede fikset i steg 2
+    (getNextSeatNumber).
+10. index.html: «Bytt spilletype» og «Start ny hånd» var sperret i
+    FINISHED (når alle andre kastet seg). Knappene sperres nå kun i
+    PREFLOP/FLOP/TURN/RIVER.
+11. Frakoblede spillere (valgt løsning B):
+    - Frakoblede får fortsatt kort (telefonen kobler seg normalt på
+      igjen av seg selv).
+    - Statusskjermen viser «📵 Frakoblet» på spilleren, og under en
+      aktiv hånd en knapp «Kast kort for spilleren» (med bekreftelse).
+    - Ny server-hendelse 'host_fold_player' (seat). Godtas kun for
+      frakoblede spillere som er med i en aktiv hånd. Er det bare én
+      igjen etterpå, avsluttes hånden som vanlig.
+
+Merk: index.html har CRLF-linjeskift (Windows); de er bevart.
+
+Testet: heads-up-roller, dealer kan ikke kaste for tilkoblet
+spiller, kan kaste for frakoblet, hånden avsluttes riktig.
+Alle tidligere tester kjørt på nytt: OK.

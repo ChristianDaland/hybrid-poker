@@ -180,6 +180,13 @@
     .btn-help { background-color: #009688; color: white; }
     .btn-dashboard { background-color: #d84315; color: white; }
     .btn-dashboard:hover { background-color: #bf360c; }
+    .btn-fold-for {
+      background-color: #c62828;
+      color: white;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      margin-top: 6px;
+    }
 
     /* Knappen for å åpne eget bordvindu */
     .btn-open-board {
@@ -369,6 +376,13 @@
     function startNewHand() { socket.emit('start_new_hand'); }
     function nextPhase() { socket.emit('next_phase'); }
 
+    // Dealeren kaster kortene for en frakoblet spiller, så hånden ikke blir hengende
+    let lastState = null;
+    function foldForPlayer(seat) {
+      const p = lastState && lastState.players.find(pl => pl.seat === seat);
+      if (p && confirm(`Kaste kortene for ${p.name}?`)) socket.emit('host_fold_player', seat);
+    }
+
     function openBoardWindow() {
       window.open('/board.html', 'PokerBoard', 'width=1200,height=800');
     }
@@ -382,6 +396,7 @@
     }
 
     socket.on('state_update', (state) => {
+      lastState = state;
       const modeSelection = document.getElementById('mode-selection');
       const gameControls = document.getElementById('game-controls');
       const gameInfo = document.getElementById('game-info');
@@ -401,7 +416,7 @@
         gameInfo.innerText = `Modus: ${state.gameMode} | Fase: ${state.phase}`;
       }
 
-      const isRoundActive = state.phase !== 'VENTING' && state.phase !== 'SHOWDOWN';
+      const isRoundActive = ['PREFLOP', 'FLOP', 'TURN', 'RIVER'].includes(state.phase);
       changeModeBtn.disabled = isRoundActive;
       startHandBtn.disabled = isRoundActive;
 
@@ -441,6 +456,10 @@
           <div style="font-size: 0.8rem; margin-top: 4px;">
             ${p.waiting ? '⏳ VENTER PÅ NESTE HÅND' : (p.folded ? '🔴 FOLDET' : '🟢 INNE')}
           </div>
+          ${!p.connected ? `<div style="font-size: 0.8rem; color: #ffb74d; margin-top: 4px;">📵 Frakoblet</div>` : ''}
+          ${!p.connected && isRoundActive && !p.folded && !p.waiting ? `
+            <button class="btn-fold-for" onclick="foldForPlayer(${Number(p.seat)})">Kast kort for spilleren</button>
+          ` : ''}
           ${p.cards && p.cards.length > 0 ? `
             <div style="margin-top: 6px; display: flex; gap: 4px; justify-content: center;">
               ${p.cards.map(c => formatCard(c)).join('')}
