@@ -631,3 +631,18 @@ spør om passord, avviser feil, viser data med riktig.
 - dashboard.html: omgang-, tids-, dato- og kortkolonnene brytes ikke
   over flere linjer («Omgang 1» ble delt i to).
 - veiledning.html oppdatert tilsvarende.
+
+------------------------------------------------------------
+2026-10-12 – Realistisk filtduk
+------------------------------------------------------------
+- Ny fil public/felt.css (ren CSS, ingen bildefiler): grønn grunnfarge
+  + fin filtstruktur (SVG feTurbulence-støy i gråtoner, lav alfa) +
+  lyskjegle i midten og mørkere kanter. Klasser: .felt, .felt-dark,
+  .projector-black.
+- index.html: rommet rundt bordet er mørk filt; selve bordet er filt
+  med treramme (gradient i border-området) og skygger.
+- board.html (projektor): filt over hele flaten. Ny bryter
+  «Bakgrunn: Filt/Svart» ved kortstørrelse. Svart = projektoren lyser
+  ikke opp bordet, kun kortene vises (best på et ekte filtbord).
+  Valget huskes i nettleseren (localStorage board_bg).
+Testet: skjermbilder av statusskjerm og projektorvisning i 1600x900.

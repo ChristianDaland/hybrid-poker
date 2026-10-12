@@ -4,12 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Løland Gård Poker - Bordvisning</title>
+  <link rel="stylesheet" href="/felt.css">
   <style>
     * { box-sizing: border-box; }
 
     body {
       font-family: Arial, sans-serif;
-      background-color: #1b4d2e;
+      /* Bakgrunn: filt (klassen felt, se felt.css) eller svart for projektor */
       color: white;
       text-align: center;
       margin: 0;
@@ -153,7 +154,7 @@
     }
   </style>
 </head>
-<body>
+<body class="felt">
 
   <!-- Zoom-kontroll -->
   <div class="zoom-controls">
@@ -162,6 +163,8 @@
     <span id="zoom-val">100%</span>
     <button class="zoom-btn" onclick="adjustZoom(0.1)">+</button>
     <button class="zoom-btn" style="width: auto; padding: 0 8px; border-radius: 10px; font-size: 0.75rem;" onclick="resetZoom()">Nullstill</button>
+    <span style="margin-left: 8px;">Bakgrunn:</span>
+    <button id="bg-toggle" class="zoom-btn" style="width: auto; padding: 0 8px; border-radius: 10px; font-size: 0.75rem;" onclick="toggleBackground()">Filt</button>
   </div>
 
   <!-- Kortområde som skaleres -->
@@ -262,6 +265,24 @@
     }
 
     applyZoom();
+
+    // Bakgrunn: grønn filt, eller svart (best når projektoren lyser på et ekte filtbord –
+    // svart gir ikke lys, så bare kortene vises). Valget huskes i denne nettleseren.
+    let blackBackground = false;
+    try { blackBackground = localStorage.getItem('board_bg') === 'black'; } catch (e) { /* ignorer */ }
+
+    function applyBackground() {
+      document.body.classList.toggle('projector-black', blackBackground);
+      document.getElementById('bg-toggle').innerText = blackBackground ? 'Svart' : 'Filt';
+    }
+
+    function toggleBackground() {
+      blackBackground = !blackBackground;
+      try { localStorage.setItem('board_bg', blackBackground ? 'black' : 'felt'); } catch (e) { /* ignorer */ }
+      applyBackground();
+    }
+
+    applyBackground();
 
     // Genererer tradisjonelt posisjonerte pips for tallene 2-10 og Ess
     function renderPips(rawVal, suitSymbol) {
