@@ -740,3 +740,16 @@ og SHOWDOWN (begge).
 - Justert: «Start ny hånd» vises kun før første hånd (VENTING). Etter
   showdown/«alle kastet seg» gjør den blå «Ny Runde» det samme, så da
   vises bare den. Testet: skjermbilde i SHOWDOWN (kun «Ny Runde»).
+
+------------------------------------------------------------
+2026-10-12 – Tydelig merking av spiller som har mistet kontakten
+------------------------------------------------------------
+index.html:
+- Spillerboks for frakoblet spiller (connected = false) får klassen
+  «disconnected»: gråtoner + dempet innhold, stiplet grå ramme, mørk
+  grå bakgrunn.
+- Merkelapp «📵 MISTET KONTAKT» (oransje, fet, blinker rolig) erstatter
+  den lille «📵 Frakoblet».
+- «Kast kort for spilleren» og «Ute» beholder farge og er klikkbare.
+- Normal visning igjen så snart mobilen kobler seg til.
+Testet: skjermbilde med én frakoblet spiller midt i en hånd.
