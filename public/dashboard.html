@@ -113,6 +113,7 @@
     .rank-2 td:first-child { color: #c0c0c0; font-weight: bold; }
     .rank-3 td:first-child { color: #cd7f32; font-weight: bold; }
     .hidden { display: none; }
+    .nowrap { white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -277,10 +278,10 @@
           <td>${i + 1}</td>
           <td><strong>${escapeHtml(h.player_name || 'Ukjent')}</strong></td>
           <td>${escapeHtml(h.hand_description || '')}</td>
-          <td>${miniCards(h.winning_cards)}</td>
+          <td class="nowrap">${miniCards(h.winning_cards)}</td>
           ${allTime
-            ? `<td>${formatDate(h.created_at)}</td><td>${roundLabel(h, false)}</td>`
-            : `<td>${roundLabel(h, false)}</td><td>${formatTime(h.created_at)}</td>`}
+            ? `<td class="nowrap">${formatDate(h.created_at)}</td><td class="nowrap">${roundLabel(h, false)}</td>`
+            : `<td class="nowrap">${roundLabel(h, false)}</td><td class="nowrap">${formatTime(h.created_at)}</td>`}
         </tr>`).join('');
     }
 
@@ -307,7 +308,7 @@
       document.getElementById('rounds-body').innerHTML = rounds.length > 0
         ? rounds.map(r => `
             <tr>
-              <td>Omgang ${r.omgang_nr}</td>
+              <td class="nowrap">Omgang ${r.omgang_nr}</td>
               <td>${formatTime(r.started_at)}</td>
               <td>${r.ended_at ? formatTime(r.ended_at) : '<span class="running">pågår</span>'}</td>
               <td>${r.hands}</td>
@@ -324,8 +325,8 @@
       document.getElementById('hands-body').innerHTML = hands.length > 0
         ? hands.slice().reverse().map(h => `
             <tr>
-              <td>${formatTime(h.created_at)}</td>
-              <td>${roundLabel(h, false)}</td>
+              <td class="nowrap">${formatTime(h.created_at)}</td>
+              <td class="nowrap">${roundLabel(h, false)}</td>
               <td><strong>${escapeHtml(h.player_name || 'Ukjent')}</strong></td>
               <td>${escapeHtml(h.hand_description || '')}</td>
               <td>${miniCards(h.winning_cards)}</td>

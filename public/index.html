@@ -263,8 +263,6 @@
     .btn-help { background-color: #009688; color: white; }
     .btn-dashboard { background-color: #d84315; color: white; }
     .btn-dashboard:hover { background-color: #bf360c; }
-    .btn-alltime { background-color: #b8860b; color: #111; }
-    .btn-alltime:hover { background-color: #daa520; }
     .btn-kick-all { background-color: #6a1b9a; color: white; }
     .btn-kick-all:hover { background-color: #4a148c; }
     .btn-fold-for {
@@ -353,14 +351,13 @@
       </div>
 
       <!-- Nytt spill: kast ut alle spillere -->
-      <button class="btn-kick-all" onclick="kickAllPlayers()">🚪 Nytt spill</button>
+      <button class="btn-kick-all" onclick="kickAllPlayers()">🚪 Nytt spill (kast ut alle)</button>
 
       <!-- Knapp for å åpne eget bordvindu (projektor) -->
       <button class="btn-open-board" onclick="openBoardWindow()">🖥️ Åpne Bordvisning</button>
 
       <!-- Knapp for dashboard -->
       <button class="btn-dashboard" onclick="openDashboardWindow()">🏆 Se Dashboard</button>
-      <button class="btn-alltime" onclick="openAllTimeWindow()">⭐ All time topp 10</button>
 
       <!-- Knapp for spilleveiledning -->
       <button class="btn-help" onclick="openHelpWindow()">📖 Spilleveiledning</button>
@@ -520,10 +517,6 @@
 
     function openDashboardWindow() {
       window.open('/dashboard.html', 'PokerDashboard', 'width=1200,height=800');
-    }
-
-    function openAllTimeWindow() {
-      window.open('/dashboard.html#alltime', 'PokerAllTime', 'width=1200,height=800');
     }
 
     function openHelpWindow() {

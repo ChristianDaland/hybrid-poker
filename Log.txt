@@ -620,3 +620,14 @@ OPPSETT PÅ RENDER: Environment -> legg til ADMIN_PASSWORD=<passord>.
 Testet: npm test (26/26) inkl. proxy-header uten/feil/riktig passord
 og uten ADMIN_PASSWORD; database.html i Chrome via proxy-header:
 spør om passord, avviser feil, viser data med riktig.
+
+------------------------------------------------------------
+2026-10-12 – Små justeringer etter test på Render
+------------------------------------------------------------
+- index.html: «🚪 Nytt spill» heter nå «🚪 Nytt spill (kast ut alle)»,
+  så det er tydelig at det er knappen som kaster ut alle spillere.
+- index.html: knappen «⭐ All time topp 10» er fjernet fra
+  statusskjermen – all time topp 10 åpnes fra dashboardet.
+- dashboard.html: omgang-, tids-, dato- og kortkolonnene brytes ikke
+  over flere linjer («Omgang 1» ble delt i to).
+- veiledning.html oppdatert tilsvarende.
