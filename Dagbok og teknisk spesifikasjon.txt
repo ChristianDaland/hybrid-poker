@@ -1,390 +1,195 @@
 ============================================================
-HYBRID POKER - DAGBOK OG TEKNISK SPEKIFIKASJON
-Dato: 26. september 2026
+HYBRID POKER – TEKNISK SPESIFIKASJON
+Sist oppdatert: 12. oktober 2026
 ============================================================
-
-============================================================
-DEL 1: OPPSUMMERING AV DAGENS ARBEID
-============================================================
-
-Hva vi har oppnådd i dag:
-
-1. STABILITET / DISCONNECT-HÅNDTERING (Hovedmål)
-   - Problem: Når en spiller mistet forbindelsen, krasjet spillet
-     ofte eller tapte spillertilstand.
-   - Løsning: Implementert robust disconnect-håndtering:
-     a) Player blir merket som connected: false ved disconnect
-        (IKKE slettet umiddelbart).
-     b) 60 sekunders grace-period: spilleren kan gjenopprette
-        forbindelsen innen 60 sek uten å miste plassen, kort og
-        posisjon.
-     c) uuidToPlayerId Map for vedvarende identitet: hver spiller
-        får en UUID som kobles til socket-id. Når socket-id endres
-        (ny connection), kobler vi om til same UUID.
-     d) join_game: sjekker om navnet allerede finnes (rejoin case).
-        Rens gamle socket-id og tildeler ny.
-     e) rejoin_game: dedikert event som bruker UUID til å finne
-        tilbake til playerobjektet uansett socket-id.
-     f) updateAll() sender fortsatt tilstand til alle connected
-        spillere; disconnected spillere hoppes over.
-   - Resultat: Spillet krasjer IKKE lenger ved midlertidig
-     forbindelsestab. Spillere kan gå inn og ut uten at
-     bordkort, fase eller vinnerinformasjon forsvinner.
-
-2. TEKNISKE ENDRINGER I DAG
-   - server.js:
-     + disconnectTimeouts objekt for timeout-tracking
-     + uuidToPlayerId Map for vedvarende spiller-identitet
-     + join_game: rejoin-deteksjon via navn
-     + rejoin_game: ny event for UUID-basert gjeninnlogging
-     + disconnect: grace-period i stedet for umiddelbar sletting
-     + updateAll: sjekker p.connected før sending
-   - public/mobile.html:
-     + UUID lagres i localStorage
-     + auto-reconnect med rejoin_game event
-   - public/iPad.html:
-     + Samme UUID + reconnect-mekanisme som mobile
-   - public/index.html (bordet):
-     + Viser disconnected spillere med grå markering
-   - public/board.html:
-     + Oppdatert for å vise connected-tilstand
-
-3. BEKREFTEDE PUNKT FRA FORHÅNDSARBEID
-   - Spilleregler: Texas (2 kort) / Omaha (4 kort, 2+3 regelen)
-   - Blind-rotasjon: Lilleblind/Storeblind, 2-spiller-case
-   - Dealerknappen flytter rundt i spillerguppen
-   - Stokking av plasser ved ny game mode
-   - pokersolver: håndevaluering server-side
-   - Oversettelse av håndbeskrivelser til norsk
-   - Faseflyt: VENTING -> PREFLOP -> FLOP -> TURN -> RIVER -> SHOWDOWN -> FINISHED
-   - Kasting: single player auto-win
-============================================================
-DEL 2: INSTRUKSJONER TIL MEG (AI) NÅR VI BEGYNNER IGJEN
-============================================================
-
-Når vi fortsetter arbeidet i morgen, les dette først:
-
-PROJEKTSTATUS:
-- Hybrid poker (Texas + Omaha) med lokal server.
-- Node.js + Express + Socket.IO + pokersolver.
-- Frontend: HTML/CSS/JS (mobile.html, iPad.html, index.html, board.html)
-- Server: server.js (enkel Node prosess på port 3000).
-- Ingen database - all tilstand i minne.
-
-ARBEIDET SOM ER FERDIG:
-- Grunnleggende spillflyt (alle faser)
-- Håndevaluering (Texas + Omaha)
-- Blind-rotasjon
-- Disconnected-håndtering med 60s grace period
-- UUID-basert spilleridentitet
-- Rejoin-mekanisme
-- Norsk oversettelse av håndbeskrivelser
-
-KJENTE UTESTTEDE PROBLEMER / MÅLER:
-1. Vinnernedberegning:
-   - Når alle kastet seg, vises kun "Alle andre kastet seg"
-   - Mangler: faktisk pott-vinner (hvis blinds var i spill)
-   - TODO: Track blinds som er "dead money"
-
-2. Penger/Chips:
-   - Ingen chip-stack system ennå
-   - Ingen blinds som reelle verdier
-   - Spillet er for øyeblikket kun håndevaluering + vinner
-
-3. Auto-fold ved timeout:
-   - Hvis en spiller IKKE klikker "Fold" i tide, blokkeres spillet
-   - TODO: Server-side timeout for fold-decision
-   - Foreslått: 30-60 sek timeout per spiller per fase
-
-4. Visuell polering:
-   - Board-design kan forbedres
-   - Kort-animasjoner mangler
-- DISCONNECT UUID-BUG (server.js ~linje 325):
-  `players[socket.id].uuid` er ALDRIG satt. Timeout-cleanup slettes IKKE fra
-  uuidToPlayerId. FIX: reverse-lookup eller sett player.uuid ved rejoin/join.
-
-- JOIN_GAME OPPDATERER IKKE UUID-MAPPEN:
-  Rejoin via navn setter ikke ny socket.id i uuidToPlayerId.
-  FIX: uuidToPlayerId.set(uuid, socket.id) i rejoin-case.
-
-- 2 spillere: dealerIndex rolle mangler "Dealer" i 2-player mode
-   - Responsive design bør testes på ulike skjermer
-
-5. Test-dekning:
-   - Ingen automatiserte tester
-   - Alt testing er manuell
-   - TODO: Unit tests for håndevaluering
-
-6. Multi-table support:
-   - Kun ett bord i gang samtidig
-   - TODO: Table objects for multi-table
-
-NÅR VI BEGYNNER I MORGEN:
-1. Les denne filen
-2. Les server.js (spesielt io.on('connection') blokken)
-3. Les public/mobile.html (spiller-view)
-4. Les public/index.html (bord-view)
-5. Spør brukeren hvilket problem vi skal jobbe på
-6. Hvis disconnect: test med to browsere, koble fra én, se om
-   spillet fortsetter
-
-VIKTIGSTE ARKITEKTURPUNKTER Å HUSKE:
-- gameState = global state (phase, board, winnerInfo, dealerIndex)
-- players = object keyed by socket.id
-- uuidToPlayerId = Map<uuid, socketId> for persistent ID
-- disconnectTimeouts = object of pending timeout IDs
-- updateAll() er KALLEREN for alle state changes
-- pokersolver Hand.solve() tar card strings som "As" (Ace spades)
-- Omaha: C(4,2) * C(5,3) = 6 * 10 = 60 kombinasjoner pr. spiller
-- Texas: kun 1 hånd (alle 7 kort evalueres automatisk)
-
-KODEKONVENSJONER:
-- Variabler: camelCase
-- Event names: snake_case (join_game, set_game_mode, next_phase)
-- Comments: norsk
-- Filstruktur: flate (ingen folder hierarki for .js)
-- Frontend: vanilla JS, ingen framework
+Endringshistorikk (hva, hvorfor, hvordan testet): se Log.txt.
+Eldre versjon av dette dokumentet: se git-historikken.
 
 ============================================================
-DEL 3: TEKNISK SPEKIFIKASJON - HELE SPELET
+1. LES DETTE FØRST (for den som jobber videre – menneske eller AI)
 ============================================================
-
-3.1 SYSTEMOVERSIKT
--------------------
-Hybrid Poker er et lokalnettverkspoker-spill som støtter både
-Texas Hold'em og Omaha. Spillet kjører på en Node.js server
-som håndterer all spill-logikk og kommuniserer med klienter
-via Socket.IO (WebSocket).
-
-ARKITEKTUR:
-┌─────────────────────────────────────────────────────┐
-│                    SERVER (Node.js)                  │
-│                                                     │
-│  Express  →  Static files (public/)                 │
-│  Socket.IO →  Real-time communication               │
-│  pokersolver →  Håndevaluering                     │
-│                                                     │
-│  State:                                             │
-│    - gameState (phase, board, mode, winner)         │
-│    - players (map: socketId → player object)        │
-│    - uuidToPlayerId (persistent identity)           │
-│    - disconnectTimeouts (grace period tracking)     │
-└────────────────────────┬────────────────────────────┘
-                         │ WebSocket (Socket.IO)
-          ┌──────────────┼──────────────┐
-          ▼              ▼              ▼
-   ┌────────────┐ ┌────────────┐ ┌────────────┐
-   │   BOARD    │ │  MOBILE 1  │ │  MOBILE 2  │
-   │ index.html │ │  mobile    │ │  mobile    │
-   │ (main TV)  │ │  .html     │ │  .html     │
-   └────────────┘ └────────────┘ └────────────┘
-                              │
-                      ┌───────┘
-                      ▼
-               ┌────────────┐
-               │   iPad     │
-               │  iPad.html │
-               │ (alt view) │
-               └────────────┘
-
-3.2 SPILLEFLYT
---------------
-FASEDIAGRAM:
-  VENTING ──[set_game_mode + start_new_hand]──► PREFLOP
-                                                  │
-          ┌────────────────────────────────────────┤
-          │                                        ▼
-       PREFLOP ◄────[next_phase / start_new_hand]── FLOP → TURN → RIVER → SHOWDOWN
-          ▲
-          │
-          └────[next_phase / start_new_hand]── FINISHED (alle kastet seg)
-
-  VENTING er kun ved serverstart eller når gameMode settes til null.
-  Når spillet er igang, går det: PREFLOP → ... → SHOWDOWN/FINISHED → PREFLOP.
-
-VENTING:
-- Venting på at en spilletype velges (Texas eller Omaha)
-- Spillere kan joine/forlate fritt
-- Ingen kort delt ut
-
-PREFLOP:
-- Dealerknappen har flyttet til neste spiller
-- Blinds assignert (Lilleblind, Storeblind)
-- 2 kort (Texas) eller 4 kort (Omaha) delt pr. spiller
-- Spillere kan kaste seg
-- Når alle aktive spillere har "handlet" → FLOP
-
-FLOP:
-- 3 community cards på board
-- Kasting muliggjort
-- Neste → TURN
-
-TURN:
-- 1 community card lagt til
-- Kasting muliggjort
-- Neste → RIVER
-
-RIVER:
-- 1 community card lagt til (totalt 5 på board)
-- Kasting muliggjort
-- Neste → SHOWDOWN
-
-SHOWDOWN:
-- Alle aktive spilleres kort evalueres
-- Vinner(e) bestemt via pokersolver
-- Vinnerkort vises på hovedskjerm (kun ved showdown)
-- Finneshendelse: "Alle andre kastet seg" (foldedWin)
-
-FINISHED:
-- Runde avsluttet
-- Neste runde: "Neste hånd" → PREFLOP (ny runde)
-
-3.3 SPILLERIDENTITET OG DISCONNECT-HÅNDTERING
------------------------------------------------
-Spiller-objekt:
-{
-  id: string,          // socket.id (kan endres ved reconnect)
-  name: string,        // spillernavn (unikt, case-insensitive)
-  seat: number,        // bordposisjon (1-indexed)
-  cards: string[],     // private kort, f.eks. ["As", "Kd"]
-  folded: boolean,     // har kastet denne runden?
-  role: string,        // 'Dealer' | 'Lilleblind' | 'Storeblind' | ''
-  connected: boolean   // er WebSocket opptatt?
-}
-
-Disconnection Flow:
-1. Socket disconnect → connected = false, timeout satt (60s)
-2. Dagens spill fortsetter - andre ser at spilleren er offline
-3. Hvis spiller reconnecter innen 60s:
-   a. Enkelt join_game (navn-based) → rebind socket
-   b. rejoin_game (UUID-based) → rebind socket
-   c. Timeout klareres, connected = true
-4. Hvis 60s utløper uten reconnect:
-   - Spiller slettes fra players[]
-   - UUID mapping ryddet
-   - State broadcast til alle
-
-UUID-mekanisme:
-- localStorage: "poker_uuid" → random UUID per browser
-- Ved rejoin_game: sender UUID til server
-- Server: uuidToPlayerId.get(uuid) → fant player
-- Player rebindes til ny socket.id
-- uuidToPlayerId.set(uuid, newSocketId)
-
-3.4 HANDEVALUERING
--------------------
-TEXAS HOLD'EM:
-- Spiller: 2 kort
-- Board: 5 kort (ved showdown)
-- Evaluering: Alle 7 kort, pokersolver velger beste 5
-- API: Hand.solve([card1, card2, board1..5])
-
-OMAHA:
-- Spiller: 4 kort
-- Board: 5 kort
-- Regelen: MUST USE EXAKT 2 av 4 kort + 3 av board
-- Evaluering: C(4,2)=6 player-kombos × C(5,3)=10 board-kombos = 60 hands
-- API: For hver kombinasjon: Hand.solve([p1,p2,b1,b2,b3])
-- Beste kombinasjon vinner
-
-Pokersolver format:
-- "As" = Ace of Spades
-- "Td" = Ten of Diamonds
-- "9h" = Nine of Hearts
-- "2c" = Two of Clubs
-
-3.5 BLIND-ROTAASJON
---------------------
-- dealerIndex: 0-indexed posisjon i player-array
-- Flyttes +1 for hver nye hånd (modulo antall spillere)
-- 2 spillere: pos 0 = Lilleblind, pos 1 = Storeblind
-- 3+ spillere: pos 0 = Dealer, pos 1 = Lilleblind, pos 2 = Storeblind
-- Stokking: Ved valg av ny game mode stokkes hele orderen
-  (randomizePlayerSeats) - alle får ny seat-nummer
-
-3.6 EVENT-API (Socket.IO)
---------------------------
-CLIENT → SERVER:
-  join_game(name)         → Joine spill som 'name'
-  set_game_mode(mode)     → 'TEXAS' | 'OMAHA' | null
-  start_new_hand()        → Start neste hånd
-  next_phase()            → Avansér til neste fase
-  player_fold()           → Kast kortene dine
-  rejoin_game({uuid})     → Gjeninnlogge med UUID
-
-SERVER → CLIENT (broadcast):
-  state_update {
-    gameMode, phase, board, winnerInfo,
-    players: [{name, seat, role, folded, connected, cards}]
-  }
-
-SERVER → CLIENT (per spiller):
-  player_state {
-    phase, cards, role, folded, winnerInfo
-  }
-
-SERVER → CLIENT (ein gang):
-  joined {uuid, name}     → Bekreftet rejoin
-
-3.7 FILSTRUKTUR
-----------------
-hybrid-poker/
-├── server.js              # Server-logikk, Socket.IO, pokersolver
-├── package.json           # Dependencies
-├── Teknisk dokumentasjon.txt  # Eldre docs
-├── Versjonskontroll.txt   # Change log
-├── Dagbok og teknisk spesifikasjon.txt  # DENNE FILLEN
-└── public/
-    ├── index.html         # Hovedbord (TV/skjerm)
-    ├── board.html         # Alternativ bord-view
-    ├── mobile.html        # Mobil-spiller-view
-    └── iPad.html          # iPad-spiller-view
-
-3.8 DEPENDENCIES
-----------------
-- express 4.x     → Static file server + HTTP
-- socket.io 4.x   → WebSocket real-time
-- pokersolver     → Håndevaluering (Texas/Omaha)
-
-3.9 KJENTE BEGRENSELSER
-------------------------
-- Ingen chip/pengestack system
-- Ingen auto-fold timeout (spillere MÅ trykke fold)
-- Ingen multi-table
-- Ingen historikk (siste hånd, tidligere rounder)
-- Ingen settings/preferences
-- Ingen autentisering (navn er identitet)
-- Alt i minne - server-restart = total reset
-- Kun 1 bord, kun 1 hånd i gang
-- Ingen "all-in" mekanikk
-- Ingen side-pots
-
-3.10 FUTURE ENHANCEMENTS (PRIORITISERT)
----------------------------------------
-MÅLE (neste session):
-- [ ] Auto-fold timeout (server-side, 30-60s)
-- [ ] Chip-stack system (blinds med reelle verdier)
-- [ ] Pot-kalkulasjon ved showdown
-- [ ] Vis at en spiller er "all-in"
-
-KJERE (neste uke):
-- [ ] Multi-table support
-- [ ] Spillhistorikk (siste 10 hender)
-- [ ] Settings (blind sizes, timer)
-- [ ] Animasjoner (kort-flipping, dealing)
-- [ ] Unit tests for håndevaluering
-
-LANGSiktig:
-- [ ] Lobby system (opprette/joine bord)
-- [ ] Auth (navn + PIN)
-- [ ] Spectator mode
-- [ ] Mobile app (React Native / PWA)
-- [ ] AI-spiller (for testing)
-- [ ] Leaderboard / statistik
+- Arbeidsform: bli enige om hva og rekkefølge FØR endringer.
+  Logg hver endring i Log.txt. Commit etter hvert ferdige steg.
+- Kjør testene før og etter endringer:   npm test
+  (25 tester, ca. 15 sek, egen server + midlertidig SQLite-fil per
+  test – den ekte Turso-databasen røres aldri.)
+- Start serveren:   npm start   (port 3000, eller PORT=...)
+- Kommentarer og tekster på norsk. Vanilla JS, ingen rammeverk.
+- index.html og veiledning.html har CRLF-linjeskift (Windows) –
+  behold dem ved redigering.
+- Prinsipp: kort som ikke ble vist ved bordet skal ALDRI lagres
+  eller vises noe sted (en spiller kan ha bløffet).
+- Prinsipp: spiller-UUID fungerer som innloggingsnøkkel og skal
+  aldri sendes til skjermene eller være tilgjengelig fra nettet.
 
 ============================================================
-SLUTT PÅ DOKUMENT
+2. SYSTEMOVERSIKT
 ============================================================
+Fysisk oppsett: projektor i taket viser fellesskortene på bordet,
+en skjerm viser status/spillere/dealer, og hver spiller har kortene
+sine på mobilen (logger inn via QR-kode). Sjetongene er fysiske –
+systemet holder ikke styr på penger, innsatser eller pott.
 
+Teknologi: Node.js + Express + Socket.IO + pokersolver.
+Database: Turso (libSQL/SQLite) via @libsql/client. Valgfri – uten
+TURSO_DATABASE_URL/TURSO_AUTH_TOKEN i .env kjører spillet uten
+statistikk.
 
+Filer:
+  server.js                 All spillogikk, Socket.IO, API, database
+  public/index.html         Statusskjerm + dealerens kontrollpanel
+  public/board.html         Projektorvisning (kun fellesskort, zoom)
+  public/mobile.html        Spillerens telefon
+  public/dashboard.html     Statistikk: dag + all time topp 10
+  public/database.html      Databaseinspektør (kun fra servermaskinen)
+  public/veiledning.html    Spilleveiledning
+  tests/                    Automatiske tester (node --test)
+  Log.txt                   Endringslogg
+  .env                      Turso-nøkler (IKKE i git)
 
+============================================================
+3. SPILLFLYT
+============================================================
+Faser: VENTING -> PREFLOP -> FLOP -> TURN -> RIVER -> SHOWDOWN
+                                     \-> FINISHED (alle andre kastet seg)
+- VENTING: ingen spilletype valgt.
+- Ny hånd: «Start ny hånd» eller den store knappen etter
+  SHOWDOWN/FINISHED. Dealerknappen går til neste sete.
+- Texas: 2 kort, beste 5 av 7. Omaha: 4 kort, NØYAKTIG 2 hullkort +
+  3 bordkort (60 kombinasjoner, evaluatePlayerHand).
+- Kast: lov i PREFLOP–RIVER for spillere med kort. Kan angres
+  (player_unfold) til neste kort åpnes. Den siste spilleren kan ikke
+  kaste. Står bare én igjen etter et kast, avsluttes hånden med en
+  gang (FINISHED) og kastet kan ikke angres.
+- Showdown: pokersolver kårer vinner(e); delt pott ved likhet.
+
+Roller: Dealer, Lilleblind, Storeblind (neste seter etter dealer).
+To spillere: «Dealer / Lilleblind» og «Storeblind».
+
+============================================================
+4. SPILLERE, SETER OG IDENTITET
+============================================================
+Spillerobjekt (players, nøkkel = socket.id):
+  id, name, uuid, seat, cards[], folded, foldedInPhase, waiting,
+  out, role, connected, removeAfterHand
+
+- Rekkefølge rundt bordet = setenummer (getSeatedPlayers), ALDRI
+  rekkefølgen i players-objektet (socket-id endres ved reconnect).
+- gameState.dealerSeat = setet til forrige dealer.
+- Plasser trekkes tilfeldig første gang spilletype velges etter
+  serverstart/«Nytt spill» (seatsDrawn). Dealer flytter med ◀ ▶
+  mellom hender (host_move_player). Når noen går, nummereres setene
+  om (compactSeats) og dealerknappen justeres.
+- Identitet: UUID lagres på telefonen (localStorage poker_uuid).
+  join_game sjekker UUID først, deretter navn. Navnet til en
+  TILKOBLET spiller kan ikke tas (join_failed). Plassen til en
+  FRAKOBLET spiller kan tas over med samme navn (ny telefon).
+  Navn: trimmes, maks 15 tegn, ikke tomt.
+- Spiller som kommer midt i en hånd: waiting = true, med fra neste.
+- Frakobling: plassen beholdes i 5 min (DISCONNECT_GRACE_MS).
+  Ingen fjernes midt i en hånd (removeAfterHand -> fjernes ved neste
+  hånd). Frakoblede får kort; dealer kan «Kast kort for spilleren».
+- «Ute» (tom for sjetonger): settes av dealer mellom hender. Får
+  ikke kort, hoppes over av dealerknappen.
+
+Mobilen (mobile.html):
+- Kobler til igjen automatisk (rejoin_game med UUID). Feiler det
+  (f.eks. serveromstart), logger den stille inn igjen med lagret
+  navn + UUID (join_game med auto:true).
+- Etter «Nytt spill» (kicked): flagget poker_logged_out stopper
+  automatisk innlogging til spilleren trykker «Koble til».
+  Serveren husker kastede UUID-er (kickedUuids) og avviser auto-join
+  fra telefoner som sov da.
+- Skjermen holdes våken (NoSleep.js fra cdnjs).
+- Kort vises 5 sek ved trykk. Kortene kan sorteres med dra og slipp
+  (Pointer Events); rekkefølgen lagres i localStorage
+  (poker_card_order) og gjelder til neste hånd.
+- Socket.IO pingTimeout 60 sek (tåler korte wifi-brudd).
+
+============================================================
+5. OMGANGER
+============================================================
+Det spilles 3–8 omganger per kveld. En omgang varer til alle unntatt
+én er markert «ute» – den ene vinner omgangen (ikke kvelden).
+- Starter med første hånd etter serverstart / «Ny omgang».
+- Avgjort: raden i omganger får ended_at + vinner, 'celebrate_win'
+  sendes (konfetti på statusskjerm og projektor). Ny hånd sperres.
+- Angres en ute-markering, gjenåpnes omgangen.
+- «Ny omgang» (host_reset_out): alle inn igjen, neste hånd = ny omgang.
+
+============================================================
+6. SOCKET.IO-HENDELSER
+============================================================
+Klient -> server (spiller):
+  join_game {name, uuid?, auto?}   rejoin_game {uuid}
+  player_fold                      player_unfold
+Klient -> server (statusskjerm/dealer):
+  set_game_mode 'TEXAS'|'OMAHA'|null   start_new_hand   next_phase
+  host_fold_player seat            host_set_out {seat, out}
+  host_reset_out                   host_move_player {seat, direction}
+  host_kick_all
+Server -> alle:
+  state_update {gameMode, phase, board, winnerInfo, roundWinner,
+                players:[{name, seat, role, folded, waiting, out,
+                          connected, cards*}]}
+     *cards kun ved showdown, kun for spillere som ikke kastet seg
+  celebrate_win {playerName, handDescription}
+Server -> én spiller:
+  player_state {phase, cards, role, folded, waiting, out, canFold,
+                canUndoFold, winnerInfo}
+  joined {uuid, name}   rejoin_failed   join_failed {reason}
+  kicked {reason}
+Alle handlere er pakket i safeHandler (try/catch) – en feil i én
+hendelse stopper ikke serveren.
+
+============================================================
+7. DATABASE (Turso / SQLite)
+============================================================
+Tabeller (opprettes/migreres automatisk ved oppstart, ensureTables):
+  poker_sessions (id, started_at, ended_at, game_mode)
+  omganger       (omgang_id, session_id, started_at, ended_at,
+                  game_mode, winner_uuid, winner_name)
+  player_stats   (id, uuid, name, hands_played, hands_won, total_chips)
+  winning_hands  (id, session_id, omgang_id, player_uuid, player_name,
+                  hand_description, winning_cards, hand_rank, created_at)
+- Tidspunkter lagres som ISO/UTC. «Dag» regnes i Node (norsk tid),
+  fordi Turso kjører i UTC.
+- winning_cards (JSON, "v":2): board, winningCards, cards (kun
+  spillere som var med til showdown). Ved «alle andre kastet seg»:
+  ingen spillerkort. scrubUnshownCards ryddet eldre rader én gang.
+- hand_rank: calculateHandScore (kategori * 1e10 + kortverdier).
+  0 = alle andre kastet seg (tas ikke med på topp 10).
+- hand_description lagres på norsk; eldre halvoversatte tekster
+  oversettes på nytt ved visning (retranslateStoredDescription).
+
+API:
+  GET  /api/stats                     statistikk per navn (alle datoer)
+  GET  /api/winning-hands[?date=]     topp 10 (dag eller all time)
+  GET  /api/hands?date=ÅÅÅÅ-MM-DD     alle hender en dag
+  GET  /api/rounds?date=ÅÅÅÅ-MM-DD    omganger en dag
+  GET  /api/server-info               LAN-adresser (for QR-koden)
+  GET  /api/debug-db                  rådata  – kun fra servermaskinen
+  POST /api/reset-db                  tøm DB  – kun fra servermaskinen
+  (ALLOW_REMOTE_ADMIN=1 åpner de to siste for nettet.)
+
+============================================================
+8. MILJØVARIABLER
+============================================================
+  TURSO_DATABASE_URL, TURSO_AUTH_TOKEN   database (valgfri)
+  PORT                                  standard 3000
+  DISCONNECT_GRACE_MS                   standard 300000 (5 min)
+  ALLOW_REMOTE_ADMIN=1                  admin-API fra nettet
+
+============================================================
+9. KJENTE BEGRENSNINGER / MULIGE NESTE STEG
+============================================================
+- Styringshendelsene (neste fase, ute, nytt spill osv.) har ingen
+  tilgangskontroll – alle tilkoblede kan i prinsippet sende dem.
+- Ingen sjetong-/pottberegning (fysiske sjetonger).
+- Kun ett bord.
+- Feiringen (konfetti) og NoSleep lastes fra CDN – krever internett.
+- Kortsorteringen på mobil er testet i Chrome (DevTools-protokollen),
+  ikke i den automatiske testpakken.
+- Statistikk grupperes på navn (eldre rader kan ha flere UUID-er per
+  spiller).
+============================================================

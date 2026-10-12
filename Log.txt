@@ -564,3 +564,16 @@ Endringer for å støtte dette:
 - socket.io-client lagt til som devDependency (var installert, men
   manglet i package.json/package-lock.json).
 Ikke med: nettlesertesten av kortsortering på mobil (krever Chrome).
+
+------------------------------------------------------------
+2026-10-12 – Opprydding 18: Dokumentasjon
+------------------------------------------------------------
+- «Dagbok og teknisk spesifikasjon.txt» skrevet om til en oppdatert
+  teknisk spesifikasjon (spillflyt, seter/identitet, omganger,
+  Socket.IO-hendelser, database/API, miljøvariabler, kjente
+  begrensninger). Den gamle sa bl.a. «ingen database» og nevnte
+  iPad.html som ikke finnes. Historikken ligger i Log.txt og git.
+- veiledning.html oppdatert: kort vises 5 sek (ikke «hold inne»),
+  sortering av kort, angre kast, ute/ny omgang/nytt spill,
+  dashboard/all time, at bløffkort ikke lagres.
+- Versjon på statusskjermen: 2.11 -> 3.0.
