@@ -489,6 +489,37 @@ async function ensureTables() {
     await db.execute("ALTER TABLE winning_hands ADD COLUMN omgang_id INTEGER");
     console.log('[DB] La til kolonnen omgang_id i winning_hands.');
   }
+
+  await scrubUnshownCards();
+}
+
+// Engangsopprydding av eldre rader (uten "v":2), som lagret kortene til alle spillere:
+// - Alle andre kastet seg (hand_rank 0): alle spillerkort og vinnerkort fjernes.
+// - Showdown: kortene per spiller fjernes (det går ikke å se hvem som kastet seg).
+//   Vinnerhånden og bordkortene beholdes.
+// Kjøres ved hver oppstart, men rører kun rader som ikke er ryddet ennå.
+async function scrubUnshownCards() {
+  const rows = await db.execute(
+    "SELECT id, hand_rank, winning_cards FROM winning_hands WHERE winning_cards IS NULL OR winning_cards NOT LIKE '%\"v\":2%'"
+  );
+  let cleaned = 0;
+  for (const r of rows.rows) {
+    let payload = {};
+    try { payload = JSON.parse(r.winning_cards || '{}') || {}; } catch (e) { payload = {}; }
+    const isFoldedWin = Number(r.hand_rank) === 0;
+    const scrubbed = {
+      v: 2,
+      board: Array.isArray(payload.board) ? payload.board : [],
+      winningCards: isFoldedWin ? [] : (Array.isArray(payload.winningCards) ? payload.winningCards : []),
+      cards: []
+    };
+    await db.execute({
+      sql: "UPDATE winning_hands SET winning_cards = ? WHERE id = ?",
+      args: [JSON.stringify(scrubbed), Number(r.id)]
+    });
+    cleaned++;
+  }
+  if (cleaned > 0) console.log(`[DB] Fjernet ikke-viste kort fra ${cleaned} eldre hender.`);
 }
 
 async function ensureSession(nowIso) {
@@ -643,6 +674,7 @@ async function persistHandResult() {
     const shownPlayers = isFoldedWin ? [] : activePlayersList.filter(isInHand);
 
     const jsonPayload = JSON.stringify({
+      v: 2, // versjon: kun viste kort lagres (se scrubUnshownCards)
       board: cleanBoard,
       winningCards: cleanWinningCards,
       cards: shownPlayers.map(p => ({

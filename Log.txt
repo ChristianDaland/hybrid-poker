@@ -463,3 +463,21 @@ Nå (server.js, persistHandResult):
 Testet: bløffkort finnes ingen steder i databasen, kastede kort ved
 showdown ikke lagret, vinnerhånd ved showdown lagret.
 Merk: Eldre rader i Turso inneholder fortsatt alle kort.
+
+------------------------------------------------------------
+2026-10-12 – Opprydding av kort i eldre rader (godkjent av bruker)
+------------------------------------------------------------
+- server.js: scrubUnshownCards() kjøres ved oppstart (i ensureTables).
+  Rører kun rader uten "v":2 i winning_cards:
+  * Alle andre kastet seg (hand_rank 0): alle spillerkort og
+    vinnerkort fjernes; bordkort beholdes.
+  * Showdown: kort per spiller fjernes (kan ikke avgjøre hvem som
+    kastet seg i gamle data); vinnerhånd og bordkort beholdes.
+  Ryddede rader får "v":2, så det skjer kun én gang.
+- Nye rader lagres med "v":2.
+- Dataene som fjernes kan IKKE gjenopprettes (bruker godkjente).
+- Turso ryddes første gang serveren startes etter denne endringen;
+  serverloggen viser «Fjernet ikke-viste kort fra N eldre hender».
+Testet: gamle rader (fold-seier med bløffkort, showdown med kastede
+kort, rad uten data) ryddet; ny v2-rad urørt; andre oppstart gjør
+ingenting. Alle databasetester OK.
