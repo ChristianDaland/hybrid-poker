@@ -218,3 +218,53 @@ test('Admin-endepunkter uten ADMIN_PASSWORD: kun lokalt', async (t) => {
   assert.strictEqual(res.status, 403);
   assert.strictEqual((await res.json()).needsPassword, false);
 });
+
+test('Omgang fortsetter etter omstart; ute huskes; forlatte omganger avsluttes', async (t) => {
+  const dbFile = tempDbFile();
+
+  // Første serverkjøring: én hånd i omgangen, Anne markeres ute
+  let srv = await startServer({ dbFile });
+  let host = srv.host();
+  let P = n => findPlayer(host.state, n);
+  let A = srv.player('Anne', 'u-a'), B = srv.player('Bjørn', 'u-b'); srv.player('Cato', 'u-c');
+  await wait(300);
+  host.emit('set_game_mode', 'TEXAS'); await wait(100);
+  host.emit('start_new_hand'); await wait(150);
+  A.emit('player_fold'); await wait(100); B.emit('player_fold'); await wait(300);
+  host.emit('host_set_out', { seat: P('Anne').seat, out: true }); await wait(300);
+  const roundId = (await srv.getJson('/api/debug-db')).omganger[0].omgang_id;
+  await srv.stop();
+
+  // En gammel, forlatt omgang (10 timer siden) som aldri ble avsluttet
+  const db = createClient({ url: 'file:' + dbFile });
+  await db.execute({ sql: 'INSERT INTO omganger (session_id, started_at) VALUES (1, ?)', args: [new Date(Date.now() - 10 * 3600e3).toISOString()] });
+  db.close();
+
+  // Serveren starter på nytt (deploy / Render-dvale)
+  srv = await startServer({ dbFile });
+  t.after(() => srv.stop());
+  assert.match(srv.log(), new RegExp(`Fortsetter omgang ${roundId}`));
+  assert.match(srv.log(), /Avsluttet 1 forlatte omganger/);
+
+  host = srv.host();
+  P = n => findPlayer(host.state, n);
+  A = srv.player('Anne', 'u-a'); B = srv.player('Bjørn', 'u-b'); srv.player('Cato', 'u-c');
+  await wait(300);
+  assert.strictEqual(P('Anne').out, true, 'Anne er fortsatt ute etter omstart');
+
+  host.emit('set_game_mode', 'TEXAS'); await wait(100);
+  host.emit('start_new_hand'); await wait(150);
+  B.emit('player_fold'); await wait(300);
+  let d = await srv.getJson('/api/debug-db');
+  const hands = d.winning_hands.filter(h => h.omgang_id === roundId);
+  assert.strictEqual(hands.length, 2, 'hånden etter omstart hører til samme omgang');
+  const old = d.omganger.find(o => o.omgang_id !== roundId);
+  assert.ok(old.ended_at, 'forlatt omgang er avsluttet');
+  assert.strictEqual(old.winner_name, null);
+
+  // «Ny omgang» før omgangen er avgjort -> avbrutt (avsluttet uten vinner)
+  host.emit('host_reset_out'); await wait(300);
+  d = await srv.getJson('/api/debug-db');
+  const r = d.omganger.find(o => o.omgang_id === roundId);
+  assert.ok(r.ended_at && r.winner_name === null, 'avbrutt omgang har slutt-tid men ingen vinner');
+});

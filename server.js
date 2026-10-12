@@ -519,6 +519,12 @@ let db = null;
 let currentSessionId = null;
 let currentRoundId = null;        // omgang_id i databasen for pågående omgang
 let roundRowPromise = null;       // hindrer at to samtidige kall oppretter to rader
+// «Ute»-markeringer gjenopprettet fra databasen etter en omstart (UUID-er).
+// Brukes når spillerne logger inn igjen.
+let restoredOutUuids = new Set();
+// En åpen omgang med aktivitet innenfor dette vinduet fortsetter etter omstart
+// (Render legger tjenesten i dvale etter 15 min uten trafikk, og hver deploy starter den på nytt).
+const ROUND_RESUME_WINDOW_MS = (Number(process.env.ROUND_RESUME_MINUTES) || 180) * 60 * 1000;
 
 function initDatabase() {
   const url = process.env.TURSO_DATABASE_URL;
@@ -590,7 +596,44 @@ async function ensureTables() {
     console.log('[DB] La til kolonnen omgang_id i winning_hands.');
   }
 
+  // Migrering: «ute»-markeringer lagres per omgang, så de overlever en omstart
+  const roundCols = await db.execute("PRAGMA table_info(omganger)");
+  if (!roundCols.rows.some(c => c.name === 'out_uuids')) {
+    await db.execute("ALTER TABLE omganger ADD COLUMN out_uuids TEXT");
+    console.log('[DB] La til kolonnen out_uuids i omganger.');
+  }
+
   await scrubUnshownCards();
+  await resumeOrCloseOpenRounds();
+}
+
+// Ved oppstart: den nyeste åpne omgangen med aktivitet siste 3 timer fortsetter
+// (inkl. hvem som er ute). Eldre åpne omganger avsluttes uten vinner («avbrutt»).
+async function resumeOrCloseOpenRounds() {
+  const open = await db.execute(`
+    SELECT o.omgang_id, o.started_at, o.out_uuids,
+           (SELECT MAX(${CREATED_AT_ISO}) FROM winning_hands w WHERE w.omgang_id = o.omgang_id) AS last_hand
+    FROM omganger o
+    WHERE o.ended_at IS NULL
+    ORDER BY o.started_at DESC`);
+  let closed = 0;
+  for (const r of open.rows) {
+    const lastActivity = normalizeTimestamp(r.last_hand || r.started_at);
+    const age = Date.now() - Date.parse(lastActivity);
+    if (!currentRoundId && age <= ROUND_RESUME_WINDOW_MS) {
+      currentRoundId = Number(r.omgang_id);
+      gameState.roundStartedAt = r.started_at;
+      try { restoredOutUuids = new Set(JSON.parse(r.out_uuids || '[]')); } catch (e) { restoredOutUuids = new Set(); }
+      console.log(`[DB] Fortsetter omgang ${currentRoundId} etter omstart (${restoredOutUuids.size} ute).`);
+    } else {
+      await db.execute({
+        sql: "UPDATE omganger SET ended_at = ? WHERE omgang_id = ?",
+        args: [lastActivity, Number(r.omgang_id)]
+      });
+      closed++;
+    }
+  }
+  if (closed > 0) console.log(`[DB] Avsluttet ${closed} forlatte omganger (avbrutt).`);
 }
 
 // Engangsopprydding av eldre rader (uten "v":2), som lagret kortene til alle spillere:
@@ -686,11 +729,43 @@ async function reopenRound() {
   }
 }
 
+// Lagrer hvem som er ute i pågående omgang (overlever omstart av serveren)
+async function saveOutUuids() {
+  if (!db) return;
+  try {
+    const present = new Set(Object.values(players).map(p => p.uuid));
+    const outUuids = Object.values(players).filter(p => p.out && p.uuid).map(p => p.uuid);
+    // Ute-markerte som ikke har logget inn igjen etter en omstart, beholdes
+    restoredOutUuids.forEach(u => { if (!present.has(u)) outUuids.push(u); });
+    const roundId = await ensureRoundRow();
+    await db.execute({
+      sql: "UPDATE omganger SET out_uuids = ? WHERE omgang_id = ?",
+      args: [JSON.stringify(outUuids), Number(roundId)]
+    });
+  } catch (err) {
+    console.error('[DB] Feil ved lagring av ute-markeringer:', err.message);
+  }
+}
+
+// En omgang som ikke ble avgjort (Nytt spill / Ny omgang) avsluttes uten vinner («avbrutt»)
+async function closeUnfinishedRound() {
+  if (!db || !currentRoundId || gameState.roundFinished) return;
+  try {
+    await db.execute({
+      sql: "UPDATE omganger SET ended_at = ? WHERE omgang_id = ? AND ended_at IS NULL",
+      args: [new Date().toISOString(), Number(currentRoundId)]
+    });
+  } catch (err) {
+    console.error('[DB] Feil ved avslutning av omgang:', err.message);
+  }
+}
+
 // «Ny omgang»: neste hånd hører til en ny omgang
 function startNewRound() {
   currentRoundId = null;
   gameState.roundStartedAt = null;
   gameState.roundFinished = false;
+  restoredOutUuids = new Set();
 }
 
 async function ensurePlayerStats(uuid, name) {
@@ -1004,6 +1079,8 @@ io.on('connection', (socket) => {
         cards: [],
         folded: joinsMidHand,
         waiting: joinsMidHand,
+        // Var spilleren markert ute før en omstart av serveren, er hen fortsatt ute
+        out: restoredOutUuids.has(playerUuid),
         role: '',
         connected: true
       };
@@ -1163,6 +1240,9 @@ io.on('connection', (socket) => {
     const winnerAfter = getRoundWinnerPlayer();
     updateAll();
 
+    if (!player.out && player.uuid) restoredOutUuids.delete(player.uuid);
+    await saveOutUuids();
+
     if (winnerAfter && winnerAfter !== winnerBefore) {
       io.emit('celebrate_win', { playerName: winnerAfter.name, handDescription: 'Vinner av omgangen!' });
       await finishRound(winnerAfter);
@@ -1175,6 +1255,7 @@ io.on('connection', (socket) => {
   socket.on('host_reset_out', safeHandler('host_reset_out', async () => {
     if (isHandInProgress()) return;
     Object.values(players).forEach(p => { p.out = false; });
+    await closeUnfinishedRound();
     startNewRound();
     updateAll();
   }));
@@ -1202,6 +1283,7 @@ io.on('connection', (socket) => {
     gameState.winnerUuids = [];
     gameState.dealerSeat = 0;
     gameState.seatsDrawn = false;
+    await closeUnfinishedRound();
     startNewRound();
 
     // Avslutt sesjonen i databasen – neste hånd starter en ny

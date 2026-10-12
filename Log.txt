@@ -850,3 +850,35 @@ Eikeskiltet ble ikke så bra som tittel. Bordrammen beholder eik.
 - Samme høyde som før – resten av siden flytter seg ikke.
 - Vurdert og forkastet: Las Vegas-neon (brukeren valgte Monte Carlo).
 Testet: skjermbilder av begge variantene, valgt variant i 1280x720.
+
+------------------------------------------------------------
+2026-10-12 – Mange «pågår»-omganger: årsak og fiks
+------------------------------------------------------------
+Årsak: En ny omgang startet med første hånd etter hver omstart av
+serveren (hver push/deploy til Render, og når Render vekker tjenesten
+etter dvale). Den forrige omgangen ble aldri avsluttet og stod som
+«pågår» for alltid. Det samme ved «Nytt spill»/«Ny omgang» uten vinner.
+Fiks (server.js):
+- Ved oppstart (resumeOrCloseOpenRounds): nyeste åpne omgang med
+  aktivitet siste 3 timer fortsetter; eldre åpne omganger avsluttes
+  (ended_at = siste hånd/start, ingen vinner).
+- «Ute»-markeringer lagres i omganger.out_uuids (ny kolonne, migreres
+  automatisk) og gjenopprettes når spillerne logger inn etter omstart.
+- «Ny omgang» og «Nytt spill» avslutter en uavgjort omgang
+  (closeUnfinishedRound).
+dashboard.html: omgang avsluttet uten vinner vises som «avbrutt».
+Testet: ny test (omstart midt i omgang: samme omgang_id, Anne
+fortsatt ute, gammel omgang avsluttet, «Ny omgang» -> avbrutt).
+npm test: 27/27.
+Merk: Ved første oppstart etter deploy avsluttes testomgangene i Turso
+automatisk og vises som «avbrutt».
+
+------------------------------------------------------------
+2026-10-12 – Spilleveiledningen skrevet om
+------------------------------------------------------------
+veiledning.html: nye avsnitt – Kom i gang, På mobilen (5 sek, sortere,
+angre kast, liggende, mistet kontakt), Kortene, Fasene, For dealeren
+(spilletype, den store knappen, ute/omgang, nytt spill), Projektoren
+(fullskjerm, innstillinger, tastatur), Omganger og statistikk.
+Dagbok og teknisk spesifikasjon.txt: omganger/omstart og nye
+miljøvariabler.

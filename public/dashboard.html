@@ -314,7 +314,9 @@
               <td>${formatTime(r.started_at)}</td>
               <td>${r.ended_at ? formatTime(r.ended_at) : '<span class="running">pågår</span>'}</td>
               <td>${r.hands}</td>
-              <td>${r.winner_name ? `🏆 <strong>${escapeHtml(r.winner_name)}</strong>` : '<span class="muted">–</span>'}</td>
+              <td>${r.winner_name
+                ? `🏆 <strong>${escapeHtml(r.winner_name)}</strong>`
+                : (r.ended_at ? '<span class="muted">avbrutt</span>' : '<span class="muted">–</span>')}</td>
             </tr>`).join('')
         : '<tr><td colspan="5">Ingen omganger denne dagen.</td></tr>';
 

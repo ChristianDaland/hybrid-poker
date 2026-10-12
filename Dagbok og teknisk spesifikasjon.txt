@@ -116,6 +116,13 @@ Det spilles 3–8 omganger per kveld. En omgang varer til alle unntatt
   sendes (konfetti på statusskjerm og projektor). Ny hånd sperres.
 - Angres en ute-markering, gjenåpnes omgangen.
 - «Ny omgang» (host_reset_out): alle inn igjen, neste hånd = ny omgang.
+  En omgang som ikke var avgjort, avsluttes uten vinner («avbrutt»).
+  Det samme ved «Nytt spill».
+- Omstart av serveren (deploy, Render-dvale): den nyeste åpne omgangen
+  med aktivitet siste 3 timer fortsetter (ROUND_RESUME_MINUTES).
+  Hvem som er ute lagres i omganger.out_uuids og gjenopprettes når
+  spillerne logger inn igjen. Eldre åpne omganger avsluttes ved
+  oppstart (ended_at = siste aktivitet, ingen vinner = «avbrutt»).
 
 ============================================================
 6. SOCKET.IO-HENDELSER
@@ -148,7 +155,7 @@ hendelse stopper ikke serveren.
 Tabeller (opprettes/migreres automatisk ved oppstart, ensureTables):
   poker_sessions (id, started_at, ended_at, game_mode)
   omganger       (omgang_id, session_id, started_at, ended_at,
-                  game_mode, winner_uuid, winner_name)
+                  game_mode, winner_uuid, winner_name, out_uuids)
   player_stats   (id, uuid, name, hands_played, hands_won, total_chips)
   winning_hands  (id, session_id, omgang_id, player_uuid, player_name,
                   hand_description, winning_cards, hand_rank, created_at)
@@ -179,6 +186,9 @@ API:
   PORT                                  standard 3000
   DISCONNECT_GRACE_MS                   standard 300000 (5 min)
   ALLOW_REMOTE_ADMIN=1                  admin-API fra nettet
+  ADMIN_PASSWORD                        passord for databaseinspektøren
+  ROUND_RESUME_MINUTES                  standard 180 (omgang fortsetter etter omstart)
+  APP_TZ                                standard Europe/Oslo
 
 ============================================================
 9. KJENTE BEGRENSNINGER / MULIGE NESTE STEG
