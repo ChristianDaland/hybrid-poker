@@ -204,7 +204,8 @@ let gameState = {
   roundStartedAt: null,  // Når første hånd i pågående omgang startet
   roundFinished: false,  // Omgangen er avgjort (vinner funnet)
   winnerUuids: [], // Kun på serveren – UUID gir tilgang til kortene og må ikke sendes ut
-  dealerSeat: 0 // Setenummeret til forrige dealer (0 = ingen ennå)
+  dealerSeat: 0, // Setenummeret til forrige dealer (0 = ingen ennå)
+  seatsDrawn: false // Plassene er trukket – bytte av spilletype trekker ikke på nytt
 };
 
 let players = {};
@@ -765,8 +766,11 @@ io.on('connection', (socket) => {
       gameState.board = [];
       gameState.winnerInfo = null;
       gameState.winnerUuids = [];
-    } else {
+    } else if (!gameState.seatsDrawn) {
+      // Plassene trekkes kun første gang (etter serverstart / «Nytt spill»),
+      // så rekkefølgen dealeren har satt med pilene beholdes ved bytte av spilletype
       randomizePlayerSeats();
+      gameState.seatsDrawn = true;
     }
     updateAll();
   }));
@@ -939,6 +943,7 @@ io.on('connection', (socket) => {
     gameState.winnerInfo = null;
     gameState.winnerUuids = [];
     gameState.dealerSeat = 0;
+    gameState.seatsDrawn = false;
     startNewRound();
 
     // Avslutt sesjonen i databasen – neste hånd starter en ny

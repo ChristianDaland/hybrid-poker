@@ -82,7 +82,8 @@
       margin-bottom: 20px;
       align-items: center;
       cursor: pointer;
-      touch-action: manipulation;
+      /* Hindrer at siden scroller/zoomer mens et kort dras */
+      touch-action: none;
     }
 
     .cards-container:active {
@@ -98,6 +99,9 @@
       border-radius: 10px;
       width: 75px;
       height: 110px;
+      flex: 0 1 75px;
+      min-width: 0;
+      transition: transform 0.12s ease, box-shadow 0.12s ease;
       box-shadow: 0 4px 12px rgba(0,0,0,0.6);
       font-weight: bold;
       pointer-events: none;
@@ -111,6 +115,13 @@
     .card.hidden-card .eye-icon {
       font-size: 2.2rem;
       opacity: 0.85;
+    }
+
+    /* Kortet som dras løftes opp */
+    .card.dragging {
+      transform: translateY(-14px) scale(1.08);
+      box-shadow: 0 10px 22px rgba(0,0,0,0.8);
+      outline: 3px solid #ffd54f;
     }
 
     .card.red { color: #d9534f; }
@@ -170,11 +181,9 @@
 
     <div id="role-label" class="role-badge" style="display: none;"></div>
 
-    <div class="instruction-text">💡 Trykk på feltet under for å se kortene dine (de vises i 5 sekunder)</div>
+    <div class="instruction-text">💡 Trykk på feltet under for å se kortene dine (de vises i 5 sekunder). Hold på et kort og dra for å endre rekkefølgen.</div>
 
-    <div id="my-cards" class="cards-container"
-         onmousedown="showAllCards()"
-         ontouchstart="showAllCards()">
+    <div id="my-cards" class="cards-container">
     </div>
   </div>
 
@@ -265,13 +274,94 @@
       renderCards();
     }
 
+    // ------------------------------------------------------------
+    // Sortering av kort: hold på et kort og dra det til ny plass.
+    // Rekkefølgen lagres på telefonen og gjelder til neste hånd.
+    // ------------------------------------------------------------
+    let dragIndex = -1;
+
+    function sameCards(a, b) {
+      return a.length === b.length && [...a].sort().join() === [...b].sort().join();
+    }
+
+    // Bruk spillerens egen rekkefølge hvis det fortsatt er de samme kortene
+    function applySavedOrder(cards) {
+      try {
+        const saved = JSON.parse(localStorage.getItem('poker_card_order') || '[]');
+        if (Array.isArray(saved) && cards.length > 0 && sameCards(saved, cards)) return saved;
+      } catch (e) { /* ugyldig lagret verdi – ignorer */ }
+      return cards.slice();
+    }
+
+    function saveOrder() {
+      try { localStorage.setItem('poker_card_order', JSON.stringify(myCardsData)); } catch (e) { /* ignorer */ }
+    }
+
+    // Finner hvilken kortplass fingeren er over (nærmeste kort horisontalt)
+    function cardIndexAt(clientX) {
+      const cards = document.querySelectorAll('#my-cards .card');
+      let best = -1, bestDist = Infinity;
+      cards.forEach((el, i) => {
+        const r = el.getBoundingClientRect();
+        const dist = Math.abs(clientX - (r.left + r.width / 2));
+        if (dist < bestDist) { bestDist = dist; best = i; }
+      });
+      return best;
+    }
+
+    function cardIndexUnder(clientX, clientY) {
+      const cards = document.querySelectorAll('#my-cards .card');
+      for (let i = 0; i < cards.length; i++) {
+        const r = cards[i].getBoundingClientRect();
+        if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) return i;
+      }
+      return -1;
+    }
+
+    (function setupCardDragging() {
+      const container = document.getElementById('my-cards');
+
+      container.addEventListener('pointerdown', (e) => {
+        // Skjulte kort: et trykk viser dem (som før)
+        if (!isShowingCards) { showAllCards(); return; }
+        const idx = cardIndexUnder(e.clientX, e.clientY);
+        if (idx === -1) { showAllCards(); return; }
+        // Start dra: kortene holdes synlige så lenge fingeren er nede
+        dragIndex = idx;
+        if (revealTimer) { clearTimeout(revealTimer); revealTimer = null; }
+        try { container.setPointerCapture(e.pointerId); } catch (err) { /* ignorer */ }
+        keepScreenAwake();
+        renderCards();
+      });
+
+      container.addEventListener('pointermove', (e) => {
+        if (dragIndex === -1) return;
+        const target = cardIndexAt(e.clientX);
+        if (target !== -1 && target !== dragIndex) {
+          const [card] = myCardsData.splice(dragIndex, 1);
+          myCardsData.splice(target, 0, card);
+          dragIndex = target;
+          renderCards();
+        }
+      });
+
+      function endDrag() {
+        if (dragIndex === -1) return;
+        dragIndex = -1;
+        saveOrder();
+        showAllCards(); // vis i 5 nye sekunder etter at kortet er sluppet
+      }
+      container.addEventListener('pointerup', endDrag);
+      container.addEventListener('pointercancel', endDrag);
+    })();
+
     function renderCards() {
       const container = document.getElementById('my-cards');
       if (!myCardsData || myCardsData.length === 0) {
         container.innerHTML = '<span style="color:#aaa;">Ingen kort utdelt enn\u00E5</span>';
         return;
       }
-      container.innerHTML = myCardsData.map((cardCode) => {
+      container.innerHTML = myCardsData.map((cardCode, idx) => {
         if (!isShowingCards) {
           return '<div class="card hidden-card"><span class="eye-icon">\uD83D\uDC41\uFE0F</span><span style="font-size:0.7rem;margin-top:4px;opacity:0.8;">VIS</span></div>';
         }
@@ -285,7 +375,8 @@
           's': { symbol: '\u2660', color: 'black' }
         };
         const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
-        return '<div class="card ' + suit.color + '"><span class="card-val">' + value + '</span><span class="card-suit">' + suit.symbol + '</span></div>';
+        const dragClass = (idx === dragIndex) ? ' dragging' : '';
+        return '<div class="card ' + suit.color + dragClass + '"><span class="card-val">' + value + '</span><span class="card-suit">' + suit.symbol + '</span></div>';
       }).join('');
     }
 
@@ -389,7 +480,12 @@
       } else {
         roleBadge.style.display = 'none';
       }
-      myCardsData = state.cards || [];
+      // Samme kort som vi allerede viser (f.eks. midt i en dragning): behold rekkefølgen
+      const newCards = state.cards || [];
+      if (!sameCards(myCardsData, newCards) || newCards.length === 0) {
+        dragIndex = -1;
+        myCardsData = applySavedOrder(newCards);
+      }
       renderCards();
       const foldBtn = document.getElementById('btn-fold');
       foldBtn.classList.remove('undo');

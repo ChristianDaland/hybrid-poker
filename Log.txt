@@ -369,3 +369,37 @@ Testet: flytting begge veier, sperre ved kantene og midt i hånd,
 ønsket rekkefølge satt etter trekning, dealer roterer i ny
 rekkefølge, seter nummereres om og dealer stemmer etter at en
 spiller er fjernet. Skjermbilde. Alle tidligere tester OK.
+
+------------------------------------------------------------
+2026-10-12 – Trekning av plasser kun én gang
+------------------------------------------------------------
+- server.js: gameState.seatsDrawn. Plassene trekkes kun første gang
+  spilletype velges etter serverstart / «Nytt spill». Bytte mellom
+  Texas og Omaha senere beholder rekkefølgen dealer har satt med
+  pilene. «Nytt spill» nullstiller flagget.
+Testet: 6 spillere, bytte spilletype beholder rekkefølgen.
+
+------------------------------------------------------------
+2026-10-12 – Ønske 9: Sortere kort på mobilen
+------------------------------------------------------------
+mobile.html:
+- Når kortene vises: hold fingeren på et kort og dra – kortet løftes
+  (gul ramme) og bytter plass med kortene det passerer. Ny plass når
+  fingeren slippes. Pointer Events (fungerer på iOS og Android).
+- Kortene holdes synlige mens man drar, og vises 5 nye sekunder
+  etter slipp. Skjulte kort: et trykk viser dem som før.
+- Rekkefølgen lagres i localStorage (poker_card_order) og brukes så
+  lenge det er de samme kortene – også etter omlasting av siden.
+  Ny hånd = ny standardrekkefølge.
+- Oppdateringer fra serveren midt i en dragning endrer ikke
+  rekkefølgen.
+- touch-action: none på kortfeltet (siden scroller ikke mens man drar).
+- Kortene kan krympe litt, så 4 Omaha-kort alltid får plass.
+- Instruksjonsteksten nevner dra-funksjonen.
+
+Testet i EKTE Chrome (headless, via DevTools-protokollen, 375px
+mobilskjerm med berøring): innlogging, trykk viser kort, dra første
+kort til siste plass, kortene synlige etter slipp, rekkefølge
+beholdt ved serveroppdatering og etter omlasting (inkl. automatisk
+reconnect), skjules etter 5 sek, ny hånd gir nye kort.
+Alle tidligere tester OK.
