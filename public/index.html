@@ -579,8 +579,9 @@
       }
 
       changeModeBtn.disabled = isRoundActive;
-      // «Start ny hånd» vises kun når den kan brukes
-      const canStartHand = !!state.gameMode && !isRoundActive && !state.roundWinner;
+      // «Start ny hånd» vises kun før første hånd. Etter showdown gjør den blå
+      // «Ny Runde»-knappen det samme, så da vises bare den.
+      const canStartHand = !!state.gameMode && state.phase === 'VENTING' && !state.roundWinner;
       startHandBtn.style.display = canStartHand ? 'flex' : 'none';
       nextBtn.disabled = !!state.roundWinner;
       document.getElementById('btn-reset-out').style.display =

@@ -737,3 +737,6 @@ index.html:
   viste «Neste fase» uten å gjøre noe.
 Testet: skjermbilder i VENTING (kun Start), FLOP (kun «Åpne Turn»)
 og SHOWDOWN (begge).
+- Justert: «Start ny hånd» vises kun før første hånd (VENTING). Etter
+  showdown/«alle kastet seg» gjør den blå «Ny Runde» det samme, så da
+  vises bare den. Testet: skjermbilde i SHOWDOWN (kun «Ny Runde»).
