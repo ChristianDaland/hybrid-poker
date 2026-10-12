@@ -597,3 +597,26 @@ Fiks: server.js setter process.env.TZ = 'Europe/Oslo' ved oppstart
 (kan overstyres med APP_TZ).
 Testet: dashboard-testen starter nå serveren med TZ=UTC. Den feiler
 uten fiksen og består med den. Hele testpakken: 25/25.
+
+------------------------------------------------------------
+2026-10-12 – Admin-passord for databaseinspektøren (Render)
+------------------------------------------------------------
+Bakgrunn: Låsingen til «maskinen som kjører serveren» virker ikke på
+Render (alle forespørsler kommer via proxy), så database.html sluttet
+å virke der.
+Fiks (server.js, adminOnly erstatter localOnly):
+- /api/debug-db og /api/reset-db godtas hvis headeren
+  x-admin-password stemmer med miljøvariabelen ADMIN_PASSWORD
+  (sammenlignes tidskonstant via sha256), ELLER forespørselen kommer
+  direkte fra servermaskinen (lokal npm start).
+- Forespørsler med x-forwarded-for (proxy, f.eks. Render) regnes
+  aldri som lokale.
+- Feil passord gir 403 etter 1 sek forsinkelse (tregere gjetting).
+- ALLOW_REMOTE_ADMIN=1 åpner fortsatt for alle (frarådes).
+database.html:
+- Ved 403 spørres det om admin-passord (inntil 3 forsøk). Passordet
+  huskes i fanen (sessionStorage) og sendes i x-admin-password.
+OPPSETT PÅ RENDER: Environment -> legg til ADMIN_PASSWORD=<passord>.
+Testet: npm test (26/26) inkl. proxy-header uten/feil/riktig passord
+og uten ADMIN_PASSWORD; database.html i Chrome via proxy-header:
+spør om passord, avviser feil, viser data med riktig.

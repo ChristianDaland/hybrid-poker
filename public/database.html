@@ -121,12 +121,30 @@
       return html;
     }
 
+    // Admin-passordet huskes kun i denne fanen (sessionStorage)
+    function adminHeaders() {
+      let pw = '';
+      try { pw = sessionStorage.getItem('admin_password') || ''; } catch (e) { /* ignorer */ }
+      return pw ? { 'x-admin-password': pw } : {};
+    }
+
+    // Kaller et admin-API; ved 403 spørres det om passord og forsøket gjentas
+    async function adminFetch(url, options = {}) {
+      for (let attempt = 0; attempt < 3; attempt++) {
+        const res = await fetch(url, { ...options, headers: { ...(options.headers || {}), ...adminHeaders() } });
+        if (res.status !== 403) return res;
+        const body = await res.json().catch(() => ({}));
+        if (!body.needsPassword) throw new Error(body.error || 'Ingen tilgang.');
+        const pw = prompt(attempt === 0 ? 'Admin-passord:' : 'Feil passord. Prøv igjen:');
+        if (!pw) throw new Error('Admin-passord kreves.');
+        try { sessionStorage.setItem('admin_password', pw); } catch (e) { /* ignorer */ }
+      }
+      throw new Error('Feil admin-passord.');
+    }
+
     async function fetchData() {
       try {
-        const res = await fetch('/api/debug-db');
-        if (res.status === 403) {
-          throw new Error('Databaseinspektøren kan bare brukes på maskinen som kjører serveren (http://localhost:…).');
-        }
+        const res = await adminFetch('/api/debug-db');
         if (!res.ok) {
           throw new Error(`Server svarte med status ${res.status}`);
         }
@@ -158,16 +176,15 @@
     async function resetDb() {
       if (confirm('Er du sikker på at du vil slette all historikk og nullstille databasen?')) {
         try {
-          const res = await fetch('/api/reset-db', { method: 'POST' });
+          const res = await adminFetch('/api/reset-db', { method: 'POST' });
           if (res.ok) {
             fetchData();
-          } else if (res.status === 403) {
-            alert('Databasen kan bare tømmes fra maskinen som kjører serveren.');
           } else {
             alert('Kunne ikke nullstille databasen.');
           }
         } catch (err) {
           console.error('Feil ved nullstilling:', err);
+          alert('Kunne ikke nullstille databasen: ' + err.message);
         }
       }
     }

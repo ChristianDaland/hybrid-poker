@@ -19,15 +19,42 @@ const io = new Server(server, { pingInterval: 25000, pingTimeout: 60000 });
 app.use(express.static('public'));
 app.use(express.json());
 
-// Admin-endepunkter (tømme databasen, se rådata inkl. spiller-UUID-er) er kun
-// tilgjengelige fra maskinen som kjører serveren. UUID fungerer som innloggingsnøkkel,
-// så den skal ikke kunne hentes fra telefonene på nettet.
-// Kan overstyres med miljøvariabelen ALLOW_REMOTE_ADMIN=1.
-function localOnly(req, res, next) {
+// Admin-endepunkter (tømme databasen, se rådata inkl. spiller-UUID-er) krever enten
+// - riktig admin-passord (miljøvariabelen ADMIN_PASSWORD, sendes i headeren
+//   x-admin-password) – brukes når serveren kjører på Render/internett, eller
+// - at forespørselen kommer direkte fra maskinen som kjører serveren (npm start lokalt).
+// UUID fungerer som innloggingsnøkkel, så rådata skal ikke kunne hentes av andre.
+// ALLOW_REMOTE_ADMIN=1 åpner for alle (frarådes).
+const crypto = require('crypto');
+
+function passwordMatches(given) {
+  const expected = process.env.ADMIN_PASSWORD;
+  if (!expected || !given) return false;
+  // Sammenlign hasher med fast lengde (tidskonstant sammenligning)
+  const a = crypto.createHash('sha256').update(String(given)).digest();
+  const b = crypto.createHash('sha256').update(String(expected)).digest();
+  return crypto.timingSafeEqual(a, b);
+}
+
+function isDirectLocalRequest(req) {
+  // Bak en proxy (Render) er forespørselen aldri «lokal», uansett avsenderadresse
+  if (req.headers['x-forwarded-for']) return false;
   const addr = req.socket.remoteAddress || '';
-  const isLocal = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(addr);
-  if (isLocal || process.env.ALLOW_REMOTE_ADMIN === '1') return next();
-  res.status(403).json({ error: 'Kun tilgjengelig på maskinen som kjører serveren.' });
+  return ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(addr);
+}
+
+function adminOnly(req, res, next) {
+  if (process.env.ALLOW_REMOTE_ADMIN === '1') return next();
+  if (passwordMatches(req.headers['x-admin-password'])) return next();
+  if (isDirectLocalRequest(req)) return next();
+
+  const passwordSet = !!process.env.ADMIN_PASSWORD;
+  const respond = () => res.status(403).json({
+    error: passwordSet ? 'Feil eller manglende admin-passord.' : 'Admin-passord er ikke satt opp på serveren (ADMIN_PASSWORD).',
+    needsPassword: passwordSet
+  });
+  // Litt forsinkelse ved feil passord gjør gjetting tregere
+  if (req.headers['x-admin-password']) setTimeout(respond, 1000); else respond();
 }
 
 // ============================================================
@@ -216,7 +243,7 @@ app.get('/api/rounds', async (req, res) => {
   }
 });
 
-app.get('/api/debug-db', localOnly, async (req, res) => {
+app.get('/api/debug-db', adminOnly, async (req, res) => {
   if (!db) return res.status(503).json({ error: 'Database ikke tilkoblet.' });
   try {
     const hands = await db.execute("SELECT * FROM winning_hands ORDER BY id DESC");
@@ -236,7 +263,7 @@ app.get('/api/debug-db', localOnly, async (req, res) => {
   }
 });
 
-app.post('/api/reset-db', localOnly, async (req, res) => {
+app.post('/api/reset-db', adminOnly, async (req, res) => {
   if (!db) return res.status(503).json({ error: 'Database ikke tilkoblet.' });
   try {
     await db.execute("DELETE FROM winning_hands");

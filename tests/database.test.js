@@ -188,14 +188,33 @@ test('Engangsopprydding av kort i eldre rader', async (t) => {
   assert.match(srv.log(), /Fjernet ikke-viste kort fra 2 eldre hender/);
 });
 
-test('Admin-endepunkter er kun tilgjengelige fra servermaskinen', async (t) => {
-  const srv = await startServer({ dbFile: tempDbFile() });
+test('Admin-endepunkter: lokalt, eller med admin-passord', async (t) => {
+  const srv = await startServer({ dbFile: tempDbFile(), env: { ADMIN_PASSWORD: 'hemmelig' } });
   t.after(() => srv.stop());
-  assert.strictEqual((await fetch(`http://127.0.0.1:${srv.port}/api/debug-db`)).status, 200);
+  const local = `http://127.0.0.1:${srv.port}`;
+  assert.strictEqual((await fetch(local + '/api/debug-db')).status, 200, 'direkte lokalt uten passord');
+
+  // Bak en proxy (som Render) regnes forespørselen ikke som lokal
+  const proxied = { 'x-forwarded-for': '203.0.113.5' };
+  const noPw = await fetch(local + '/api/debug-db', { headers: proxied });
+  assert.strictEqual(noPw.status, 403);
+  assert.strictEqual((await noPw.json()).needsPassword, true);
+  assert.strictEqual((await fetch(local + '/api/debug-db', { headers: { ...proxied, 'x-admin-password': 'feil' } })).status, 403);
+  assert.strictEqual((await fetch(local + '/api/debug-db', { headers: { ...proxied, 'x-admin-password': 'hemmelig' } })).status, 200);
+  assert.strictEqual((await fetch(local + '/api/reset-db', { method: 'POST', headers: proxied })).status, 403);
+  assert.strictEqual((await fetch(local + '/api/reset-db', { method: 'POST', headers: { ...proxied, 'x-admin-password': 'hemmelig' } })).status, 200);
+  assert.strictEqual((await fetch(local + '/api/stats', { headers: proxied })).status, 200, 'dashboard-API er åpent');
 
   const lan = Object.values(os.networkInterfaces()).flat().find(n => n && n.family === 'IPv4' && !n.internal);
-  if (!lan) return t.skip('ingen nettverksadresse å teste fra');
-  assert.strictEqual((await fetch(`http://${lan.address}:${srv.port}/api/debug-db`)).status, 403);
-  assert.strictEqual((await fetch(`http://${lan.address}:${srv.port}/api/reset-db`, { method: 'POST' })).status, 403);
-  assert.strictEqual((await fetch(`http://${lan.address}:${srv.port}/api/stats`)).status, 200);
+  if (lan) {
+    assert.strictEqual((await fetch(`http://${lan.address}:${srv.port}/api/debug-db`)).status, 403, 'fra nettet uten passord');
+  }
+});
+
+test('Admin-endepunkter uten ADMIN_PASSWORD: kun lokalt', async (t) => {
+  const srv = await startServer({ dbFile: tempDbFile() });
+  t.after(() => srv.stop());
+  const res = await fetch(`http://127.0.0.1:${srv.port}/api/debug-db`, { headers: { 'x-forwarded-for': '203.0.113.5', 'x-admin-password': 'noe' } });
+  assert.strictEqual(res.status, 403);
+  assert.strictEqual((await res.json()).needsPassword, false);
 });
