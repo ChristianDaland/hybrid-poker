@@ -237,6 +237,8 @@
     .btn-help { background-color: #009688; color: white; }
     .btn-dashboard { background-color: #d84315; color: white; }
     .btn-dashboard:hover { background-color: #bf360c; }
+    .btn-kick-all { background-color: #6a1b9a; color: white; }
+    .btn-kick-all:hover { background-color: #4a148c; }
     .btn-fold-for {
       background-color: #c62828;
       color: white;
@@ -321,6 +323,9 @@
         <button id="btn-start-hand" class="btn-action" onclick="startNewHand()">Start Ny Hånd</button>
         <button id="btn-reset-out" class="btn-change-mode" onclick="resetOut()" style="display: none;">🔄 Ny omgang (alle inn igjen)</button>
       </div>
+
+      <!-- Nytt spill: kast ut alle spillere -->
+      <button class="btn-kick-all" onclick="kickAllPlayers()">🚪 Nytt spill</button>
 
       <!-- Knapp for dashboard -->
       <button class="btn-dashboard" onclick="openDashboardWindow()">🏆 Se Dashboard</button>
@@ -443,6 +448,13 @@
 
     // Dealeren kaster kortene for en frakoblet spiller, så hånden ikke blir hengende
     let lastState = null;
+    function kickAllPlayers() {
+      const midHand = lastState && ['PREFLOP', 'FLOP', 'TURN', 'RIVER'].includes(lastState.phase);
+      const msg = (midHand ? 'En hånd pågår!\n\n' : '') +
+        'Starte nytt spill? Alle spillere blir kastet ut og må logge inn på nytt.';
+      if (confirm(msg)) socket.emit('host_kick_all');
+    }
+
     function setPlayerOut(seat, out) {
       socket.emit('host_set_out', { seat: seat, out: out });
     }

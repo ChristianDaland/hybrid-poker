@@ -151,6 +151,7 @@
 
   <div id="login-screen" class="join-box">
     <h2>Velkommen til Pokerbordet</h2>
+    <p id="login-message" style="color:#ff9800;"></p>
     <p>Skriv inn navnet ditt for å koble til:</p>
     <input type="text" id="player-name" placeholder="Ditt navn" maxlength="15" />
     <br>
@@ -187,6 +188,8 @@
     let isJoined = false;
 
     let savedUuid = localStorage.getItem('poker_uuid');
+    // Satt når dealeren har startet nytt spill – da skal mobilen IKKE logge inn igjen av seg selv
+    let loggedOut = localStorage.getItem('poker_logged_out') === '1';
     let savedName = localStorage.getItem('poker_name');
 
     // Hindrer at skjermen låser seg (som kobler fra spillet).
@@ -234,6 +237,9 @@
       const name = document.getElementById('player-name').value.trim();
       if (!name) return alert('Vennligst skriv inn et navn!');
       keepScreenAwake();
+      loggedOut = false;
+      localStorage.removeItem('poker_logged_out');
+      document.getElementById('login-message').innerText = '';
       setConnectionStatus('\u23F3 Kobler til...', '#4caf50');
       socket.emit('join_game', { name: name, uuid: savedUuid });
       startJoinTimeout();
@@ -288,7 +294,7 @@
     socket.on('connect', () => {
       console.log('[Mobile] Socket connected:', socket.id);
       setConnectionStatus('\u2705 Tilkoblet', '#4caf50');
-      if (savedUuid) {
+      if (savedUuid && !loggedOut) {
         console.log('[Mobile] Attempting rejoin with UUID:', savedUuid);
         socket.emit('rejoin_game', { uuid: savedUuid });
       }
@@ -318,15 +324,32 @@
       console.log('[Mobile] Rejoin failed:', data);
       // Serveren kjenner ikke igjen økten (f.eks. etter omstart). Har vi et lagret
       // navn, logger vi stille inn igjen i stedet for å kaste spilleren ut.
-      if (savedName) {
+      if (savedName && !loggedOut) {
         setConnectionStatus('\u23F3 Kobler til p\u00E5 nytt...', '#ff9800');
-        socket.emit('join_game', { name: savedName, uuid: savedUuid });
+        socket.emit('join_game', { name: savedName, uuid: savedUuid, auto: true });
         return;
       }
       isJoined = false;
       clearJoinTimeout();
       const reason = (data && data.reason) ? data.reason : 'Klarte ikke \u00E5 gjenoppta spillet.';
       setConnectionStatus('\u26A0\uFE0F ' + reason, '#f44336');
+      switchToLogin();
+    });
+
+    // Dealeren startet nytt spill: tilbake til innlogging (navnet står fortsatt i feltet)
+    socket.on('kicked', (data) => {
+      if (!isJoined && loggedOut) return;
+      isJoined = false;
+      loggedOut = true;
+      localStorage.setItem('poker_logged_out', '1');
+      clearJoinTimeout();
+      myCardsData = [];
+      hideAllCards();
+      const reason = (data && data.reason) ? data.reason : 'Spillet er avsluttet.';
+      setConnectionStatus('', '#888');
+      const input = document.getElementById('player-name');
+      if (input && savedName) input.value = savedName;
+      document.getElementById('login-message').innerText = reason;
       switchToLogin();
     });
 

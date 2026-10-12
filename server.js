@@ -210,6 +210,9 @@ let gameState = {
 let players = {};
 const disconnectTimeouts = {};
 const uuidToPlayerId = new Map();
+// Spillere som ble kastet ut ved «Nytt spill». Telefoner som sov da, skal ikke
+// logge seg stille inn igjen når de våkner (kun manuell innlogging slipper inn).
+const kickedUuids = new Set();
 
 // Hvor lenge en frakoblet spiller beholder plassen sin (telefoner som låser seg kobler fra)
 const DISCONNECT_GRACE_MS = Number(process.env.DISCONNECT_GRACE_MS) || 5 * 60 * 1000;
@@ -644,11 +647,22 @@ io.on('connection', (socket) => {
   socket.on('join_game', safeHandler('join_game', async (nameOrPayload) => {
     let rawName = '';
     let clientUuid = null;
+    let isAutoJoin = false;
     if (nameOrPayload && typeof nameOrPayload === 'object') {
       rawName = nameOrPayload.name ? String(nameOrPayload.name) : '';
       clientUuid = nameOrPayload.uuid ? String(nameOrPayload.uuid) : null;
+      isAutoJoin = !!nameOrPayload.auto;
     } else {
       rawName = nameOrPayload ? String(nameOrPayload) : '';
+    }
+
+    // Kastet ut ved «Nytt spill»: automatisk innlogging avvises, manuell innlogging godtas
+    if (clientUuid && kickedUuids.has(clientUuid)) {
+      if (isAutoJoin) {
+        socket.emit('kicked', { reason: 'Spillet er avsluttet. Logg inn på nytt for å bli med.' });
+        return;
+      }
+      kickedUuids.delete(clientUuid);
     }
 
     const cleanName = rawName.trim().slice(0, MAX_NAME_LENGTH);
@@ -890,6 +904,47 @@ io.on('connection', (socket) => {
     if (isHandInProgress()) return;
     Object.values(players).forEach(p => { p.out = false; });
     startNewRound();
+    updateAll();
+  }));
+
+  // Nytt spill: alle spillere kastes ut og spillet nullstilles.
+  // Telefonene får 'kicked' og går til innloggingsskjermen (uten å logge inn igjen av seg selv).
+  socket.on('host_kick_all', safeHandler('host_kick_all', async () => {
+    Object.values(players).forEach(p => {
+      io.to(p.id).emit('kicked', { reason: 'Spillet er avsluttet. Logg inn på nytt for å bli med.' });
+    });
+
+    Object.keys(disconnectTimeouts).forEach(id => {
+      clearTimeout(disconnectTimeouts[id]);
+      delete disconnectTimeouts[id];
+    });
+    Object.values(players).forEach(p => { if (p.uuid) kickedUuids.add(p.uuid); });
+    players = {};
+    uuidToPlayerId.clear();
+
+    gameState.gameMode = null;
+    gameState.phase = 'VENTING';
+    gameState.board = [];
+    gameState.deck = [];
+    gameState.winnerInfo = null;
+    gameState.winnerUuids = [];
+    gameState.dealerSeat = 0;
+    startNewRound();
+
+    // Avslutt sesjonen i databasen – neste hånd starter en ny
+    if (db && currentSessionId) {
+      try {
+        await db.execute({
+          sql: "UPDATE poker_sessions SET ended_at = ? WHERE id = ?",
+          args: [new Date().toISOString(), Number(currentSessionId)]
+        });
+      } catch (err) {
+        console.error('[DB] Feil ved avslutning av sesjon:', err.message);
+      }
+    }
+    currentSessionId = null;
+
+    console.log('[SPILL] Nytt spill – alle spillere er kastet ut.');
     updateAll();
   }));
 

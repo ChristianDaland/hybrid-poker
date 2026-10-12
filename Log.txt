@@ -320,3 +320,35 @@ to omganger med riktig omgang_id på hendene, vinner lagret,
 angre gjenåpner omgang, rounds_won i statistikken, omgang_id i
 topp 10. Alle tidligere tester OK.
 Merk: Turso-databasen migreres automatisk neste gang serveren startes.
+
+------------------------------------------------------------
+2026-10-12 – Ønske 4: Nytt spill (kast ut alle)
+------------------------------------------------------------
+index.html:
+- Ny knapp «🚪 Nytt spill» i knappelinja. Bekreftelse, med ekstra
+  advarsel hvis en hånd pågår.
+
+server.js – ny hendelse 'host_kick_all':
+- Sender 'kicked' til hver spillers telefon (ikke til skjermene).
+- Tømmer spillere, UUID-kobling og frakoblings-timere.
+- Nullstiller spillet (ingen spilletype, VENTING, ny omgang).
+- Avslutter sesjonen i databasen (poker_sessions.ended_at);
+  neste hånd starter en ny sesjon.
+- kickedUuids: husker hvem som ble kastet ut. Automatisk innlogging
+  (join_game med auto:true) fra disse avvises med 'kicked', så en
+  telefon som sov under «Nytt spill» ikke logger seg stille inn
+  igjen. Manuell innlogging slipper inn (og fjerner fra listen).
+
+mobile.html:
+- 'kicked': tilbake til innloggingsskjermen med melding
+  «Spillet er avsluttet …» og navnet ferdig utfylt.
+- Flagget poker_logged_out (localStorage) stopper automatisk
+  rejoin/stille innlogging – også etter at siden lastes på nytt.
+  Fjernes når spilleren trykker «Koble til».
+- Stille innlogging sender auto:true.
+
+Testet (simulerte telefoner): alle ut og spillet nullstilt,
+tilkoblede telefoner får 'kicked', statusskjermen gjør ikke,
+sovende telefon slippes ikke stille inn igjen, manuell innlogging
+går fint. Alle tidligere tester OK.
+Ikke testet i ekte nettleser: selve innloggingsskjermen på mobil.
