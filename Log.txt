@@ -403,3 +403,44 @@ kort til siste plass, kortene synlige etter slipp, rekkefølge
 beholdt ved serveroppdatering og etter omlasting (inkl. automatisk
 reconnect), skjules etter 5 sek, ny hånd gir nye kort.
 Alle tidligere tester OK.
+
+------------------------------------------------------------
+2026-10-12 – Ønske 7 + 8: Dashboard med dato og all time topp 10
+------------------------------------------------------------
+API (server.js):
+- /api/winning-hands?date=ÅÅÅÅ-MM-DD: topp 10 for valgt dag.
+  Uten dato: ALL TIME topp 10 (beste hender uavhengig av dato).
+  Seire der alle andre kastet seg (hand_rank 0) er ikke med.
+  Ved lik hånd vinner den som kom først.
+- /api/hands?date=…: alle hender den dagen (også «kastet seg»).
+- /api/rounds?date=…: dagens omganger med nummer (1, 2, 3 …),
+  start/slutt, antall hender og vinner.
+- Hver hånd får omgang_nr («Omgang 3» = tredje omgang som startet
+  den dagen), omgang_date og vinnerkortene.
+- Dag = vanlig kalenderdato i norsk tid. Regnes ut i Node (Turso
+  kjører i UTC). En hånd spilt etter midnatt havner på ny dato, men
+  hører fortsatt til omgangen den ble spilt i («Omgang 1 (11.10.)»).
+- Robust mot eldre tidsformat «ÅÅÅÅ-MM-DD TT:MM:SS» (REPLACE(' ','T')
+  i spørringer, normalizeTimestamp i svaret).
+- Ugyldig dato gir 400.
+
+dashboard.html (skrevet om):
+- Datovelger med ◀ ▶ og «I dag» (dagens dato som standard).
+- Omganger (nr, start, slutt/«pågår», hender, 🏆 vinner).
+- Topp 10 for dagen (spiller, hånd, kort, omgang, tid).
+- Alle hender for dagen (nyeste øverst).
+- Spillerstatistikk (alle datoer) med omganger vunnet.
+- Knapp «🏆 All time topp 10» bytter til egen visning med dato og
+  omgang. dashboard.html#alltime åpner den direkte.
+- Oppdateres automatisk hvert 5. sek når man ser på i dag/all time.
+- Alt escapes (escapeHtml).
+index.html:
+- Ny knapp «⭐ All time topp 10» som åpner all time-visningen.
+
+Testet: testdata over tre dager (inkl. omgang over midnatt og rad
+uten omgang/gammelt tidsformat): all time-rekkefølge, omgangsnummer,
+dagfilter, «kastet seg» utelatt fra topp 10, ugyldig dato. Ekte
+spillflyt -> riktige omgangsnummer i /api/hands. Skjermbilder av
+dagsvisning og all time. Alle tidligere tester OK.
+
+Funnet: «Flush, Qd High» – halvoversatt beskrivelse (opprydding 17).

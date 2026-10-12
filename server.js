@@ -38,23 +38,143 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
-// Henter de 10 beste hendene noensinne og sorterer fra 1. plass (beste) og nedover
+// ------------------------------------------------------------
+// Dato-hjelpere. Tidspunkter lagres som ISO/UTC. Turso kjører i UTC, så
+// «dag» regnes ut her i Node (serverens lokale tidssone, dvs. norsk tid).
+// ------------------------------------------------------------
+function parseDateParam(value) {
+  if (!value) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+  return m ? { y: Number(m[1]), m: Number(m[2]), d: Number(m[3]) } : undefined;
+}
+
+// Eldre rader kan ha SQLite-format «ÅÅÅÅ-MM-DD TT:MM:SS» (UTC). Med «T» i stedet
+// for mellomrom sammenlignes de riktig mot ISO-strenger.
+const CREATED_AT_ISO = "REPLACE(created_at, ' ', 'T')";
+
+function normalizeTimestamp(value) {
+  const s = String(value || '');
+  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s) ? s.replace(' ', 'T') + 'Z' : s;
+}
+
+// Lokal midnatt -> neste lokale midnatt, som ISO-strenger
+function localDayRange(date) {
+  const start = new Date(date.y, date.m - 1, date.d);
+  const end = new Date(date.y, date.m - 1, date.d + 1);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
+function localDateString(iso) {
+  const d = new Date(iso);
+  if (isNaN(d)) return null;
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+// omgang_id -> { number, date }: «Omgang 3» = tredje omgang som startet den dagen
+async function getRoundNumbers(roundIds) {
+  const ids = [...new Set(roundIds.filter(id => id !== null && id !== undefined).map(Number))];
+  if (ids.length === 0) return {};
+  const rounds = await db.execute({
+    sql: `SELECT omgang_id, started_at FROM omganger WHERE omgang_id IN (${ids.map(() => '?').join(',')})`,
+    args: ids
+  });
+  const result = {};
+  for (const r of rounds.rows) {
+    const day = localDateString(r.started_at);
+    const range = localDayRange(parseDateParam(day));
+    const count = await db.execute({
+      sql: "SELECT COUNT(*) AS n FROM omganger WHERE started_at >= ? AND started_at <= ?",
+      args: [range.start, r.started_at]
+    });
+    result[Number(r.omgang_id)] = { number: Number(count.rows[0].n), date: day };
+  }
+  return result;
+}
+
+// Legger til omgangsnummer og vinnerkort på hver hånd
+async function decorateHands(rows) {
+  const numbers = await getRoundNumbers(rows.map(r => r.omgang_id));
+  return rows.map(r => {
+    let winningCards = [];
+    try { winningCards = JSON.parse(r.winning_cards || '{}').winningCards || []; } catch (e) { /* ignorer */ }
+    const round = r.omgang_id != null ? numbers[Number(r.omgang_id)] : null;
+    return {
+      id: r.id,
+      player_name: r.player_name,
+      hand_description: r.hand_description,
+      hand_rank: r.hand_rank,
+      created_at: normalizeTimestamp(r.created_at),
+      omgang_id: r.omgang_id,
+      omgang_nr: round ? round.number : null,
+      omgang_date: round ? round.date : null,
+      winning_cards: winningCards
+    };
+  });
+}
+
+// Topp 10 beste hender. Med ?date=ÅÅÅÅ-MM-DD: kun den dagen. Uten: all time.
+// Seire der alle andre kastet seg (hand_rank 0) teller ikke.
 app.get('/api/winning-hands', async (req, res) => {
   if (!db) return res.status(503).json({ error: 'Database ikke tilkoblet.' });
+  const date = parseDateParam(req.query.date);
+  if (date === undefined) return res.status(400).json({ error: 'Ugyldig dato.' });
   try {
-    const result = await db.execute(`
-      SELECT player_name, hand_description, winning_cards, hand_rank, created_at, omgang_id 
-      FROM (
-        SELECT player_name, hand_description, winning_cards, hand_rank, created_at, id, omgang_id
-        FROM winning_hands
-        ORDER BY hand_rank DESC, id DESC
-        LIMIT 10
-      )
-      ORDER BY hand_rank DESC, id DESC
-    `);
-    res.json(result.rows);
+    const range = date ? localDayRange(date) : null;
+    const result = await db.execute({
+      sql: `SELECT id, player_name, hand_description, winning_cards, hand_rank, created_at, omgang_id
+            FROM winning_hands
+            WHERE hand_rank > 0 ${range ? `AND ${CREATED_AT_ISO} >= ? AND ${CREATED_AT_ISO} < ?` : ''}
+            ORDER BY hand_rank DESC, id ASC
+            LIMIT 10`,
+      args: range ? [range.start, range.end] : []
+    });
+    res.json(await decorateHands(result.rows));
   } catch (err) {
     console.error('[DB Error /api/winning-hands]:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Alle hender en gitt dag, i rekkefølge
+app.get('/api/hands', async (req, res) => {
+  if (!db) return res.status(503).json({ error: 'Database ikke tilkoblet.' });
+  const date = parseDateParam(req.query.date);
+  if (!date) return res.status(400).json({ error: 'Mangler eller ugyldig dato.' });
+  try {
+    const range = localDayRange(date);
+    const result = await db.execute({
+      sql: `SELECT id, player_name, hand_description, winning_cards, hand_rank, created_at, omgang_id
+            FROM winning_hands
+            WHERE ${CREATED_AT_ISO} >= ? AND ${CREATED_AT_ISO} < ?
+            ORDER BY ${CREATED_AT_ISO} ASC, id ASC`,
+      args: [range.start, range.end]
+    });
+    res.json(await decorateHands(result.rows));
+  } catch (err) {
+    console.error('[DB Error /api/hands]:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Omganger som startet en gitt dag, med vinner og antall hender
+app.get('/api/rounds', async (req, res) => {
+  if (!db) return res.status(503).json({ error: 'Database ikke tilkoblet.' });
+  const date = parseDateParam(req.query.date);
+  if (!date) return res.status(400).json({ error: 'Mangler eller ugyldig dato.' });
+  try {
+    const range = localDayRange(date);
+    const result = await db.execute({
+      sql: `SELECT o.omgang_id, o.started_at, o.ended_at, o.game_mode, o.winner_name,
+                   (SELECT COUNT(*) FROM winning_hands w WHERE w.omgang_id = o.omgang_id) AS hands
+            FROM omganger o
+            WHERE o.started_at >= ? AND o.started_at < ?
+            ORDER BY o.started_at ASC`,
+      args: [range.start, range.end]
+    });
+    res.json(result.rows.map((r, idx) => ({ ...r, omgang_nr: idx + 1 })));
+  } catch (err) {
+    console.error('[DB Error /api/rounds]:', err);
     res.status(500).json({ error: err.message });
   }
 });

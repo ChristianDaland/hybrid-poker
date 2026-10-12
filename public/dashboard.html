@@ -10,18 +10,58 @@
       color: #ffffff;
       font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       margin: 0;
-      padding: 30px;
+      padding: 24px 30px;
+    }
+    .header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
     }
     h1 {
-      margin-bottom: 30px;
+      margin: 0;
       font-size: 28px;
     }
+    .date-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .date-controls input[type="date"] {
+      background: #1e1e1e;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 15px;
+      color-scheme: dark;
+    }
+    button {
+      background: #2a2a2a;
+      color: #fff;
+      border: 1px solid #444;
+      border-radius: 6px;
+      padding: 8px 14px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #383838; }
+    .btn-alltime {
+      background: #b8860b;
+      border-color: #daa520;
+      color: #111;
+    }
+    .btn-alltime:hover { background: #daa520; }
     .grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 20px;
     }
-    @media (max-width: 900px) {
+    .full { grid-column: 1 / -1; }
+    @media (max-width: 1000px) {
       .grid { grid-template-columns: 1fr; }
     }
     .card {
@@ -35,14 +75,16 @@
       font-size: 18px;
     }
     .green-title { color: #4caf50; }
+    .gold-title { color: #ffc107; }
+    .subtitle { color: #888; font-size: 13px; font-weight: normal; }
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 15px;
+      margin-top: 10px;
     }
     th, td {
       text-align: left;
-      padding: 10px;
+      padding: 9px 10px;
       border-bottom: 1px solid #333;
       font-size: 14px;
     }
@@ -54,111 +96,278 @@
       color: #4caf50;
       font-weight: bold;
     }
+    .muted { color: #777; }
+    .running { color: #ff9800; }
+    .mini-card {
+      display: inline-block;
+      background: #fff;
+      border-radius: 4px;
+      padding: 1px 5px;
+      margin-right: 3px;
+      font-weight: bold;
+      font-size: 13px;
+    }
+    .mini-card.red { color: #d32f2f; }
+    .mini-card.black { color: #222; }
+    .rank-1 td:first-child { color: #ffd700; font-weight: bold; }
+    .rank-2 td:first-child { color: #c0c0c0; font-weight: bold; }
+    .rank-3 td:first-child { color: #cd7f32; font-weight: bold; }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
 
-  <h1>Poker Dashboard</h1>
+  <div class="header">
+    <h1 id="page-title">Poker Dashboard</h1>
+    <div class="date-controls" id="date-controls">
+      <button onclick="changeDay(-1)" title="Forrige dag">◀</button>
+      <input type="date" id="date-picker" onchange="selectDate(this.value)">
+      <button onclick="changeDay(1)" title="Neste dag">▶</button>
+      <button onclick="selectDate(todayString())">I dag</button>
+    </div>
+    <button id="btn-view" class="btn-alltime" onclick="toggleAllTime()">🏆 All time topp 10</button>
+  </div>
 
-  <div class="grid">
-    <!-- Spillerstatistikk -->
+  <!-- Dagsvisning -->
+  <div id="day-view" class="grid">
     <div class="card">
-      <h2 class="green-title">Spillerstatistikk</h2>
+      <h2 class="green-title">Omganger <span class="subtitle" id="rounds-date"></span></h2>
       <table>
         <thead>
-          <tr>
-            <th>Spiller</th>
-            <th>Omganger Vunnet</th>
-            <th>Hender Spilt</th>
-            <th>Hender Vunnet</th>
-            <th>Seiersprosent</th>
-          </tr>
+          <tr><th>Omgang</th><th>Start</th><th>Slutt</th><th>Hender</th><th>Vinner</th></tr>
         </thead>
-        <tbody id="stats-body">
-          <tr><td colspan="5">Laster statistikk...</td></tr>
-        </tbody>
+        <tbody id="rounds-body"><tr><td colspan="5">Laster...</td></tr></tbody>
       </table>
     </div>
 
-    <!-- Top 10 Beste Vinnerhender -->
     <div class="card">
-      <h2 class="green-title">Top 10 Beste Vinnerhender (Spillekveld)</h2>
+      <h2 class="green-title">Topp 10 beste hender <span class="subtitle" id="top-date"></span></h2>
       <table>
         <thead>
-          <tr>
-            <th>#</th>
-            <th>Spiller</th>
-            <th>Vinnerhånd</th>
-            <th>Tidspunkt</th>
-          </tr>
+          <tr><th>#</th><th>Spiller</th><th>Hånd</th><th>Kort</th><th>Omgang</th><th>Tid</th></tr>
         </thead>
-        <tbody id="top-body">
-          <tr><td colspan="4">Laster topphender...</td></tr>
-        </tbody>
+        <tbody id="top-body"><tr><td colspan="6">Laster...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="card full">
+      <h2 class="green-title">Alle hender <span class="subtitle" id="hands-date"></span></h2>
+      <table>
+        <thead>
+          <tr><th>Tid</th><th>Omgang</th><th>Vinner</th><th>Hånd</th><th>Kort</th></tr>
+        </thead>
+        <tbody id="hands-body"><tr><td colspan="5">Laster...</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="card full">
+      <h2 class="green-title">Spillerstatistikk <span class="subtitle">(alle datoer)</span></h2>
+      <table>
+        <thead>
+          <tr><th>Spiller</th><th>Omganger Vunnet</th><th>Hender Spilt</th><th>Hender Vunnet</th><th>Seiersprosent</th></tr>
+        </thead>
+        <tbody id="stats-body"><tr><td colspan="5">Laster statistikk...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- All time topp 10 -->
+  <div id="alltime-view" class="hidden">
+    <div class="card">
+      <h2 class="gold-title">🏆 All time topp 10 – de beste hendene som noen gang er spilt</h2>
+      <table>
+        <thead>
+          <tr><th>#</th><th>Spiller</th><th>Hånd</th><th>Kort</th><th>Dato</th><th>Omgang</th></tr>
+        </thead>
+        <tbody id="alltime-body"><tr><td colspan="6">Laster...</td></tr></tbody>
       </table>
     </div>
   </div>
 
   <script>
-    async function loadDashboardData() {
-      try {
-        // 1. Hent Spillerstatistikk
-        const resStats = await fetch('/api/stats');
-        const stats = await resStats.json();
-        const statsBody = document.getElementById('stats-body');
-        
-        if (Array.isArray(stats) && stats.length > 0) {
-          statsBody.innerHTML = stats.map(s => {
-            const played = s.hands_played || s.handsPlayed || 0;
-            const won = s.hands_won || s.handsWon || 0;
+    let selectedDate = todayString();
+    let showAllTime = false;
+
+    function pad(n) { return String(n).padStart(2, '0'); }
+
+    function todayString() {
+      const d = new Date();
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+
+    function localDateOf(iso) {
+      const d = new Date(iso);
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    }
+
+    function formatTime(iso) {
+      if (!iso) return '-';
+      const d = new Date(iso);
+      return isNaN(d) ? '-' : `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }
+
+    function formatDate(isoOrDay) {
+      if (!isoOrDay) return '-';
+      const [y, m, d] = (isoOrDay.length === 10 ? isoOrDay : localDateOf(isoOrDay)).split('-');
+      return `${d}.${m}.${y}`;
+    }
+
+    function formatDateShort(day) {
+      const [, m, d] = day.split('-');
+      return `${d}.${m}.`;
+    }
+
+    function escapeHtml(text) {
+      return String(text == null ? '' : text)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function miniCards(cards) {
+      if (!Array.isArray(cards) || cards.length === 0) return '<span class="muted">–</span>';
+      const suits = { h: ['♥', 'red'], d: ['♦', 'red'], c: ['♣', 'black'], s: ['♠', 'black'] };
+      return cards.map(c => {
+        const code = String(c);
+        let val = code.slice(0, -1).toUpperCase();
+        if (val === 'T') val = '10';
+        const [sym, color] = suits[code.slice(-1).toLowerCase()] || ['?', 'black'];
+        return `<span class="mini-card ${color}">${escapeHtml(val)}${sym}</span>`;
+      }).join('');
+    }
+
+    // «Omgang 3» – med dato hvis omgangen startet en annen dag enn hånden ble spilt
+    function roundLabel(h, alwaysDate) {
+      if (!h.omgang_nr) return '<span class="muted">–</span>';
+      const otherDay = h.omgang_date && h.created_at && h.omgang_date !== localDateOf(h.created_at);
+      return `Omgang ${h.omgang_nr}` + ((alwaysDate || otherDay) && h.omgang_date ? ` <span class="muted">(${formatDateShort(h.omgang_date)})</span>` : '');
+    }
+
+    function selectDate(value) {
+      if (!value) return;
+      selectedDate = value;
+      document.getElementById('date-picker').value = value;
+      loadDashboardData();
+    }
+
+    function changeDay(delta) {
+      const [y, m, d] = selectedDate.split('-').map(Number);
+      const next = new Date(y, m - 1, d + delta);
+      selectDate(`${next.getFullYear()}-${pad(next.getMonth() + 1)}-${pad(next.getDate())}`);
+    }
+
+    function toggleAllTime() {
+      showAllTime = !showAllTime;
+      document.getElementById('day-view').classList.toggle('hidden', showAllTime);
+      document.getElementById('alltime-view').classList.toggle('hidden', !showAllTime);
+      document.getElementById('date-controls').classList.toggle('hidden', showAllTime);
+      document.getElementById('btn-view').innerText = showAllTime ? '📅 Tilbake til dagsoversikt' : '🏆 All time topp 10';
+      document.getElementById('page-title').innerText = showAllTime ? 'All time topp 10' : 'Poker Dashboard';
+      loadDashboardData();
+    }
+
+    async function getJson(url) {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`${url}: ${res.status}`);
+      return res.json();
+    }
+
+    function topRows(hands, allTime) {
+      return hands.map((h, i) => `
+        <tr class="rank-${i + 1}">
+          <td>${i + 1}</td>
+          <td><strong>${escapeHtml(h.player_name || 'Ukjent')}</strong></td>
+          <td>${escapeHtml(h.hand_description || '')}</td>
+          <td>${miniCards(h.winning_cards)}</td>
+          ${allTime
+            ? `<td>${formatDate(h.created_at)}</td><td>${roundLabel(h, false)}</td>`
+            : `<td>${roundLabel(h, false)}</td><td>${formatTime(h.created_at)}</td>`}
+        </tr>`).join('');
+    }
+
+    async function loadAllTime() {
+      const hands = await getJson('/api/winning-hands');
+      document.getElementById('alltime-body').innerHTML = hands.length > 0
+        ? topRows(hands, true)
+        : '<tr><td colspan="6">Ingen vinnerhender registrert ennå.</td></tr>';
+    }
+
+    async function loadDay() {
+      const dateLabel = selectedDate === todayString() ? `– i dag (${formatDate(selectedDate)})` : `– ${formatDate(selectedDate)}`;
+      ['rounds-date', 'top-date', 'hands-date'].forEach(id => document.getElementById(id).innerText = dateLabel);
+
+      const q = '?date=' + encodeURIComponent(selectedDate);
+      const [rounds, top, hands, stats] = await Promise.all([
+        getJson('/api/rounds' + q),
+        getJson('/api/winning-hands' + q),
+        getJson('/api/hands' + q),
+        getJson('/api/stats')
+      ]);
+
+      // Omganger
+      document.getElementById('rounds-body').innerHTML = rounds.length > 0
+        ? rounds.map(r => `
+            <tr>
+              <td>Omgang ${r.omgang_nr}</td>
+              <td>${formatTime(r.started_at)}</td>
+              <td>${r.ended_at ? formatTime(r.ended_at) : '<span class="running">pågår</span>'}</td>
+              <td>${r.hands}</td>
+              <td>${r.winner_name ? `🏆 <strong>${escapeHtml(r.winner_name)}</strong>` : '<span class="muted">–</span>'}</td>
+            </tr>`).join('')
+        : '<tr><td colspan="5">Ingen omganger denne dagen.</td></tr>';
+
+      // Topp 10 for dagen
+      document.getElementById('top-body').innerHTML = top.length > 0
+        ? topRows(top, false)
+        : '<tr><td colspan="6">Ingen vinnerhender ved showdown denne dagen.</td></tr>';
+
+      // Alle hender (nyeste øverst)
+      document.getElementById('hands-body').innerHTML = hands.length > 0
+        ? hands.slice().reverse().map(h => `
+            <tr>
+              <td>${formatTime(h.created_at)}</td>
+              <td>${roundLabel(h, false)}</td>
+              <td><strong>${escapeHtml(h.player_name || 'Ukjent')}</strong></td>
+              <td>${escapeHtml(h.hand_description || '')}</td>
+              <td>${miniCards(h.winning_cards)}</td>
+            </tr>`).join('')
+        : '<tr><td colspan="5">Ingen hender denne dagen.</td></tr>';
+
+      // Spillerstatistikk (alle datoer)
+      document.getElementById('stats-body').innerHTML = Array.isArray(stats) && stats.length > 0
+        ? stats.map(s => {
+            const played = s.hands_played || 0;
+            const won = s.hands_won || 0;
             const pct = played > 0 ? ((won / played) * 100).toFixed(1) : '0.0';
             return `
               <tr>
-                <td><strong>${s.name || s.player_name || 'Ukjent'}</strong></td>
+                <td><strong>${escapeHtml(s.name || 'Ukjent')}</strong></td>
                 <td>${s.rounds_won || 0}</td>
                 <td>${played}</td>
                 <td>${won}</td>
                 <td class="percent">${pct}%</td>
-              </tr>
-            `;
-          }).join('');
-        } else {
-          statsBody.innerHTML = '<tr><td colspan="5">Ingen data ennå.</td></tr>';
-        }
+              </tr>`;
+          }).join('')
+        : '<tr><td colspan="5">Ingen data ennå.</td></tr>';
+    }
 
-        // 2. Hent Top 10 Vinnerhender
-        const resHands = await fetch('/api/winning-hands');
-        const hands = await resHands.json();
-        const topBody = document.getElementById('top-body');
-
-        if (Array.isArray(hands) && hands.length > 0) {
-          topBody.innerHTML = hands.map((h, index) => {
-            const playerName = h.player_name || h.playerName || h.name || 'Ukjent';
-            const handDescr = h.hand_description || h.handDescr || h.descr || 'Vinnerhånd';
-            const createdAt = h.created_at || h.createdAt;
-            const timeStr = createdAt ? new Date(createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '-';
-
-            return `
-              <tr>
-                <td>${index + 1}</td>
-                <td><strong>${playerName}</strong></td>
-                <td>${handDescr}</td>
-                <td>${timeStr}</td>
-              </tr>
-            `;
-          }).join('');
-        } else {
-          topBody.innerHTML = '<tr><td colspan="4">Ingen vinnerhender registrert til showdown ennå.</td></tr>';
-        }
-
+    async function loadDashboardData() {
+      try {
+        if (showAllTime) await loadAllTime();
+        else await loadDay();
       } catch (err) {
         console.error('Feil ved oppdatering av dashboard:', err);
       }
     }
 
-    // Oppdaterer data med en gang, og deretter hvert 3. sekund
-    loadDashboardData();
-    setInterval(loadDashboardData, 3000);
+    document.getElementById('date-picker').value = selectedDate;
+    // dashboard.html#alltime åpner All time-visningen direkte
+    if (location.hash === '#alltime') toggleAllTime();
+    else loadDashboardData();
+
+    // Oppdater automatisk kun når vi ser på i dag eller all time (gamle dager endres ikke)
+    setInterval(() => {
+      if (showAllTime || selectedDate === todayString()) loadDashboardData();
+    }, 5000);
   </script>
 </body>
 </html>
