@@ -328,7 +328,10 @@
       myCardsData = state.cards || [];
       renderCards();
       const foldBtn = document.getElementById('btn-fold');
-      if (state.folded) {
+      if (state.waiting) {
+        foldBtn.disabled = true;
+        foldBtn.innerText = 'Venter p\u00E5 neste h\u00E5nd';
+      } else if (state.folded) {
         foldBtn.disabled = true;
         foldBtn.innerText = 'Foldet';
       } else {

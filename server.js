@@ -195,12 +195,63 @@ let gameState = {
   board: [],
   deck: [],
   winnerInfo: null,
-  dealerIndex: 0
+  dealerSeat: 0 // Setenummeret til forrige dealer (0 = ingen ennå)
 };
 
 let players = {};
 const disconnectTimeouts = {};
 const uuidToPlayerId = new Map();
+
+// Hvor lenge en frakoblet spiller beholder plassen sin (telefoner som låser seg kobler fra)
+const DISCONNECT_GRACE_MS = Number(process.env.DISCONNECT_GRACE_MS) || 5 * 60 * 1000;
+const ACTIVE_HAND_PHASES = ['PREFLOP', 'FLOP', 'TURN', 'RIVER'];
+
+function isHandInProgress() {
+  return ACTIVE_HAND_PHASES.includes(gameState.phase);
+}
+
+// Rekkefølgen rundt bordet bestemmes av setenummer – IKKE av socket-id/innsettingsrekkefølge
+function getSeatedPlayers() {
+  return Object.values(players).sort((a, b) => a.seat - b.seat);
+}
+
+function getNextSeatNumber() {
+  const seats = Object.values(players).map(p => p.seat);
+  return seats.length > 0 ? Math.max(...seats) + 1 : 1;
+}
+
+// En spiller er med i hånden hvis hen har kort og ikke har kastet seg
+function isInHand(p) {
+  return !p.folded && Array.isArray(p.cards) && p.cards.length > 0;
+}
+
+function removePlayer(playerId) {
+  const p = players[playerId];
+  if (!p) return;
+  delete players[playerId];
+  if (p.uuid && uuidToPlayerId.get(p.uuid) === playerId) {
+    uuidToPlayerId.delete(p.uuid);
+  }
+}
+
+// Fjerner spillere som har vært frakoblet for lenge, men ventet til hånden var ferdig
+function removePlayersMarkedForRemoval() {
+  Object.values(players).forEach(p => {
+    if (p.removeAfterHand && !p.connected) removePlayer(p.id);
+  });
+}
+
+// Sikrer at en feil i én hendelse ikke krasjer hele serveren
+function safeHandler(eventName, fn) {
+  return async (...args) => {
+    try {
+      await fn(...args);
+    } catch (err) {
+      console.error(`[FEIL i ${eventName}]:`, err);
+      try { updateAll(); } catch (e) { /* ignorer */ }
+    }
+  };
+}
 
 // ============================================================
 // Turso (SQLite) database-integrasjon
@@ -278,6 +329,8 @@ async function ensurePlayerStats(uuid, name) {
 
 async function persistHandResult() {
   const { winnerInfo, board, gameMode } = gameState;
+  // Øyeblikksbilde før første await – en ny hånd kan starte mens vi skriver til databasen
+  const activePlayersList = Object.values(players).map(p => ({ ...p, cards: [...(p.cards || [])] }));
 
   if (!db) {
     console.error('[DB ERROR] Ingen databasetilkobling.');
@@ -306,7 +359,6 @@ async function persistHandResult() {
     }
   }
 
-  const activePlayersList = Object.values(players);
   const winners = activePlayersList.filter(p => 
     winnerInfo.winnerName && winnerInfo.winnerName.includes(p.name)
   );
@@ -370,37 +422,37 @@ async function persistHandResult() {
 }
 
 function randomizePlayerSeats() {
-  const playerArray = Object.values(players);
-  if (playerArray.length <= 1) return;
-
-  const shuffled = shuffle(playerArray);
-  const newPlayersObj = {};
-
+  const shuffled = shuffle(Object.values(players));
   shuffled.forEach((p, index) => {
     p.seat = index + 1;
-    newPlayersObj[p.id] = p;
   });
-
-  players = newPlayersObj;
-  gameState.dealerIndex = 0;
+  gameState.dealerSeat = 0;
 }
 
 function startNewHandLogic() {
-  const playerList = Object.values(players);
-  if (playerList.length === 0 || !gameState.gameMode) return;
+  if (!gameState.gameMode) return;
+
+  removePlayersMarkedForRemoval();
+
+  const playerList = getSeatedPlayers();
+  if (playerList.length === 0) return;
 
   gameState.deck = createDeck();
   gameState.board = [];
   gameState.phase = 'PREFLOP';
   gameState.winnerInfo = null;
 
-  gameState.dealerIndex = (gameState.dealerIndex + 1) % playerList.length;
+  // Dealerknappen går til neste sete etter forrige dealer (fungerer selv om noen har gått)
+  let dealerPos = playerList.findIndex(p => p.seat > gameState.dealerSeat);
+  if (dealerPos === -1) dealerPos = 0;
+  gameState.dealerSeat = playerList[dealerPos].seat;
 
   playerList.forEach((p, idx) => {
     p.folded = false;
+    p.waiting = false;
     p.cards = [];
-    
-    const relativePos = (idx - gameState.dealerIndex + playerList.length) % playerList.length;
+
+    const relativePos = (idx - dealerPos + playerList.length) % playerList.length;
 
     if (playerList.length === 2) {
       p.role = relativePos === 0 ? 'Lilleblind' : 'Storeblind';
@@ -418,8 +470,26 @@ function startNewHandLogic() {
   });
 }
 
+// Avslutter hånden når kun én spiller er igjen. Returnerer true hvis hånden ble avsluttet.
+async function finishIfOnlyOneLeft() {
+  if (!isHandInProgress()) return false;
+  const remaining = Object.values(players).filter(isInHand);
+  if (remaining.length !== 1) return false;
+
+  gameState.phase = 'FINISHED';
+  gameState.winnerInfo = {
+    winnerName: remaining[0].name,
+    descr: 'Alle andre kastet seg',
+    foldedWin: true,
+    rawCards: [],
+    rankVal: 0
+  };
+  await persistHandResult();
+  return true;
+}
+
 io.on('connection', (socket) => {
-  socket.on('join_game', async (nameOrPayload) => {
+  socket.on('join_game', safeHandler('join_game', async (nameOrPayload) => {
     let cleanName = 'Spiller';
     let clientUuid = null;
     if (nameOrPayload && typeof nameOrPayload === 'object') {
@@ -445,6 +515,7 @@ io.on('connection', (socket) => {
 
       playerData.id = socket.id;
       playerData.connected = true;
+      playerData.removeAfterHand = false;
 
       if (clientUuid && clientUuid !== playerData.uuid) {
         if (playerData.uuid) {
@@ -471,14 +542,16 @@ io.on('connection', (socket) => {
         playerUuid = 'uuid-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
       }
 
-      const seatNumber = Object.keys(players).length + 1;
+      // Kommer spilleren inn midt i en hånd, venter hen til neste hånd
+      const joinsMidHand = isHandInProgress();
       players[socket.id] = {
         id: socket.id,
         name: cleanName,
         uuid: playerUuid,
-        seat: seatNumber,
+        seat: getNextSeatNumber(),
         cards: [],
-        folded: false,
+        folded: joinsMidHand,
+        waiting: joinsMidHand,
         role: '',
         connected: true
       };
@@ -487,11 +560,12 @@ io.on('connection', (socket) => {
     }
 
     const joinedPlayer = players[socket.id];
+    if (!joinedPlayer) return;
     socket.emit('joined', { uuid: joinedPlayer.uuid, name: joinedPlayer.name });
     updateAll();
-  });
+  }));
 
-  socket.on('set_game_mode', (mode) => {
+  socket.on('set_game_mode', safeHandler('set_game_mode', (mode) => {
     gameState.gameMode = mode;
     if (!mode) {
       gameState.phase = 'VENTING';
@@ -501,35 +575,28 @@ io.on('connection', (socket) => {
       randomizePlayerSeats();
     }
     updateAll();
-  });
+  }));
 
-  socket.on('start_new_hand', () => {
+  socket.on('start_new_hand', safeHandler('start_new_hand', () => {
     startNewHandLogic();
     updateAll();
-  });
+  }));
 
-  socket.on('next_phase', async () => {
-    const activePlayers = Object.values(players).filter(p => !p.folded);
-
+  socket.on('next_phase', safeHandler('next_phase', async () => {
     if (gameState.phase === 'FINISHED' || gameState.phase === 'SHOWDOWN') {
       startNewHandLogic();
       updateAll();
       return;
     }
 
-    if (activePlayers.length === 1 && gameState.phase !== 'VENTING') {
-      gameState.phase = 'FINISHED';
-      gameState.winnerInfo = {
-        winnerName: activePlayers[0].name,
-        descr: 'Alle andre kastet seg',
-        foldedWin: true,
-        rawCards: [],
-        rankVal: 0
-      };
-      await persistHandResult();
+    if (!isHandInProgress()) return;
+
+    if (await finishIfOnlyOneLeft()) {
       updateAll();
       return;
     }
+
+    const activePlayers = Object.values(players).filter(isInHand);
 
     if (gameState.phase === 'PREFLOP') {
       gameState.phase = 'FLOP';
@@ -542,11 +609,26 @@ io.on('connection', (socket) => {
       gameState.board.push(gameState.deck.pop());
     } else if (gameState.phase === 'RIVER') {
       gameState.phase = 'SHOWDOWN';
-      
-      const solvedHands = activePlayers.map(p => ({
-        player: p,
-        solved: evaluatePlayerHand(p.cards, gameState.board, gameState.gameMode)
-      }));
+
+      const solvedHands = activePlayers
+        .map(p => ({
+          player: p,
+          solved: evaluatePlayerHand(p.cards, gameState.board, gameState.gameMode)
+        }))
+        .filter(sh => sh.solved);
+
+      if (solvedHands.length === 0) {
+        gameState.phase = 'FINISHED';
+        gameState.winnerInfo = {
+          winnerName: 'Ingen',
+          descr: 'Ingen gyldige hender',
+          foldedWin: true,
+          rawCards: [],
+          rankVal: 0
+        };
+        updateAll();
+        return;
+      }
 
       const handsOnly = solvedHands.map(sh => sh.solved);
       const winningHands = Hand.winners(handsOnly);
@@ -575,29 +657,19 @@ io.on('connection', (socket) => {
       await persistHandResult();
     }
     updateAll();
-  });
+  }));
 
-  socket.on('player_fold', async () => {
-    if (players[socket.id]) {
-      players[socket.id].folded = true;
-      
-      const activePlayers = Object.values(players).filter(p => !p.folded);
-      if (activePlayers.length === 1 && gameState.phase !== 'VENTING') {
-        gameState.phase = 'FINISHED';
-        gameState.winnerInfo = {
-          winnerName: activePlayers[0].name,
-          descr: 'Alle andre kastet seg',
-          foldedWin: true,
-          rawCards: [],
-          rankVal: 0
-        };
-        await persistHandResult();
-      }
-      updateAll();
-    }
-  });
+  socket.on('player_fold', safeHandler('player_fold', async () => {
+    const player = players[socket.id];
+    // Fold er kun lov midt i en hånd, og kun for spillere som faktisk er med
+    if (!player || !isHandInProgress() || !isInHand(player)) return;
 
-  socket.on('rejoin_game', async (data) => {
+    player.folded = true;
+    await finishIfOnlyOneLeft();
+    updateAll();
+  }));
+
+  socket.on('rejoin_game', safeHandler('rejoin_game', async (data) => {
     const uuid = (data && data.uuid) || (typeof data === 'string' ? data : null);
     if (!uuid) {
       socket.emit('rejoin_failed', { reason: 'Mangler UUID.' });
@@ -625,6 +697,7 @@ io.on('connection', (socket) => {
     }
 
     player.connected = true;
+    player.removeAfterHand = false;
     player.uuid = uuid;
     player.id = socket.id;
     players[socket.id] = player;
@@ -633,34 +706,38 @@ io.on('connection', (socket) => {
 
     socket.emit('joined', { uuid: uuid, name: player.name });
     updateAll();
-  });
+  }));
 
   socket.on('disconnect', () => {
-    if (players[socket.id]) {
-      players[socket.id].connected = false;
-      const disconnectedId = socket.id;
-      const playerUuid = players[socket.id].uuid;
+    const disconnectedId = socket.id;
+    if (!players[disconnectedId]) return;
 
-      if (disconnectTimeouts[disconnectedId]) {
-        clearTimeout(disconnectTimeouts[disconnectedId]);
-      }
+    players[disconnectedId].connected = false;
 
-      disconnectTimeouts[disconnectedId] = setTimeout(() => {
-        delete players[disconnectedId];
-        delete disconnectTimeouts[disconnectedId];
-        if (playerUuid) {
-          uuidToPlayerId.delete(playerUuid);
-        }
-        updateAll();
-      }, 60000);
-
-      updateAll();
+    if (disconnectTimeouts[disconnectedId]) {
+      clearTimeout(disconnectTimeouts[disconnectedId]);
     }
+
+    disconnectTimeouts[disconnectedId] = setTimeout(() => {
+      delete disconnectTimeouts[disconnectedId];
+      const p = players[disconnectedId];
+      if (!p || p.connected) return;
+
+      if (isHandInProgress()) {
+        // Ikke fjern noen midt i en hånd – vent til neste hånd starter
+        p.removeAfterHand = true;
+      } else {
+        removePlayer(disconnectedId);
+      }
+      updateAll();
+    }, DISCONNECT_GRACE_MS);
+
+    updateAll();
   });
 });
 
 function updateAll() {
-  const playerList = Object.values(players);
+  const playerList = getSeatedPlayers();
 
   const showCardsOnScreen = gameState.phase === 'SHOWDOWN' && 
                             gameState.winnerInfo && 
@@ -676,6 +753,7 @@ function updateAll() {
       seat: p.seat,
       role: p.role,
       folded: p.folded,
+      waiting: !!p.waiting,
       connected: p.connected,
       cards: showCardsOnScreen && !p.folded ? p.cards : []
     }))
@@ -688,11 +766,20 @@ function updateAll() {
         cards: p.cards,
         role: p.role,
         folded: p.folded,
+        waiting: !!p.waiting,
         winnerInfo: gameState.winnerInfo
       });
     }
   });
 }
+
+// Siste sikkerhetsnett: logg uventede feil i stedet for å la serveren dø
+process.on('unhandledRejection', (err) => {
+  console.error('[UHÅNDTERT PROMISE-FEIL]:', err);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[UHÅNDTERT FEIL]:', err);
+});
 
 initDatabase();
 

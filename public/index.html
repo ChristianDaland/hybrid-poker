@@ -439,7 +439,7 @@
           <div style="font-size: 0.8rem; color: #ccc;">Plass ${p.seat}</div>
           ${p.role ? `<span class="badge">${p.role}</span>` : ''}
           <div style="font-size: 0.8rem; margin-top: 4px;">
-            ${p.folded ? '🔴 FOLDET' : '🟢 INNE'}
+            ${p.waiting ? '⏳ VENTER PÅ NESTE HÅND' : (p.folded ? '🔴 FOLDET' : '🟢 INNE')}
           </div>
           ${p.cards && p.cards.length > 0 ? `
             <div style="margin-top: 6px; display: flex; gap: 4px; justify-content: center;">

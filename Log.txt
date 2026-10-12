@@ -1,1 +1,68 @@
+============================================================
+HYBRID POKER – ENDRINGSLOGG
+============================================================
 
+------------------------------------------------------------
+2026-10-12 – Steg 1: Sikkert utgangspunkt
+------------------------------------------------------------
+- Lagt til .gitignore (node_modules/, .env, Backup/).
+  .env inneholder Turso-tokenet og skal aldri committes.
+- Committet dagens fungerende versjon som baseline (f08c7b8),
+  slik at vi alltid kan gå tilbake.
+
+------------------------------------------------------------
+2026-10-12 – Steg 2: Kritiske stabilitetsfeil (server.js)
+------------------------------------------------------------
+1. Dealerknappen/rekkefølgen ble ødelagt ved reconnect
+   Årsak: Rekkefølgen rundt bordet var rekkefølgen i players-
+   objektet. Ved reconnect ble spilleren slettet og lagt inn på
+   nytt under ny socket-id, og havnet dermed sist.
+   Fiks:
+   - Ny getSeatedPlayers() sorterer alltid på setenummer.
+   - Dealer lagres som setenummer (gameState.dealerSeat) i stedet
+     for indeks. Neste dealer = neste sete etter forrige dealer,
+     også om noen har forlatt bordet.
+   - Nye spillere får høyeste sete + 1 (ingen dupliserte seter).
+
+2. Krasj ved showdown når noen ble med midt i en hånd
+   Årsak: Spilleren hadde 0 kort men telte som aktiv. I Omaha ga
+   det null-hånd -> Hand.winners kastet feil -> serveren døde.
+   Fiks:
+   - Spillere som blir med midt i en hånd får status «venter»
+     (waiting) og er med fra neste hånd.
+   - Kun spillere med kort som ikke har foldet er med i hånden
+     (isInHand). Hender som ikke kan evalueres filtreres bort.
+   - Alle socket-hendelser er pakket inn i safeHandler (try/catch),
+     og process.on('unhandledRejection'/'uncaughtException') logger
+     feil i stedet for å stoppe serveren.
+
+3. Spillere ble fjernet midt i en hånd etter 60 sek frakobling
+   Fiks:
+   - Grace-tiden er økt fra 60 sek til 5 min (DISCONNECT_GRACE_MS,
+     kan overstyres med miljøvariabel).
+   - Utløper tiden midt i en hånd, merkes spilleren og fjernes
+     først når neste hånd starter.
+
+4. Fold etter showdown ga dobbel statistikk
+   Årsak: Fold ble godtatt i alle faser. En taper som foldet etter
+   showdown overskrev vinneren og lagret hånden på nytt.
+   Fiks: Fold godtas kun i PREFLOP/FLOP/TURN/RIVER og kun for
+   spillere som er med i hånden. Logikken for «alle andre kastet
+   seg» er samlet i finishIfOnlyOneLeft().
+
+Øvrig:
+- persistHandResult tar øyeblikksbilde av spillerne før første
+  await, så en ny hånd som starter under lagring ikke blander
+  inn feil kort.
+- next_phase gjør ingenting utenfor en aktiv hånd.
+- index.html viser «⏳ VENTER PÅ NESTE HÅND» for nye spillere.
+- mobile.html viser «Venter på neste hånd» på fold-knappen.
+
+Testet med simulerte klienter (socket.io-client, 4 spillere,
+Omaha): reconnect beholder rekkefølgen, spiller inn midt i hånd
+gir ikke krasj, fold i showdown ignoreres, dealer flytter ett
+sete, frakoblet spiller fjernes først ved neste hånd.
+
+Gjenstår (neste steg): punkt 5–11 fra gjennomgangen
+(vinner-matching på navn, UUID ved innlogging, navnekapring,
+heads-up dealer, FINISHED-knapper, frakoblede får kort).
