@@ -303,7 +303,24 @@
       filter: grayscale(100%);
     }
 
-    .btn-mode { background-color: #ffffff; color: #333; }
+    /* Spilletype: to knapper over hverandre, til sammen like store som den store knappen */
+    .mode-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      width: 100%;
+      height: 140px;
+    }
+    .btn-mode {
+      flex: 1;
+      width: 100%;
+      font-size: 1.15rem;
+      border-radius: 14px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+    .btn-mode:hover { transform: scale(1.02); }
+    .btn-mode-texas { background: linear-gradient(135deg, #c62828, #8e1c1c); color: white; }
+    .btn-mode-omaha { background: linear-gradient(135deg, #f9b825, #c88a00); color: #222; }
     .btn-change-mode { background-color: #607d8b; color: white; }
     .btn-action { background-color: #4caf50; color: white; }
 
@@ -382,18 +399,19 @@
         <div id="qr-url" class="qr-url"></div>
       </div>
 
-      <!-- 2. Stor, høy knapp: «Start Ny Hånd» (grønn) før første hånd, ellers neste fase/kort (blå) -->
+      <!-- 2. Valg av spilletype (før spilletype er valgt) – samme plass og høyde som den store knappen -->
+      <div id="mode-selection" class="mode-stack">
+        <button class="btn-mode btn-mode-texas" onclick="setMode('TEXAS')">Texas Hold'em</button>
+        <button class="btn-mode btn-mode-omaha" onclick="setMode('OMAHA')">Omaha</button>
+      </div>
+
+      <!-- 3. Stor, høy knapp: «Start Ny Hånd» (grønn) før første hånd, ellers neste fase/kort (blå) -->
       <button id="btn-next-phase" class="btn-next-large" onclick="bigButtonClick()" style="display: none;">Åpne Flopp</button>
     </div>
   </div>
 
   <div class="controls">
     <div class="controls-left">
-      <div id="mode-selection" style="display: flex; gap: 10px;">
-        <button class="btn-mode" onclick="setMode('TEXAS')">Texas Hold'em</button>
-        <button class="btn-mode" onclick="setMode('OMAHA')">Omaha</button>
-      </div>
-
       <div id="game-controls" style="display: none; gap: 10px;">
         <button id="btn-change-mode" class="btn-change-mode" onclick="resetMode()">Bytt Spilletype</button>
         <button id="btn-reset-out" class="btn-change-mode" onclick="resetOut()" style="display: none;">🔄 Ny omgang (alle inn igjen)</button>

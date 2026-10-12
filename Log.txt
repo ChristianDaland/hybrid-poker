@@ -769,3 +769,17 @@ index.html:
 Testet i Chrome: bordet står på samme plass (top 128) i VENTING,
 PREFLOP og SHOWDOWN; knappen 160x140 på samme plass i alle faser;
 klikk på grønn knapp starter hånden og den blir blå «Åpne Flopp».
+
+------------------------------------------------------------
+2026-10-12 – Valg av spilletype oppe til høyre
+------------------------------------------------------------
+index.html:
+- Knappene «Texas Hold'em» og «Omaha» er flyttet fra knappelinja til
+  høyre kolonne, der den store knappen står. Over hverandre (Texas
+  øverst), til sammen 160x140 – samme størrelse og plass som den store
+  knappen, som tar over plassen når spilletype er valgt.
+- Egne farger: Texas mørk rød, Omaha gyllen (skiller seg fra de andre
+  knappene).
+Testet i Chrome: spilletype-boksen og den store knappen er begge
+160x140 på samme plass; klikk på Omaha velger spilletype og viser
+grønn «▶ Start Ny Hånd».
