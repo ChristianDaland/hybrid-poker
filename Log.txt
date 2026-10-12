@@ -192,3 +192,35 @@ Fiks (server.js):
   Før var de tomme til noe skjedde i spillet.
 Testet: skjermbilder i headless Chrome i 1920x1080, 1280x720 og
 1024x600 med 5 spillere i Omaha-showdown. Alle tidligere tester OK.
+
+------------------------------------------------------------
+2026-10-12 – Ønske 1/5: Angre kast
+------------------------------------------------------------
+Endret oppførsel: Hånden avsluttes IKKE lenger automatisk når alle
+andre har kastet seg. Dealer kårer vinneren med den store knappen.
+Fram til da (og fram til neste kort åpnes) kan et kast angres.
+
+server.js:
+- Ny hendelse 'player_unfold'. Godtas kun i samme fase som kastet
+  (foldedInPhase === phase) – dvs. før neste kort åpnes, og ikke
+  etter at vinneren er kåret.
+- canFold(): den siste spilleren i hånden kan ikke kaste (ellers
+  står ingen igjen). Gjelder også dealerens «Kast kort for spilleren».
+- player_fold / host_fold_player kaller ikke lenger
+  finishIfOnlyOneLeft – det gjøres i next_phase (dealer bekrefter).
+- state_update har nytt felt lastPlayerStanding (navn eller null).
+- player_state har nye felt canFold og canUndoFold.
+
+mobile.html:
+- Etter kast blir fold-knappen gul «↩️ Angre kast» så lenge det er
+  lov; deretter «Foldet». Fold-knappen er sperret for siste spiller.
+
+index.html:
+- Når bare én er igjen: grått banner «Alle andre har kastet seg –
+  trykk «Kår vinner» …», og den store knappen viser «Kår vinner: X».
+- «Kast kort for spilleren» skjules når bare én er igjen.
+
+Testet: kast + angre i samme fase, angre avvises etter flopp,
+siste spiller kan ikke kaste, angre etter at vinner er kåret
+avvises, dealer kårer vinner. Eldre tester oppdatert (dealer må nå
+trykke for å kåre vinner) og kjørt: OK. Skjermbilde av «Kår vinner».

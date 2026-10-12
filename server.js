@@ -228,6 +228,27 @@ function isInHand(p) {
   return !p.folded && Array.isArray(p.cards) && p.cards.length > 0;
 }
 
+// Kast er lov så lenge spilleren er med og minst én annen også er med
+// (den siste spilleren kan ikke kaste – da står ingen igjen)
+function canFold(p) {
+  if (!isHandInProgress() || !isInHand(p)) return false;
+  return Object.values(players).filter(isInHand).length > 1;
+}
+
+// Et kast kan angres fram til neste kort åpnes (samme fase)
+function canUndoFold(p) {
+  return isHandInProgress() && p.folded && !p.waiting &&
+         Array.isArray(p.cards) && p.cards.length > 0 &&
+         p.foldedInPhase === gameState.phase;
+}
+
+// Navnet på den eneste gjenværende spilleren, hvis alle andre har kastet seg
+function getLastPlayerStanding() {
+  if (!isHandInProgress()) return null;
+  const remaining = Object.values(players).filter(isInHand);
+  return remaining.length === 1 ? remaining[0].name : null;
+}
+
 function removePlayer(playerId) {
   const p = players[playerId];
   if (!p) return;
@@ -454,6 +475,7 @@ function startNewHandLogic() {
 
   playerList.forEach((p, idx) => {
     p.folded = false;
+    p.foldedInPhase = null;
     p.waiting = false;
     p.cards = [];
 
@@ -690,11 +712,22 @@ io.on('connection', (socket) => {
 
   socket.on('player_fold', safeHandler('player_fold', async () => {
     const player = players[socket.id];
-    // Fold er kun lov midt i en hånd, og kun for spillere som faktisk er med
-    if (!player || !isHandInProgress() || !isInHand(player)) return;
+    // Fold er kun lov midt i en hånd, og kun for spillere som faktisk er med.
+    // Hånden avsluttes IKKE her – dealer kårer vinneren med «neste»-knappen,
+    // slik at et feiltrykk kan angres.
+    if (!player || !canFold(player)) return;
 
     player.folded = true;
-    await finishIfOnlyOneLeft();
+    player.foldedInPhase = gameState.phase;
+    updateAll();
+  }));
+
+  socket.on('player_unfold', safeHandler('player_unfold', async () => {
+    const player = players[socket.id];
+    if (!player || !canUndoFold(player)) return;
+
+    player.folded = false;
+    player.foldedInPhase = null;
     updateAll();
   }));
 
@@ -702,10 +735,10 @@ io.on('connection', (socket) => {
   // slik at hånden ikke blir hengende på en telefon som er borte
   socket.on('host_fold_player', safeHandler('host_fold_player', async (seat) => {
     const player = Object.values(players).find(p => p.seat === Number(seat));
-    if (!player || player.connected || !isHandInProgress() || !isInHand(player)) return;
+    if (!player || player.connected || !canFold(player)) return;
 
     player.folded = true;
-    await finishIfOnlyOneLeft();
+    player.foldedInPhase = gameState.phase;
     updateAll();
   }));
 
@@ -789,6 +822,7 @@ function getPublicState() {
     phase: gameState.phase,
     board: gameState.board,
     winnerInfo: gameState.winnerInfo,
+    lastPlayerStanding: getLastPlayerStanding(),
     players: playerList.map(p => ({
       name: p.name,
       seat: p.seat,
@@ -812,6 +846,8 @@ function updateAll() {
         role: p.role,
         folded: p.folded,
         waiting: !!p.waiting,
+        canFold: canFold(p),
+        canUndoFold: canUndoFold(p),
         winnerInfo: gameState.winnerInfo
       });
     }

@@ -46,6 +46,11 @@
       cursor: pointer;
       box-shadow: 0 2px 6px rgba(0,0,0,0.4);
     }
+    .btn-fold-top.undo {
+      background-color: #f9a825;
+      border-color: #fdd835;
+      color: #222;
+    }
     .btn-fold-top:disabled {
       background-color: #444;
       border-color: #555;
@@ -234,8 +239,10 @@
       startJoinTimeout();
     }
 
+    // Samme knapp brukes til å kaste og til å angre kastet
+    let foldButtonMode = 'fold';
     function foldHand() {
-      socket.emit('player_fold');
+      socket.emit(foldButtonMode === 'undo' ? 'player_unfold' : 'player_fold');
     }
 
     function showAllCards() {
@@ -359,14 +366,22 @@
       myCardsData = state.cards || [];
       renderCards();
       const foldBtn = document.getElementById('btn-fold');
+      foldBtn.classList.remove('undo');
+      foldButtonMode = 'fold';
       if (state.waiting) {
         foldBtn.disabled = true;
         foldBtn.innerText = 'Venter p\u00E5 neste h\u00E5nd';
+      } else if (state.folded && state.canUndoFold) {
+        // Kastet kan angres fram til neste kort \u00E5pnes
+        foldButtonMode = 'undo';
+        foldBtn.disabled = false;
+        foldBtn.classList.add('undo');
+        foldBtn.innerText = '\u21A9\uFE0F Angre kast';
       } else if (state.folded) {
         foldBtn.disabled = true;
         foldBtn.innerText = 'Foldet';
       } else {
-        foldBtn.disabled = false;
+        foldBtn.disabled = !state.canFold;
         foldBtn.innerText = 'Fold (Kast)';
       }
     });
