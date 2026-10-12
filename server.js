@@ -196,6 +196,7 @@ let gameState = {
   board: [],
   deck: [],
   winnerInfo: null,
+  winnerUuids: [], // Kun på serveren – UUID gir tilgang til kortene og må ikke sendes ut
   dealerSeat: 0 // Setenummeret til forrige dealer (0 = ingen ennå)
 };
 
@@ -205,6 +206,7 @@ const uuidToPlayerId = new Map();
 
 // Hvor lenge en frakoblet spiller beholder plassen sin (telefoner som låser seg kobler fra)
 const DISCONNECT_GRACE_MS = Number(process.env.DISCONNECT_GRACE_MS) || 5 * 60 * 1000;
+const MAX_NAME_LENGTH = 15;
 const ACTIVE_HAND_PHASES = ['PREFLOP', 'FLOP', 'TURN', 'RIVER'];
 
 function isHandInProgress() {
@@ -330,6 +332,7 @@ async function ensurePlayerStats(uuid, name) {
 
 async function persistHandResult() {
   const { winnerInfo, board, gameMode } = gameState;
+  const winnerUuids = [...(gameState.winnerUuids || [])];
   // Øyeblikksbilde før første await – en ny hånd kan starte mens vi skriver til databasen
   const activePlayersList = Object.values(players).map(p => ({ ...p, cards: [...(p.cards || [])] }));
 
@@ -360,9 +363,8 @@ async function persistHandResult() {
     }
   }
 
-  const winners = activePlayersList.filter(p => 
-    winnerInfo.winnerName && winnerInfo.winnerName.includes(p.name)
-  );
+  // Vinnere identifiseres på UUID (ikke navn – «Ola» skal ikke matche «Olav»)
+  const winners = activePlayersList.filter(p => p.uuid && winnerUuids.includes(p.uuid));
 
   const winnerNamesStr = winners.length > 0 
     ? winners.map(w => w.name).join(' & ') 
@@ -372,8 +374,9 @@ async function persistHandResult() {
     ? winners.map(w => w.uuid).join(', ') 
     : 'ukjent-uuid';
 
+  // Kun spillere som ble delt kort i denne hånden teller som «spilt»
   for (const p of activePlayersList) {
-    if (!p.uuid) continue;
+    if (!p.uuid || p.cards.length === 0) continue;
     const isWinner = winners.some(w => w.uuid === p.uuid);
     try {
       await ensurePlayerStats(p.uuid, p.name);
@@ -442,6 +445,7 @@ function startNewHandLogic() {
   gameState.board = [];
   gameState.phase = 'PREFLOP';
   gameState.winnerInfo = null;
+  gameState.winnerUuids = [];
 
   // Dealerknappen går til neste sete etter forrige dealer (fungerer selv om noen har gått)
   let dealerPos = playerList.findIndex(p => p.seat > gameState.dealerSeat);
@@ -478,6 +482,7 @@ async function finishIfOnlyOneLeft() {
   if (remaining.length !== 1) return false;
 
   gameState.phase = 'FINISHED';
+  gameState.winnerUuids = [remaining[0].uuid];
   gameState.winnerInfo = {
     winnerName: remaining[0].name,
     descr: 'Alle andre kastet seg',
@@ -491,18 +496,39 @@ async function finishIfOnlyOneLeft() {
 
 io.on('connection', (socket) => {
   socket.on('join_game', safeHandler('join_game', async (nameOrPayload) => {
-    let cleanName = 'Spiller';
+    let rawName = '';
     let clientUuid = null;
     if (nameOrPayload && typeof nameOrPayload === 'object') {
-      cleanName = nameOrPayload.name ? String(nameOrPayload.name).trim() : 'Spiller';
-      clientUuid = nameOrPayload.uuid || null;
+      rawName = nameOrPayload.name ? String(nameOrPayload.name) : '';
+      clientUuid = nameOrPayload.uuid ? String(nameOrPayload.uuid) : null;
     } else {
-      cleanName = nameOrPayload ? String(nameOrPayload).trim() : 'Spiller';
+      rawName = nameOrPayload ? String(nameOrPayload) : '';
     }
 
-    let existingPlayerKey = Object.keys(players).find(
-      key => players[key].name.toLowerCase() === cleanName.toLowerCase()
-    );
+    const cleanName = rawName.trim().slice(0, MAX_NAME_LENGTH);
+    if (!cleanName) {
+      socket.emit('join_failed', { reason: 'Du må skrive inn et navn.' });
+      return;
+    }
+
+    // 1) Samme telefon (UUID) -> samme spiller, uansett hva som er skrevet i navnefeltet
+    const uuidKey = clientUuid ? uuidToPlayerId.get(clientUuid) : null;
+    let existingPlayerKey = uuidKey && players[uuidKey] ? uuidKey : null;
+
+    // 2) Ellers: samme navn. Kun lov å ta over plassen hvis den spilleren er frakoblet
+    //    (f.eks. ny telefon/nettleser). Ellers kan hvem som helst se andres kort.
+    if (!existingPlayerKey) {
+      const nameKey = Object.keys(players).find(
+        key => players[key].name.toLowerCase() === cleanName.toLowerCase()
+      );
+      if (nameKey && players[nameKey].connected && nameKey !== socket.id) {
+        socket.emit('join_failed', {
+          reason: `Navnet «${players[nameKey].name}» er allerede i bruk ved bordet. Velg et annet navn.`
+        });
+        return;
+      }
+      existingPlayerKey = nameKey || null;
+    }
 
     if (existingPlayerKey) {
       const playerData = players[existingPlayerKey];
@@ -518,12 +544,8 @@ io.on('connection', (socket) => {
       playerData.connected = true;
       playerData.removeAfterHand = false;
 
-      if (clientUuid && clientUuid !== playerData.uuid) {
-        if (playerData.uuid) {
-          uuidToPlayerId.delete(playerData.uuid);
-        }
-        playerData.uuid = clientUuid;
-      }
+      // Spilleren beholder sin opprinnelige UUID (statistikken følger spilleren).
+      // Klienten får den tilbake i 'joined' og lagrer den.
       if (playerData.uuid) {
         uuidToPlayerId.set(playerData.uuid, socket.id);
       }
@@ -572,6 +594,7 @@ io.on('connection', (socket) => {
       gameState.phase = 'VENTING';
       gameState.board = [];
       gameState.winnerInfo = null;
+      gameState.winnerUuids = [];
     } else {
       randomizePlayerSeats();
     }
@@ -647,6 +670,7 @@ io.on('connection', (socket) => {
       const rawDescr = winners[0] ? winners[0].solved.descr : 'Ukjent hånd';
       const exactRankVal = winners[0] ? calculateHandScore(winners[0].solved) : 0;
 
+      gameState.winnerUuids = winners.map(w => w.player.uuid);
       gameState.winnerInfo = {
         winnerName: winnerText,
         descr: translateHandDescription(rawDescr),

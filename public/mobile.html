@@ -323,6 +323,16 @@
       switchToLogin();
     });
 
+    // Serveren avviste innloggingen (f.eks. navnet er i bruk av en annen tilkoblet spiller)
+    socket.on('join_failed', (data) => {
+      isJoined = false;
+      clearJoinTimeout();
+      const reason = (data && data.reason) ? data.reason : 'Kunne ikke bli med i spillet.';
+      setConnectionStatus('\u26A0\uFE0F ' + reason, '#f44336');
+      switchToLogin();
+      alert(reason);
+    });
+
     // N\u00E5r telefonen v\u00E5kner / fanen blir synlig igjen: koble til umiddelbart
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible' && isJoined && !socket.connected) {

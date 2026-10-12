@@ -101,3 +101,37 @@ Tiltak mot utkasting:
 Testet: syntakssjekk av mobilskript, simulert «server-omstart ->
 stille innlogging beholder UUID», reconnect med UUID, og alle
 tester fra steg 2 på nytt.
+
+------------------------------------------------------------
+2026-10-12 – Steg 3a: Identitet og statistikk (punkt 5–7)
+------------------------------------------------------------
+5. Vinner identifiseres på UUID, ikke navn
+   Før: winnerName.includes(p.name) – «Ola» fikk seieren til «Olav».
+   Nå: gameState.winnerUuids settes ved showdown/fold-seier og brukes
+   i persistHandResult. Listen holdes KUN på serveren: UUID fungerer
+   som innloggingsnøkkel (gir tilgang til kortene ved reconnect) og
+   sendes aldri ut til skjermene.
+   I tillegg: kun spillere som ble delt kort teller «hender spilt»
+   (de som venter på neste hånd telles ikke).
+
+6. UUID bestemmer hvem du er
+   - join_game sjekker UUID først: samme telefon = samme spiller,
+     uansett hva som står i navnefeltet.
+   - Spilleren beholder sin opprinnelige UUID også når hen logger
+     inn fra ny nettleser; klienten får den tilbake i 'joined'.
+
+7. Ingen kan ta over en annen spillers plass
+   - Navnet til en TILKOBLET spiller kan ikke brukes av andre ->
+     ny hendelse 'join_failed' med melding, vises på mobilen.
+   - Plassen til en FRAKOBLET spiller kan tas over med samme navn
+     (f.eks. ny telefon / tømt nettleser).
+   - Navn trimmes og kuttes til 15 tegn; tomt navn avvises.
+
+Testet mot lokal SQLite-fil (ikke Turso): Ola/Olav-statistikk,
+navnekapring avvist, tomt/langt navn, samme UUID med nytt navn,
+overtakelse av frakoblet plass, ventende spiller ikke telt,
+ingen UUID i state_update. Tidligere tester kjørt på nytt: OK.
+
+Merk: Eldre rader i player_stats kan ha flere UUID-er per spiller
+(fra før denne endringen). Dashboardet grupperer på navn, så
+totalsummene blir fortsatt riktige.
