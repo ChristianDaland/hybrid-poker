@@ -818,3 +818,21 @@ Kan enkelt rulles tilbake (git revert) om dere ikke liker det.
   på messingbokstavene så de synes mot det lysere treet.
 Testet: skjermbilder i 1280x720 og 1920x1080 (2x), forstørret
 sammenligning skilt/ramme og kontroll av skjøter i årene.
+
+------------------------------------------------------------
+2026-10-12 – Tradisjonelle bildekort på projektoren (alternativ A)
+------------------------------------------------------------
+- Knekt, dame og konge på projektoren (board.html) bruker nå
+  tradisjonelle kortbilder: «English pattern» av Dmitry Fomin
+  (Wikimedia Commons, CC0 / offentlig eiendom). Filene ligger i
+  public/cards/faces/ (f.eks. Ks.svg), kilde i KILDE.txt.
+  Sjekket for skript/eksterne lenker før bruk (ingen funnet).
+- Bildet fyller hele kortet; våre store hjørnetegn ligger oppå med
+  hvit flate som dekker originalens små hjørnetegn og fargesymbol.
+- Tallkort og ess er uendret (de tydelige symbolene beholdes).
+- Mangler en bildefil, vises den gamle enkle tegningen (onerror).
+- Statusskjerm og mobil er uendret (kortene er for små for bilder).
+Merk: Kløver konge og ruter konge ble ikke lastet ned (Wikimedia
+svarte 429 – for mange forespørsler); de viser foreløpig den gamle
+tegningen.
+Testet: skjermbilder av alle ti nedlastede bildekort + reserve.

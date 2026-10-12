@@ -165,6 +165,32 @@
       object-fit: contain;
     }
 
+    /* Bildekort (knekt, dame, konge): tradisjonelt bilde over hele kortet,
+       med våre store hjørnetegn oppå (hvit bakgrunn skjuler originalens små). */
+    .card.face-card .card-center-graphic {
+      position: absolute;
+      inset: 0;
+      width: auto;
+      height: auto;
+    }
+    .card.face-card .face-art {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      border-radius: 12px;
+    }
+    .card.face-card .face-fallback { display: none; width: 80px; height: 120px; margin: auto; }
+    .card.face-card .card-corner {
+      z-index: 2;
+      background: #fff;
+      /* Bred nok til å dekke originalens fargesymbol ved siden av hjørnet */
+      min-width: 54px;
+      padding: 4px 6px 6px 4px;
+      border-radius: 6px;
+    }
+    .card.face-card .card-corner.top-left { top: 4px; left: 4px; border-bottom-right-radius: 10px; }
+    .card.face-card .card-corner.bottom-right { bottom: 4px; right: 4px; border-bottom-right-radius: 10px; }
+
     /* Presis plassering av pips (symboler) */
     .pip-container {
       position: relative;
@@ -463,14 +489,19 @@
       };
 
       let centerHTML = '';
-      if (faceGraphics[rawVal]) {
-        centerHTML = faceGraphics[rawVal];
+      const isFace = !!faceGraphics[rawVal];
+      if (isFace) {
+        // Tradisjonelt kortbilde (public/cards/faces, CC0). Mangler filen,
+        // vises den enkle tegningen i stedet.
+        centerHTML = `<img class="face-art" src="/cards/faces/${rawVal}${suitChar}.svg" alt=""
+                          onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
+                      <div class="face-fallback">${faceGraphics[rawVal]}</div>`;
       } else {
         centerHTML = renderPips(rawVal, icon);
       }
 
       return `
-        <div class="card ${suit.color} ${isNew ? 'animate-new' : ''}" data-card="${cardCode}">
+        <div class="card ${suit.color} ${isFace ? 'face-card' : ''} ${isNew ? 'animate-new' : ''}" data-card="${cardCode}">
           <div class="card-corner top-left">
             <span class="val">${displayVal}</span>
             <span class="suit">${icon}</span>
