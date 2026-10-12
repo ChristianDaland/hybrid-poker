@@ -1330,7 +1330,13 @@ process.on('uncaughtException', (err) => {
   console.error('[UHÅNDTERT FEIL]:', err);
 });
 
-initDatabase();
-
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => console.log(`Server kjører på port ${PORT}`));
+
+// Start kun når filen kjøres direkte (node server.js). Testene kan da importere
+// funksjonene under uten at serveren starter.
+if (require.main === module) {
+  initDatabase();
+  server.listen(PORT, () => console.log(`Server kjører på port ${PORT}`));
+}
+
+module.exports = { translateHandDescription, retranslateStoredDescription, evaluatePlayerHand, calculateHandScore };

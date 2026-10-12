@@ -538,3 +538,29 @@ Testet med curl: localhost 200, LAN-adresse 403 (debug og reset),
 dashboard-API 200 fra LAN, ALLOW_REMOTE_ADMIN=1 gir 200.
 Kjent begrensning: styringshendelsene fra statusskjermen (neste fase,
 ute-markering, nytt spill osv.) er fortsatt åpne for alle tilkoblede.
+
+------------------------------------------------------------
+2026-10-12 – Automatiske tester (npm test)
+------------------------------------------------------------
+Testene som ble brukt underveis er lagt inn i prosjektet:
+- tests/helpers.js: starter en egen server per test på ledig port,
+  med midlertidig SQLite-fil (eller uten database). Turso/.env røres
+  ALDRI (TURSO_*-variablene settes tomme/til testfil).
+- tests/handevaluering.test.js: Omaha 2+3-regelen, norske
+  beskrivelser for alle håndtyper, oversettelse av gamle tekster.
+- tests/stabilitet.test.js: reconnect og rekkefølge, sen spiller,
+  showdown uten krasj, fold i showdown, dealerrotasjon, frakobling,
+  stille innlogging, tilstand ved tilkobling.
+- tests/spillogikk.test.js: heads-up, kast for frakoblet, angre kast,
+  ute/omgangsvinner/ny omgang, plassering, nytt spill.
+- tests/database.test.js: identitet/statistikk, omganger + migrering,
+  dashboard-API, personvern (kort), opprydding av gamle rader,
+  admin-endepunkter.
+Kjøres med: npm test   (25 tester, ca. 15 sek)
+Endringer for å støtte dette:
+- server.js starter kun når den kjøres direkte (require.main) og
+  eksporterer translateHandDescription, retranslateStoredDescription,
+  evaluatePlayerHand og calculateHandScore.
+- socket.io-client lagt til som devDependency (var installert, men
+  manglet i package.json/package-lock.json).
+Ikke med: nettlesertesten av kortsortering på mobil (krever Chrome).
