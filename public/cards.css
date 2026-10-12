@@ -1,16 +1,25 @@
 /* ============================================================
-   Firefarget kortstokk – lettere å skille fargene med redusert syn
-   ♠ spar = sort · ♥ hjerter = rød · ♦ ruter = blå · ♣ kløver = grønn
-   Brukes av board.html, index.html, mobile.html og dashboard.html.
+   Kortfarger og kortsymboler – felles for board.html, index.html,
+   mobile.html og dashboard.html.
+   - To farger: ♥ ♦ røde, ♠ ♣ sorte.
+   - Symbolene tegnes som SVG (suits.js) i stedet for skrifttegn,
+     med tydelige former: kløver har tre runde blader, spar har spiss
+     topp, ruter er en smal rombe. Lettere å skille med redusert syn.
    ============================================================ */
 :root {
-  --suit-spades: #111111;
-  --suit-hearts: #d32f2f;
-  --suit-diamonds: #1565c0;
-  --suit-clubs: #1b7a2e;
+  --suit-red: #d32f2f;
+  --suit-black: #111111;
 }
 
-.suit-s { color: var(--suit-spades) !important; }
-.suit-h { color: var(--suit-hearts) !important; }
-.suit-d { color: var(--suit-diamonds) !important; }
-.suit-c { color: var(--suit-clubs) !important; }
+.suit-h, .suit-d { color: var(--suit-red) !important; }
+.suit-s, .suit-c { color: var(--suit-black) !important; }
+
+/* SVG-symbol som følger skriftstørrelse og farge der det brukes */
+.suit-icon {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  fill: currentColor;
+  vertical-align: middle;
+  flex-shrink: 0;
+}

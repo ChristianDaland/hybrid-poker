@@ -679,3 +679,22 @@ spar/kløver og ruter/hjerter.
 - veiledning.html: ny seksjon «Kortfargene».
 Testet: skjermbilder av projektor, statusskjerm og dashboard med
 alle fire farger.
+
+------------------------------------------------------------
+2026-10-12 – Tilbake til rød/sort, tydeligere symboler
+------------------------------------------------------------
+Brukeren ville ikke ha blå/grønn (firefarget kortstokk tilbakestilt).
+I stedet:
+- Ny fil public/suits.js: suitIcon(farge) gir symbolet som SVG med
+  tydelige former – kløver: tre runde blader + stilk; spar: spiss topp,
+  runde skuldre + stilk; ruter: smal rombe; hjerter: to runde buer.
+  Skarpe i alle størrelser, og fyller hele plassen (skrifttegnene ♠♣
+  er små og like hverandre).
+- cards.css: kun rødt (♥ ♦) og sort (♠ ♣), pluss .suit-icon.
+- Brukt i board.html (hjørner, pips, ess), index.html, mobile.html og
+  dashboard.html. Større symboler på statusskjerm (1.8rem) og mobil
+  (2.4rem). Projektor: justert slik at pips og hjørner ikke kolliderer
+  (pips 1.15rem, hjørne 1.3rem, ess 3.4rem).
+- veiledning.html: «Kortfargene» beskriver symbolformene.
+Testet: skjermbilder av projektor (10♣, 10♠, 9♣, A♠, J♥, 8♦, 8♥, A♦,
+Q♣, K♠), statusskjerm og dashboard.

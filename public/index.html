@@ -118,9 +118,9 @@
       box-shadow: 0 3px 8px rgba(0,0,0,0.5);
       font-weight: bold;
     }
-    /* Fargene på kortene: se cards.css (firefarget kortstokk) */
+    /* Fargene og symbolene på kortene: se cards.css og suits.js */
     .card-val { font-size: 1.4rem; line-height: 1; }
-    .card-suit { font-size: 1.6rem; line-height: 1; }
+    .card-suit { font-size: 1.8rem; line-height: 1; }
 
     /* Alle spillere på én rad – kortene krymper når det er mange spillere */
     .players-container {
@@ -378,6 +378,7 @@
     <div class="version-tag">Versjon 3.0</div>
   </div>
 
+  <script src="/suits.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
@@ -476,7 +477,7 @@
       const suitChar = cardCode.slice(-1).toLowerCase();
       
       const suits = {
-        // Firefarget kortstokk (se cards.css)
+        // Røde og sorte farger (se cards.css)
         'h': { symbol: '♥', color: 'suit-h' },
         'd': { symbol: '♦', color: 'suit-d' },
         'c': { symbol: '♣', color: 'suit-c' },
@@ -484,7 +485,7 @@
       };
       
       const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
-      return `<div class="card ${suit.color}"><span class="card-val">${value}</span><span class="card-suit">${suit.symbol}</span></div>`;
+      return `<div class="card ${suit.color}"><span class="card-val">${value}</span><span class="card-suit">${suitIcon(suitChar) || suit.symbol}</span></div>`;
     }
 
     // Hindrer at navn tolkes som HTML

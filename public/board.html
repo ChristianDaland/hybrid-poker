@@ -134,7 +134,7 @@
       animation: cardFlip 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
     }
 
-    /* Fargene på kortene: se cards.css (firefarget kortstokk) */
+    /* Fargene og symbolene på kortene: se cards.css og suits.js */
 
     .card-corner {
       position: absolute;
@@ -143,12 +143,12 @@
       align-items: center;
       line-height: 1;
     }
-    .card-corner.top-left { top: 10px; left: 10px; }
-    .card-corner.bottom-right { bottom: 10px; right: 10px; transform: rotate(180deg); }
+    .card-corner.top-left { top: 8px; left: 8px; }
+    .card-corner.bottom-right { bottom: 8px; right: 8px; transform: rotate(180deg); }
 
     /* Store hjørnetegn – lettere å lese på bordet */
     .card-corner .val { font-size: 1.8rem; font-weight: bold; }
-    .card-corner .suit { font-size: 1.7rem; margin-top: 0; }
+    .card-corner .suit { font-size: 1.3rem; margin-top: 2px; line-height: 0; }
 
     .card-center-graphic {
       width: 80px;
@@ -174,7 +174,9 @@
 
     .pip {
       position: absolute;
-      font-size: 1.3rem;
+      /* SVG-symbolet fyller hele 1em (skrifttegn bare ca. 70 %) */
+      font-size: 1.15rem;
+      line-height: 0;
       transform: translate(-50%, -50%);
     }
 
@@ -204,6 +206,7 @@
     <div id="board-cards" class="cards-container"></div>
   </div>
 
+  <script src="/suits.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script>
     const socket = io();
@@ -399,7 +402,7 @@
     // Genererer tradisjonelt posisjonerte pips for tallene 2-10 og Ess
     function renderPips(rawVal, suitSymbol) {
       if (rawVal === 'A') {
-        return `<div class="pip-container"><div class="pip" style="top: 50%; left: 50%; font-size: 3rem;">${suitSymbol}</div></div>`;
+        return `<div class="pip-container"><div class="pip" style="top: 50%; left: 50%; font-size: 3.4rem;">${suitSymbol}</div></div>`;
       }
 
       const val = parseInt(rawVal === 'T' ? '10' : rawVal, 10);
@@ -442,14 +445,16 @@
       const suitChar = cardCode.slice(-1).toLowerCase();
       
       const suits = {
-        // Firefarget kortstokk (se cards.css)
+        // Røde og sorte farger (se cards.css)
         'h': { symbol: '♥', color: 'suit-h' },
         'd': { symbol: '♦', color: 'suit-d' },
         'c': { symbol: '♣', color: 'suit-c' },
         's': { symbol: '♠', color: 'suit-s' }
       };
       
-      const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
+      const suit = suits[suitChar] || { symbol: suitChar, color: 'suit-s' };
+      // Tydelig SVG-symbol (suits.js) i stedet for skrifttegn
+      const icon = suitIcon(suitChar) || suit.symbol;
 
       const faceGraphics = {
         'J': '<svg class="face-img" viewBox="0 0 100 140"><rect width="100" height="140" fill="#f8f9fa" rx="8"/><path d="M30 40 L50 20 L70 40 L60 40 L60 80 L70 80 L50 100 L30 80 L40 80 L40 40 Z" fill="#4a5568"/><circle cx="50" cy="50" r="12" fill="#e53e3e"/><path d="M40 90 Q50 80 60 90" stroke="#2b6cb0" stroke-width="4" fill="none"/><text x="50" y="125" font-size="16" font-weight="bold" text-anchor="middle" fill="#2d3748">KNEKT</text></svg>',
@@ -461,21 +466,21 @@
       if (faceGraphics[rawVal]) {
         centerHTML = faceGraphics[rawVal];
       } else {
-        centerHTML = renderPips(rawVal, suit.symbol);
+        centerHTML = renderPips(rawVal, icon);
       }
 
       return `
         <div class="card ${suit.color} ${isNew ? 'animate-new' : ''}" data-card="${cardCode}">
           <div class="card-corner top-left">
             <span class="val">${displayVal}</span>
-            <span class="suit">${suit.symbol}</span>
+            <span class="suit">${icon}</span>
           </div>
           <div class="card-center-graphic">
             ${centerHTML}
           </div>
           <div class="card-corner bottom-right">
             <span class="val">${displayVal}</span>
-            <span class="suit">${suit.symbol}</span>
+            <span class="suit">${icon}</span>
           </div>
         </div>
       `;

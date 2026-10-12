@@ -125,9 +125,9 @@
       outline: 3px solid #ffd54f;
     }
 
-    /* Fargene på kortene: se cards.css (firefarget kortstokk) */
+    /* Fargene og symbolene på kortene: se cards.css og suits.js */
     .card-val { font-size: 1.8rem; line-height: 1; }
-    .card-suit { font-size: 2.1rem; line-height: 1; }
+    .card-suit { font-size: 2.4rem; line-height: 1; }
 
     .join-box {
       margin-top: 50px;
@@ -188,6 +188,7 @@
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/nosleep/0.12.0/NoSleep.min.js"></script>
+  <script src="/suits.js"></script>
   <script src="/socket.io/socket.io.js"></script>
   <script>    const socket = io();
     let myCardsData = [];
@@ -369,7 +370,7 @@
         if (value === 'T') value = '10';
         const suitChar = cardCode.slice(-1).toLowerCase();
         const suits = {
-          // Firefarget kortstokk (se cards.css)
+          // Røde og sorte farger (se cards.css)
           'h': { symbol: '\u2665', color: 'suit-h' },
           'd': { symbol: '\u2666', color: 'suit-d' },
           'c': { symbol: '\u2663', color: 'suit-c' },
@@ -377,7 +378,7 @@
         };
         const suit = suits[suitChar] || { symbol: suitChar, color: 'black' };
         const dragClass = (idx === dragIndex) ? ' dragging' : '';
-        return '<div class="card ' + suit.color + dragClass + '"><span class="card-val">' + value + '</span><span class="card-suit">' + suit.symbol + '</span></div>';
+        return '<div class="card ' + suit.color + dragClass + '"><span class="card-val">' + value + '</span><span class="card-suit">' + (suitIcon(suitChar) || suit.symbol) + '</span></div>';
       }).join('');
     }
 

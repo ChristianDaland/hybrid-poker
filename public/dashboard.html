@@ -108,7 +108,7 @@
       font-weight: bold;
       font-size: 13px;
     }
-    /* Fargene på kortene: se cards.css (firefarget kortstokk) */
+    /* Fargene og symbolene på kortene: se cards.css og suits.js */
     .rank-1 td:first-child { color: #ffd700; font-weight: bold; }
     .rank-2 td:first-child { color: #c0c0c0; font-weight: bold; }
     .rank-3 td:first-child { color: #cd7f32; font-weight: bold; }
@@ -185,6 +185,7 @@
     </div>
   </div>
 
+  <script src="/suits.js"></script>
   <script>
     let selectedDate = todayString();
     let showAllTime = false;
@@ -226,14 +227,14 @@
 
     function miniCards(cards) {
       if (!Array.isArray(cards) || cards.length === 0) return '<span class="muted">–</span>';
-      // Firefarget kortstokk (se cards.css)
+      // Røde og sorte farger (se cards.css)
       const suits = { h: ['♥', 'suit-h'], d: ['♦', 'suit-d'], c: ['♣', 'suit-c'], s: ['♠', 'suit-s'] };
       return cards.map(c => {
         const code = String(c);
         let val = code.slice(0, -1).toUpperCase();
         if (val === 'T') val = '10';
         const [sym, color] = suits[code.slice(-1).toLowerCase()] || ['?', 'black'];
-        return `<span class="mini-card ${color}">${escapeHtml(val)}${sym}</span>`;
+        return `<span class="mini-card ${color}">${escapeHtml(val)}${suitIcon(code.slice(-1)) || sym}</span>`;
       }).join('');
     }
 
