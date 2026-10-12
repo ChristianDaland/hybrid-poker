@@ -352,3 +352,20 @@ tilkoblede telefoner får 'kicked', statusskjermen gjør ikke,
 sovende telefon slippes ikke stille inn igjen, manuell innlogging
 går fint. Alle tidligere tester OK.
 Ikke testet i ekte nettleser: selve innloggingsskjermen på mobil.
+
+------------------------------------------------------------
+2026-10-12 – Ønske 2: Endre plassering av spillere
+------------------------------------------------------------
+- Trekning av plasser ved valg av spilletype beholdes.
+- index.html: ◀ ▶ ved «Plass N» på hver spiller (vises kun mellom
+  hender). Første/siste spiller har sperret pil mot kanten.
+- server.js: ny hendelse 'host_move_player' {seat, direction}.
+  Spilleren bytter sete med naboen. Kun lov mellom hender.
+- server.js: compactSeats() – når en spiller fjernes, nummereres
+  setene om til 1..n (ingen hull som «Plass 1, 2, 4»). Dealerknappen
+  justeres slik at neste dealer blir den samme som før.
+
+Testet: flytting begge veier, sperre ved kantene og midt i hånd,
+ønsket rekkefølge satt etter trekning, dealer roterer i ny
+rekkefølge, seter nummereres om og dealer stemmer etter at en
+spiller er fjernet. Skjermbilde. Alle tidligere tester OK.

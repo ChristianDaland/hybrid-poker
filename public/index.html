@@ -127,6 +127,25 @@
       container-type: inline-size;
     }
     .role-row { min-height: 22px; }
+    .seat-row {
+      position: relative;
+      z-index: 2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      color: #ccc;
+      min-height: 22px;
+    }
+    .btn-move {
+      background: #455a64;
+      color: white;
+      padding: 1px 8px;
+      font-size: 0.75rem;
+      border-radius: 6px;
+    }
+    .btn-move:hover:not(:disabled) { background: #607d8b; }
 
     /* Spiller som er ute: dempet med stort rødt kryss */
     .player-card { position: relative; }
@@ -455,6 +474,10 @@
       if (confirm(msg)) socket.emit('host_kick_all');
     }
 
+    function movePlayer(seat, direction) {
+      socket.emit('host_move_player', { seat: seat, direction: direction });
+    }
+
     function setPlayerOut(seat, out) {
       socket.emit('host_set_out', { seat: seat, out: out });
     }
@@ -538,10 +561,16 @@
 
       const playersContainer = document.getElementById('players-list');
       playersContainer.classList.toggle('many', state.players.length > 6);
-      playersContainer.innerHTML = state.players.map(p => `
+      playersContainer.innerHTML = state.players.map((p, idx) => `
         <div class="player-card ${p.out ? 'out' : ''}">
           <div class="player-name"><strong>${escapeHtml(p.name)}</strong></div>
-          <div style="font-size: 0.8rem; color: #ccc;">Plass ${p.seat}</div>
+          <div class="seat-row">
+            ${!isRoundActive ? `<button class="btn-move" title="Flytt til venstre" ${idx === 0 ? 'disabled' : ''}
+                onclick="movePlayer(${Number(p.seat)}, -1)">◀</button>` : ''}
+            <span>Plass ${p.seat}</span>
+            ${!isRoundActive ? `<button class="btn-move" title="Flytt til høyre" ${idx === state.players.length - 1 ? 'disabled' : ''}
+                onclick="movePlayer(${Number(p.seat)}, 1)">▶</button>` : ''}
+          </div>
           <div class="role-row">${p.role ? `<span class="badge">${escapeHtml(p.role)}</span>` : ''}</div>
           <div style="font-size: 0.8rem; margin-top: 4px;">
             ${p.out ? '❌ UTE' : (p.waiting ? '⏳ VENTER PÅ NESTE HÅND' : (p.folded ? '🔴 FOLDET' : '🟢 INNE'))}

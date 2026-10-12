@@ -260,6 +260,16 @@ function removePlayer(playerId) {
   if (p.uuid && uuidToPlayerId.get(p.uuid) === playerId) {
     uuidToPlayerId.delete(p.uuid);
   }
+  compactSeats();
+}
+
+// Nummererer setene 1..n uten hull (rekkefølgen beholdes) etter at noen har gått.
+// Dealerknappen flyttes med, så neste dealer blir den samme som før.
+function compactSeats() {
+  const seated = getSeatedPlayers();
+  const oldDealerSeat = gameState.dealerSeat;
+  gameState.dealerSeat = seated.filter(p => p.seat <= oldDealerSeat).length;
+  seated.forEach((p, idx) => { p.seat = idx + 1; });
 }
 
 // Fjerner spillere som har vært frakoblet for lenge, men ventet til hånden var ferdig
@@ -945,6 +955,24 @@ io.on('connection', (socket) => {
     currentSessionId = null;
 
     console.log('[SPILL] Nytt spill – alle spillere er kastet ut.');
+    updateAll();
+  }));
+
+  // Dealeren flytter en spiller ett sete til venstre (-1) eller høyre (+1).
+  // Kun lov mellom hender. Spilleren bytter plass med naboen.
+  socket.on('host_move_player', safeHandler('host_move_player', async (data) => {
+    if (isHandInProgress()) return;
+    const seat = data && Number(data.seat);
+    const direction = data && Number(data.direction);
+    if (direction !== -1 && direction !== 1) return;
+
+    const seated = getSeatedPlayers();
+    const idx = seated.findIndex(p => p.seat === seat);
+    const neighbour = seated[idx + direction];
+    if (idx === -1 || !neighbour) return;
+
+    const player = seated[idx];
+    [player.seat, neighbour.seat] = [neighbour.seat, player.seat];
     updateAll();
   }));
 
