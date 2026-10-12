@@ -708,3 +708,19 @@ Tallene så små ut i forhold til de nye SVG-symbolene.
   opptil 1.6rem (skalerer med plassen).
 - mobile.html: tall 2.3rem (var 1.8), symbol 2rem (var 2.4).
 Testet: skjermbilder av statusskjerm (5 spillere, Omaha) og mobil.
+
+------------------------------------------------------------
+2026-10-12 – Mobil i liggende modus
+------------------------------------------------------------
+Problem: I liggende modus (iPhone, ca. 330 px høyde etter Safari sine
+linjer) ble kortene kuttet nederst.
+Fiks (mobile.html, @media landscape og maks 520 px høy):
+- Fase, fold-knapp og rolle på én linje; tilkoblingsstatus liten øverst.
+- Forklaringsteksten skjules (vises fortsatt i stående modus).
+- Kortfeltet fyller resten av høyden (100dvh – Safari-vennlig), og
+  kortene skaleres etter høyden (maks 240 px) – større enn i stående.
+- Tall og symbol skalerer med høyden.
+- #game-screen styres nå av CSS (JS setter display '' i stedet for
+  'block'), så liggende oppsett kan bruke flex.
+Testet i Chrome (mobilemulering): 926x330 og 667x290 liggende og
+375x700 stående – kortene er helt synlige; dra-og-slipp-testen OK.
