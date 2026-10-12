@@ -35,7 +35,17 @@
       max-width: 900px;
       box-shadow: 0 4px 15px rgba(0,0,0,0.5);
       animation: pulse 1.5s infinite alternate;
+      /* Fast plass hele tiden (skjules med visibility), og alltid én linje,
+         så innholdet under ikke flytter seg når vinneren vises */
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      line-height: 1.8rem;
+      height: calc(1.8rem + 24px);
     }
+    .winner-banner.empty { visibility: hidden; animation: none; }
+    /* Lang tekst (f.eks. delt pott med lange navn): mindre skrift i stedet for å kuttes */
+    .winner-banner.long { font-size: 1.1rem; }
 
     @keyframes pulse {
       0% { transform: scale(0.98); }
@@ -297,19 +307,6 @@
     .btn-change-mode { background-color: #607d8b; color: white; }
     .btn-action { background-color: #4caf50; color: white; }
 
-    /* «Start ny hånd» oppe til høyre, under den store blå knappen */
-    .btn-start-hand {
-      background: linear-gradient(135deg, #43a047, #2e7d32);
-      color: white;
-      font-size: 1.05rem;
-      width: 100%;
-      min-height: 60px;
-      border-radius: 14px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.4);
-      align-items: center;
-      justify-content: center;
-    }
-    .btn-start-hand:hover { background: linear-gradient(135deg, #4caf50, #388e3c); }
     .btn-help { background-color: #009688; color: white; }
     .btn-dashboard { background-color: #d84315; color: white; }
     .btn-dashboard:hover { background-color: #bf360c; }
@@ -358,13 +355,16 @@
       transform: scale(1.02);
       background: linear-gradient(135deg, #2196f3, #1e88e5);
     }
+    /* Samme knapp, grønn når den starter første hånd */
+    .btn-next-large.start-mode { background: linear-gradient(135deg, #43a047, #2e7d32); }
+    .btn-next-large.start-mode:hover:not(:disabled) { background: linear-gradient(135deg, #4caf50, #388e3c); }
   </style>
 </head>
 <body class="felt-dark">
 
   <h1>Løland Gård Poker</h1>
 
-  <div id="winner-banner" class="winner-banner" style="display: none;"></div>
+  <div id="winner-banner" class="winner-banner empty">&nbsp;</div>
 
   <div class="main-layout">
     <div class="poker-table">
@@ -382,11 +382,8 @@
         <div id="qr-url" class="qr-url"></div>
       </div>
 
-      <!-- 2. Stor, høy knapp for neste fase/kort -->
-      <button id="btn-next-phase" class="btn-next-large" onclick="nextPhase()" style="display: none;">Åpne Flopp</button>
-
-      <!-- 3. Start ny hånd – vises kun når den kan brukes -->
-      <button id="btn-start-hand" class="btn-start-hand" onclick="startNewHand()" style="display: none;">▶ Start Ny Hånd</button>
+      <!-- 2. Stor, høy knapp: «Start Ny Hånd» (grønn) før første hånd, ellers neste fase/kort (blå) -->
+      <button id="btn-next-phase" class="btn-next-large" onclick="bigButtonClick()" style="display: none;">Åpne Flopp</button>
     </div>
   </div>
 
@@ -541,6 +538,12 @@
     function startNewHand() { socket.emit('start_new_hand'); }
     function nextPhase() { socket.emit('next_phase'); }
 
+    // Den store knappen: før første hånd starter den hånden, ellers neste fase
+    function bigButtonClick() {
+      if (lastState && lastState.phase === 'VENTING') startNewHand();
+      else nextPhase();
+    }
+
     // Dealeren kaster kortene for en frakoblet spiller, så hånden ikke blir hengende
     let lastState = null;
     function kickAllPlayers() {
@@ -583,7 +586,6 @@
       const gameControls = document.getElementById('game-controls');
       const gameInfo = document.getElementById('game-info');
       const changeModeBtn = document.getElementById('btn-change-mode');
-      const startHandBtn = document.getElementById('btn-start-hand');
       const nextBtn = document.getElementById('btn-next-phase');
 
       const isRoundActive = ['PREFLOP', 'FLOP', 'TURN', 'RIVER'].includes(state.phase);
@@ -596,17 +598,14 @@
       } else {
         modeSelection.style.display = 'none';
         gameControls.style.display = 'flex';
-        // Den store knappen har ingen funksjon før første hånd (VENTING) – da brukes «Start ny hånd»
-        nextBtn.style.display = state.phase === 'VENTING' ? 'none' : 'flex';
+        nextBtn.style.display = 'flex';
         gameInfo.innerText = `Modus: ${state.gameMode} | Fase: ${state.phase}`;
       }
 
       changeModeBtn.disabled = isRoundActive;
-      // «Start ny hånd» vises kun før første hånd. Etter showdown gjør den blå
-      // «Ny Runde»-knappen det samme, så da vises bare den.
-      const canStartHand = !!state.gameMode && state.phase === 'VENTING' && !state.roundWinner;
-      startHandBtn.style.display = canStartHand ? 'flex' : 'none';
       nextBtn.disabled = !!state.roundWinner;
+      // Grønn «Start Ny Hånd» før første hånd, ellers blå
+      nextBtn.classList.toggle('start-mode', state.phase === 'VENTING');
       document.getElementById('btn-reset-out').style.display =
         state.players.some(p => p.out) && !isRoundActive ? 'inline-block' : 'none';
 
@@ -623,19 +622,21 @@
       } else if (state.phase === 'FINISHED') {
         nextBtn.innerText = 'Ny Runde';
       } else {
-        nextBtn.innerText = 'Neste Fase';
+        nextBtn.innerText = '▶ Start Ny Hånd';
       }
 
       const banner = document.getElementById('winner-banner');
       if (state.roundWinner) {
         banner.innerHTML = `🏆 ${escapeHtml(state.roundWinner)} HAR VUNNET OMGANGEN! 🏆`;
-        banner.style.display = 'block';
+        banner.classList.remove('empty');
       } else if (state.winnerInfo) {
         banner.innerHTML = `🏆 VINNER: ${escapeHtml(state.winnerInfo.winnerName)} (${escapeHtml(state.winnerInfo.descr)})`;
-        banner.style.display = 'block';
+        banner.classList.remove('empty');
       } else {
-        banner.style.display = 'none';
+        banner.innerHTML = '&nbsp;';
+        banner.classList.add('empty');
       }
+      banner.classList.toggle('long', banner.innerText.length > 55);
 
       const boardContainer = document.getElementById('board-cards');
       boardContainer.innerHTML = state.board.map(c => formatCard(c)).join('');

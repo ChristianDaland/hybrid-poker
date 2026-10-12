@@ -753,3 +753,19 @@ index.html:
 - «Kast kort for spilleren» og «Ute» beholder farge og er klikkbare.
 - Normal visning igjen så snart mobilen kobler seg til.
 Testet: skjermbilde med én frakoblet spiller midt i en hånd.
+
+------------------------------------------------------------
+2026-10-12 – Fast plass til vinnerteksten, én stor knapp
+------------------------------------------------------------
+index.html:
+- Vinnerbanneret har fast plass og høyde hele tiden (skjules med
+  visibility, ikke display), alltid én linje. Innholdet under flytter
+  seg ikke lenger når vinneren vises/forsvinner. Lang tekst (>55 tegn,
+  f.eks. delt pott) får mindre skrift i stedet for å kuttes.
+- «Start Ny Hånd» er slått sammen med den store knappen: før første
+  hånd er den grønn «▶ Start Ny Hånd» (start_new_hand), ellers blå
+  med «Åpne Flopp / Turn / River / Vis Vinner / Ny Runde»
+  (next_phase). Samme størrelse og plass hele tiden.
+Testet i Chrome: bordet står på samme plass (top 128) i VENTING,
+PREFLOP og SHOWDOWN; knappen 160x140 på samme plass i alle faser;
+klikk på grønn knapp starter hånden og den blir blå «Åpne Flopp».
