@@ -32,21 +32,13 @@
       margin: 0 0 12px 0;
       padding: 6px 54px 4px 54px;
       border-radius: 10px;
-      border: 2px solid #2b1a0e;
-      background:
-        /* Messingskruer til venstre og høyre */
-        radial-gradient(circle at 20px 50%, #fff2b8 0 2px, #e2b64a 2.5px 5px, #7a5612 5.5px 6.5px, transparent 7px),
-        radial-gradient(circle at calc(100% - 20px) 50%, #fff2b8 0 2px, #e2b64a 2.5px 5px, #7a5612 5.5px 6.5px, transparent 7px),
-        /* Lys fra lampa over bordet */
-        radial-gradient(ellipse at 50% 0%, rgba(255, 220, 160, 0.18), transparent 70%),
-        /* Fin struktur i treet */
-        var(--felt-noise),
-        /* Årer i treet */
-        repeating-linear-gradient(178deg, rgba(0,0,0,0.10) 0 1px, transparent 1px 6px, rgba(255,255,255,0.05) 6px 7px, transparent 7px 11px),
-        repeating-linear-gradient(182deg, rgba(0,0,0,0.07) 0 2px, transparent 2px 15px),
-        /* Grunnfarge (samme tre som bordrammen) */
-        linear-gradient(180deg, #8a5a32 0%, #6a3f1e 40%, #4e2d14 100%);
-      background-size: auto, auto, auto, 240px 240px, auto, auto, auto;
+      border: 2px solid #4a2c12;
+      /* Messingskruer + eiketre (samme treverk som bordrammen, se felt.css) */
+      background-image:
+        radial-gradient(circle at 20px 50%, #fff2b8 0 2px, #e2b64a 2.5px 5px, #6a4a10 5.5px 6.5px, transparent 7px),
+        radial-gradient(circle at calc(100% - 20px) 50%, #fff2b8 0 2px, #e2b64a 2.5px 5px, #6a4a10 5.5px 6.5px, transparent 7px),
+        var(--oak-image);
+      background-size: auto, auto, var(--oak-size);
       box-shadow:
         inset 0 1px 0 rgba(255, 230, 190, 0.35),
         inset 0 -2px 4px rgba(0, 0, 0, 0.5),
@@ -66,7 +58,8 @@
       background-clip: text;
       color: transparent;
       /* Preget effekt: mørk skygge under bokstavene */
-      filter: drop-shadow(0 2px 0 rgba(40, 20, 5, 0.9)) drop-shadow(0 0 6px rgba(0, 0, 0, 0.35));
+      /* Mørk kontur + skygge, så messingen synes godt mot det lysere eiketreet */
+      filter: drop-shadow(0 0 1px rgba(30, 14, 2, 0.95)) drop-shadow(0 2px 0 rgba(40, 20, 5, 0.9)) drop-shadow(0 0 6px rgba(0, 0, 0, 0.4));
     }
 
     .winner-banner {
@@ -108,14 +101,16 @@
 
     .poker-table {
       flex: 1;
-      /* Filtduk innenfor en treramme (rammen er bakgrunnen i border-området) */
-      border: 16px solid transparent;
-      background:
-        var(--felt-light) padding-box,
-        var(--felt-noise) padding-box,
-        linear-gradient(var(--felt-color), var(--felt-color)) padding-box,
-        linear-gradient(145deg, #8a5a32 0%, #5a3519 35%, #3b2210 65%, #6e4423 100%) border-box;
-      background-size: 100% 100%, 240px 240px, auto, auto;
+      /* Filtduk innenfor en ramme i eik (samme treverk som tittelskiltet, se felt.css) */
+      border: 22px solid transparent;
+      background-image:
+        var(--felt-light),
+        var(--felt-noise),
+        linear-gradient(var(--felt-color), var(--felt-color)),
+        var(--oak-image);
+      background-clip: padding-box, padding-box, padding-box, border-box, border-box, border-box, border-box;
+      background-origin: padding-box, padding-box, padding-box, border-box, border-box, border-box, border-box;
+      background-size: 100% 100%, 240px 240px, auto, var(--oak-size);
       border-radius: 80px;
       padding: 15px 30px;
       min-height: 300px;
@@ -123,7 +118,8 @@
       box-shadow:
         inset 0 0 0 2px rgba(0,0,0,0.6),
         inset 0 0 50px rgba(0,0,0,0.5),
-        0 0 0 2px #24140a,
+        0 0 0 2px #4a2c12,
+        0 -1px 0 3px rgba(255, 230, 190, 0.18),
         0 12px 30px rgba(0,0,0,0.6);
     }
 

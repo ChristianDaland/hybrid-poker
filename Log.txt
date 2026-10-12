@@ -797,3 +797,24 @@ index.html:
   gamle tittelen.
 Testet: skjermbilder i 1280x720 og 1920x1080.
 Kan enkelt rulles tilbake (git revert) om dere ikke liker det.
+
+------------------------------------------------------------
+2026-10-12 – Eiketre på tittelskilt og bordramme
+------------------------------------------------------------
+Ønske: mer eikepreg, og samme treverk på skiltet og rammen rundt bordet.
+- felt.css: felles eiketre (--oak-image / --oak-size):
+  * lange, ujevne årer: SVG feTurbulence strukket vannrett
+    (baseFrequency 0.0025 x 0.1), mørkbrune striper via fargematrise
+  * fine linjer i lengderetningen (to repeating-linear-gradients med
+    litt ulik vinkel)
+  * jevn gyllenbrun eikefarge #a8743f
+  * flisen er 2400x600 px, så årene ikke får synlige skjøter
+    (600 px-flis ga tydelige hopp).
+- Lys og skygge legges på med box-shadow (fast størrelse), ikke
+  gradient i prosent av høyden – derfor får skiltet og rammen nøyaktig
+  samme farge selv om de er ulikt store.
+- index.html: bordrammen bruker eiketreet (22 px bred, var 16 px),
+  tittelskiltet bruker samme eiketre + messingskruer; mørkere kontur
+  på messingbokstavene så de synes mot det lysere treet.
+Testet: skjermbilder i 1280x720 og 1920x1080 (2x), forstørret
+sammenligning skilt/ramme og kontroll av skjøter i årene.
