@@ -646,3 +646,22 @@ spør om passord, avviser feil, viser data med riktig.
   ikke opp bordet, kun kortene vises (best på et ekte filtbord).
   Valget huskes i nettleseren (localStorage board_bg).
 Testet: skjermbilder av statusskjerm og projektorvisning i 1600x900.
+
+------------------------------------------------------------
+2026-10-12 – Projektorvisning: kun kortene synlige
+------------------------------------------------------------
+board.html:
+- Fullskjerm: dobbeltklikk, tasten F eller knapp i innstillingene.
+  Skjuler adresselinje, faner og oppgavelinje. (Nettleseren krever
+  et klikk/tastetrykk før fullskjerm. Esc avslutter.)
+- Innstillingene (kortstørrelse, bakgrunn, fullskjerm) er skjult.
+  Klikk på skjermen viser dem i 4 sek; de blir værende så lenge
+  musa er over dem.
+- Musepekeren skjules etter 2 sek uten bevegelse.
+- Tastatur: + / - størrelse, 0 nullstill, B bakgrunn, F fullskjerm.
+- Hint ved åpning: «Dobbeltklikk (eller F) for fullskjerm · klikk for
+  innstillinger» (forsvinner etter 6 sek).
+Testet i Chrome (DevTools-protokollen): innstillinger synlige ved
+åpning og skjult etter 4 sek, klikk viser dem, forblir synlige med
+musa over, peker skjules i ro, + øker størrelsen, dobbeltklikk gir
+fullskjerm. Skjermbilder med og uten innstillinger.

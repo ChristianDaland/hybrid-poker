@@ -38,7 +38,35 @@
       gap: 8px;
       font-size: 0.85rem;
       z-index: 10;
+      /* Skjult til man klikker på skjermen */
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
     }
+    .zoom-controls.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* Musepekeren skjules når musa står i ro (ingen pil på bordet) */
+    body.hide-cursor, body.hide-cursor * { cursor: none !important; }
+
+    /* Kort hint når siden åpnes */
+    .hint {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.65);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 0.9rem;
+      z-index: 10;
+      transition: opacity 0.6s ease;
+      pointer-events: none;
+    }
+    .hint.hidden { opacity: 0; }
 
     .zoom-btn {
       background: #1e88e5;
@@ -156,8 +184,8 @@
 </head>
 <body class="felt">
 
-  <!-- Zoom-kontroll -->
-  <div class="zoom-controls">
+  <!-- Innstillinger: skjult til man klikker på skjermen -->
+  <div id="zoom-controls" class="zoom-controls">
     <span>Kortstørrelse:</span>
     <button class="zoom-btn" onclick="adjustZoom(-0.1)">-</button>
     <span id="zoom-val">100%</span>
@@ -165,7 +193,10 @@
     <button class="zoom-btn" style="width: auto; padding: 0 8px; border-radius: 10px; font-size: 0.75rem;" onclick="resetZoom()">Nullstill</button>
     <span style="margin-left: 8px;">Bakgrunn:</span>
     <button id="bg-toggle" class="zoom-btn" style="width: auto; padding: 0 8px; border-radius: 10px; font-size: 0.75rem;" onclick="toggleBackground()">Filt</button>
+    <button id="fs-toggle" class="zoom-btn" style="width: auto; padding: 0 8px; border-radius: 10px; font-size: 0.75rem; margin-left: 8px;" onclick="toggleFullscreen()">⛶ Fullskjerm</button>
   </div>
+
+  <div id="hint" class="hint">Dobbeltklikk (eller F) for fullskjerm · klikk for innstillinger</div>
 
   <!-- Kortområde som skaleres -->
   <div id="board-wrapper" class="board-wrapper">
@@ -283,6 +314,86 @@
     }
 
     applyBackground();
+
+    // ------------------------------------------------------------
+    // Projektorvisning: kun kortene skal synes.
+    // - Fullskjerm (dobbeltklikk / F / knapp) skjuler adresselinje og oppgavelinje.
+    //   Nettleseren krever et klikk eller tastetrykk før fullskjerm kan slås på.
+    // - Innstillingene vises i 4 sek etter et klikk (og så lenge musa er over dem).
+    // - Musepekeren skjules når musa står i ro.
+    // ------------------------------------------------------------
+    const controls = document.getElementById('zoom-controls');
+    let controlsTimer = null;
+    let cursorTimer = null;
+    let hoveringControls = false;
+
+    function showControls() {
+      controls.classList.add('visible');
+      clearTimeout(controlsTimer);
+      controlsTimer = setTimeout(() => {
+        if (!hoveringControls) controls.classList.remove('visible');
+      }, 4000);
+    }
+
+    controls.addEventListener('mouseenter', () => { hoveringControls = true; });
+    controls.addEventListener('mouseleave', () => { hoveringControls = false; showControls(); });
+
+    function wakeCursor() {
+      document.body.classList.remove('hide-cursor');
+      clearTimeout(cursorTimer);
+      cursorTimer = setTimeout(() => {
+        if (!hoveringControls) document.body.classList.add('hide-cursor');
+      }, 2000);
+    }
+
+    function isFullscreen() {
+      return !!(document.fullscreenElement || document.webkitFullscreenElement);
+    }
+
+    function toggleFullscreen() {
+      try {
+        if (isFullscreen()) {
+          (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+        } else {
+          const el = document.documentElement;
+          const req = el.requestFullscreen || el.webkitRequestFullscreen;
+          const res = req && req.call(el);
+          if (res && typeof res.catch === 'function') res.catch(() => {});
+        }
+      } catch (e) { /* fullskjerm ikke støttet – ignorer */ }
+    }
+
+    function updateFullscreenButton() {
+      document.getElementById('fs-toggle').innerText = isFullscreen() ? '⛶ Avslutt fullskjerm' : '⛶ Fullskjerm';
+    }
+    document.addEventListener('fullscreenchange', updateFullscreenButton);
+    document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+
+    // Klikk på skjermen (utenfor innstillingene) viser innstillingene
+    document.addEventListener('click', (e) => {
+      if (!controls.contains(e.target)) showControls();
+      wakeCursor();
+    });
+    document.addEventListener('dblclick', (e) => {
+      if (!controls.contains(e.target)) toggleFullscreen();
+    });
+    document.addEventListener('mousemove', wakeCursor);
+
+    // Tastatur: F = fullskjerm, + / - = størrelse, 0 = nullstill, B = bakgrunn
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const k = e.key.toLowerCase();
+      if (k === 'f') toggleFullscreen();
+      else if (k === '+' || k === '=') { adjustZoom(0.1); showControls(); }
+      else if (k === '-') { adjustZoom(-0.1); showControls(); }
+      else if (k === '0') { resetZoom(); showControls(); }
+      else if (k === 'b') { toggleBackground(); showControls(); }
+    });
+
+    // Ved åpning: hint og innstillinger vises en kort stund
+    showControls();
+    wakeCursor();
+    setTimeout(() => document.getElementById('hint').classList.add('hidden'), 6000);
 
     // Genererer tradisjonelt posisjonerte pips for tallene 2-10 og Ess
     function renderPips(rawVal, suitSymbol) {
