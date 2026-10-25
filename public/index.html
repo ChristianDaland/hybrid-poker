@@ -289,18 +289,6 @@
       z-index: 5;
     }
     .visning.vis { display: flex; animation: visning-inn 0.35s ease-out both; }
-    /* Et klikk skjuler visningen, så dealeren kommer til setene mellom hender */
-    .visning-hint {
-      position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 150px;
-      font-size: 20px;
-      color: var(--tekst-dempet);
-      opacity: 0;
-      transition: opacity 0.25s ease;
-    }
-    body.mus-aktiv .visning-hint { opacity: 1; }
     @keyframes visning-inn {
       from { opacity: 0; transform: scale(0.96); }
       to { opacity: 1; transform: scale(1); }
@@ -821,7 +809,9 @@
     const skjulteVisninger = new Set();
     const visningsNokler = {};
     function visningsNokkel(id, state) {
-      return [id, state.roundNumber, state.handNumber, state.phase, state.roundWinner || ''].join('|');
+      // Omgangsvisningen følger vinneren; de andre følger hånden og fasen
+      const del = id === 'visning-omgang' ? [state.roundWinner] : [state.handNumber, state.phase];
+      return [id, state.roundNumber, ...del].join('|');
     }
 
     function settVisning(id, html) {
@@ -829,7 +819,6 @@
       if (html !== null && lastState) {
         visningsNokler[id] = visningsNokkel(id, lastState);
         if (skjulteVisninger.has(visningsNokler[id])) html = null;
-        else html += '<div class="visning-hint">Klikk for å se bordet</div>';
       }
       const synlig = html !== null;
       if (synlig && el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
@@ -921,12 +910,19 @@
         </div>`).join('');
     }
 
-    ['visning-showdown', 'visning-kastet', 'visning-omgang'].forEach(id => {
-      document.getElementById(id).addEventListener('click', () => {
-        if (!visningsNokler[id]) return;
-        skjulteVisninger.add(visningsNokler[id]);
-        tegnVisninger(lastState);
-      });
+    // Vinnervisningene, øverste først. «Tilbake til bordet» (hovedknappen eller et
+    // klikk på visningen) skjuler dem, så dealeren kan markere ute / flytte før ny hånd.
+    const RESULTATVISNINGER = ['visning-omgang', 'visning-showdown', 'visning-kastet'];
+    const aapenResultatvisning = () =>
+      RESULTATVISNINGER.find(id => document.getElementById(id).classList.contains('vis'));
+    function tilbakeTilBordet(id) {
+      if (!id || !visningsNokler[id]) return;
+      skjulteVisninger.add(visningsNokler[id]);
+      tegnVisninger(lastState);
+      tegnKontroller(lastState);
+    }
+    RESULTATVISNINGER.forEach(id => {
+      document.getElementById(id).addEventListener('click', () => tilbakeTilBordet(id));
     });
 
     function tegnVisninger(state) {
@@ -977,6 +973,9 @@
     }
 
     function hovedSteg(state) {
+      // Ny hånd startes først fra bordet, ikke fra vinnervisningen
+      const visning = aapenResultatvisning();
+      if (visning) return { tekst: 'Tilbake til bordet', handling: () => tilbakeTilBordet(visning) };
       if (state.roundWinner) return { tekst: 'Start ny omgang', handling: () => { ventPaNyOmgang = true; socket.emit('host_reset_out'); } };
       switch (state.phase) {
         case 'PREFLOP': return { tekst: 'Del flop', handling: () => socket.emit('next_phase') };

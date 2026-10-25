@@ -1095,3 +1095,23 @@ Fiks (valgt av brukeren):
 Testet i headless Chromium: kast for tilkoblet spiller, showdown
 klikket bort, flytt og marker ute mellom hender, ny hånd viser
 visningene igjen. npm test 29/29.
+
+------------------------------------------------------------
+2026-10-25 – «Tilbake til bordet» før ny hånd
+------------------------------------------------------------
+Brukerønske: Fra vinnervisningen skal man ikke kunne starte ny hånd,
+bare gå tilbake til bordet. Ny hånd startes fra bordet – oversiktlig,
+og lett å markere noen som ute først.
+index.html:
+- Mens showdown-, «alle kastet seg»- eller omgang-avgjort-visningen
+  vises, er hovedknappen «Tilbake til bordet» (skjuler den øverste
+  visningen). Et klikk på visningen gjør det samme. Teksten «Klikk for
+  å se bordet» er fjernet.
+- Rettet: nøkkelen for bortklikkede visninger inneholdt omgangsvinneren,
+  så showdown dukket opp igjen når omgangen ble avgjort. Showdown og
+  «alle kastet seg» følger nå hånd og fase, omgangsvisningen vinneren.
+Veiledning og spesifikasjon oppdatert.
+Testet i headless Chromium: showdown -> Tilbake til bordet -> Start ny
+hånd; marker to ute -> omgang avgjort -> Tilbake til bordet -> Start ny
+omgang (omgang 2, hånd 1); alle kastet seg -> Tilbake til bordet.
+npm test 29/29.
