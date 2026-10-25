@@ -1047,3 +1047,16 @@ også når dealer/neste dealer ble markert ute. npm test 29/29.
   bordet). Zoom, fullskjerm og hint ved åpning er uendret.
 Testet: skjermbilder i headless Chromium (DevTools) av river med
 bildekort (hjerter konge), snu-animasjon og konfetti. npm test 29/29.
+
+------------------------------------------------------------
+2026-10-25 – Nytt design, steg 7: dokumentasjon
+------------------------------------------------------------
+- Spesifikasjonen: ny seksjon 5b (statustavle, kontroller, projektor),
+  nye filer (css/tema.css, fonts/), CRLF også i board.html, kjente
+  begrensninger oppdatert (kun QR-kode og NoSleep fra CDN; MAKS_SPILLERE
+  i index.html må følge MAX_PLAYERS).
+- veiledning.html (CRLF beholdt): plass til 8 spillere / fullt bord,
+  QR-koden i lobbyen, «Frakoblet»-merket, ny seksjon om tavlen (seter,
+  brikker, statuser), «For dealeren – musa» (gullknappen, setemenyen,
+  tannhjulet, Angre ute), projektoren uten bakgrunnsvalg.
+Testet: npm test 29/29.

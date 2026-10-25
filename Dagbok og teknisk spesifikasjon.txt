@@ -1,6 +1,6 @@
 ============================================================
 HYBRID POKER – TEKNISK SPESIFIKASJON
-Sist oppdatert: 12. oktober 2026
+Sist oppdatert: 25. oktober 2026
 ============================================================
 Endringshistorikk (hva, hvorfor, hvordan testet): se Log.txt.
 Eldre versjon av dette dokumentet: se git-historikken.
@@ -15,8 +15,8 @@ Eldre versjon av dette dokumentet: se git-historikken.
   test – den ekte Turso-databasen røres aldri.)
 - Start serveren:   npm start   (port 3000, eller PORT=...)
 - Kommentarer og tekster på norsk. Vanilla JS, ingen rammeverk.
-- index.html og veiledning.html har CRLF-linjeskift (Windows) –
-  behold dem ved redigering.
+- index.html, board.html og veiledning.html har CRLF-linjeskift
+  (Windows) – behold dem ved redigering.
 - Prinsipp: kort som ikke ble vist ved bordet skal ALDRI lagres
   eller vises noe sted (en spiller kan ha bløffet).
 - Prinsipp: spiller-UUID fungerer som innloggingsnøkkel og skal
@@ -37,8 +37,10 @@ statistikk.
 
 Filer:
   server.js                 All spillogikk, Socket.IO, API, database
-  public/index.html         Statusskjerm + dealerens kontrollpanel
-  public/board.html         Projektorvisning (kun fellesskort, zoom)
+  public/index.html         Statustavle + dealerens kontroller (mus)
+  public/board.html         Projektorvisning (kun fellesskort, svart, zoom)
+  public/css/tema.css       Felles designsystem: farger, kort, markører
+  public/fonts/             Inter og Cinzel (lokale, OFL-lisens)
   public/mobile.html        Spillerens telefon
   public/dashboard.html     Statistikk: dag + all time topp 10
   public/database.html      Databaseinspektør (kun fra servermaskinen)
@@ -128,6 +130,33 @@ Det spilles 3–8 omganger per kveld. En omgang varer til alle unntatt
   oppstart (ended_at = siste aktivitet, ingen vinner = «avbrutt»).
 
 ============================================================
+5b. STATUSTAVLE, KONTROLLER OG PROJEKTOR (design okt. 2026)
+============================================================
+Skjermen står på høyre kortside av et avlangt bord og leses fra
+2–3 meter. Dealeren har musa og sender den videre hver hånd.
+index.html:
+- Fast scene 1920 x 1080 skalert til vinduet (fitScene). Topplinje
+  (logo, fasespor, «Omgang N», «X av Y med», liten QR), bordet,
+  fellesskort (fem plasser), «Pot-Limit Omaha · Hånd N».
+- Seter: konstanten PLASSER gir setets og markørenes plass for 1–8
+  spillere. Sete 1 nede nærmest skjermen, så med klokka; høyre
+  kortside tom. Speilvend der om det ikke stemmer med bordet.
+- Statuser på lysstyrke (I hånden / Kastet / Med fra neste hånd /
+  Ute / Vinner) + «Frakoblet»-merke. D/SB/BB som brikker på filten.
+- Kontroller vises bare ved musebevegelse (skjules etter 5 sek med
+  pekeren, ikke mens en meny er åpen): hovedknapp med neste steg,
+  pille «Dealer: X» / «Send musa til X», setemeny (kast for frakoblet
+  spiller, ute, flytt) og «Flere valg» (spilletype, ny omgang, lenker,
+  nytt spill med bekreftelse). Bare eksisterende hendelser brukes;
+  serveren håndhever reglene.
+- Fullskjermvisninger: showdown (vinnerkort + de andres hender
+  sortert etter handRank), alle andre kastet seg (ingen kort), omgang
+  avgjort (CSS-konfetti), lobby (stor QR + innloggede spillere).
+board.html: helt svart, hvite kort med sterk kontrast, tradisjonelle
+  bildekort, samme snu-animasjon, CSS-konfetti ved avgjort omgang.
+Mobilen og dashboardet har fortsatt gammelt design (senere runde).
+
+============================================================
 6. SOCKET.IO-HENDELSER
 ============================================================
 Klient -> server (spiller):
@@ -207,7 +236,10 @@ API:
   tilgangskontroll – alle tilkoblede kan i prinsippet sende dem.
 - Ingen sjetong-/pottberegning (fysiske sjetonger).
 - Kun ett bord.
-- Feiringen (konfetti) og NoSleep lastes fra CDN – krever internett.
+- QR-koden (qrcodejs) og NoSleep på mobilen lastes fra CDN – krever
+  internett. Konfetti og fonter er lokale.
+- MAKS_SPILLERE (8) står også i index.html (lobbyteksten); endres
+  MAX_PLAYERS på serveren, bør den følge med.
 - Kortsorteringen på mobil er testet i Chrome (DevTools-protokollen),
   ikke i den automatiske testpakken.
 - Statistikk grupperes på navn (eldre rader kan ha flere UUID-er per
