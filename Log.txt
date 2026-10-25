@@ -1026,3 +1026,24 @@ Testet i headless Chromium (DevTools): lobby tom og med 5 spillere,
 showdown med og uten kontroller, alle kastet seg, omgang avgjort med
 konfetti. «Send musa til X» stemte med faktisk dealer over 6 hender,
 også når dealer/neste dealer ble markert ute. npm test 29/29.
+
+------------------------------------------------------------
+2026-10-25 – Nytt design, steg 6: projektoren (board.html)
+------------------------------------------------------------
+- Alltid helt svart bakgrunn (#000). Bryteren filt/svart (knapp og
+  tasten B) er fjernet – svart synes nesten ikke på bordet, så kortene
+  ser ut som de ligger på filten.
+- Kortflate helt hvit, rødt #D0101E og svart #000 for maksimal kontrast.
+  Skyggen under kortene er fjernet (synes ikke på svart).
+- Tradisjonelle bildekort (knekt/dame/konge) og symbolene på tallkortene
+  er beholdt, som avtalt med brukeren. Ingen tomme plasser for kort som
+  ikke er delt.
+- Nye kort snus inn med samme animasjon som på statusskjermen
+  (tema.css: rotateY 85° -> 0°, 0,45 s).
+- Avgjort omgang: kun konfetti (70 CSS-rektangler i 6 sek, uten tekstboks
+  og uten konfettibibliotek fra CDN – virker uten internett).
+- Kortstørrelsen ved en gitt zoom er den samme som før (instruksen sier
+  300 x 420, men da ville lagret zoom gitt over dobbelt så store kort på
+  bordet). Zoom, fullskjerm og hint ved åpning er uendret.
+Testet: skjermbilder i headless Chromium (DevTools) av river med
+bildekort (hjerter konge), snu-animasjon og konfetti. npm test 29/29.

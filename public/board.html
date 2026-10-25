@@ -4,14 +4,16 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Løland Gård Poker - Bordvisning</title>
-  <link rel="stylesheet" href="/felt.css">
+  <link rel="stylesheet" href="/css/tema.css">
   <link rel="stylesheet" href="/cards.css">
   <style>
     * { box-sizing: border-box; }
 
     body {
-      font-family: Arial, sans-serif;
-      /* Bakgrunn: filt (klassen felt, se felt.css) eller svart for projektor */
+      font-family: var(--font-tekst);
+      /* Helt svart: svart lys synes nesten ikke på bordet, så kortene ser ut
+         som de ligger rett på filten */
+      background: #000000;
       color: white;
       text-align: center;
       margin: 0;
@@ -101,18 +103,6 @@
       width: 780px;
     }
 
-    /* Animasjon når kun NYE kort legges ut */
-    @keyframes cardFlip {
-      0% {
-        transform: rotateY(90deg) scale(0.8);
-        opacity: 0;
-      }
-      100% {
-        transform: rotateY(0deg) scale(1);
-        opacity: 1;
-      }
-    }
-
     /* Kort-design */
     .card {
       display: inline-flex;
@@ -120,21 +110,23 @@
       align-items: center;
       justify-content: center;
       background-color: #ffffff;
-      border-radius: 12px;
+      border-radius: 13px;
       width: 140px;
       height: 195px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.6);
-      font-weight: bold;
+      font-weight: 800;
       position: relative;
       backface-visibility: hidden;
       flex-shrink: 0;
     }
 
+    /* Nye kort snus inn – samme animasjon som på statusskjermen (tema.css) */
     .card.animate-new {
-      animation: cardFlip 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+      animation: kort-snu 0.45s ease-out both;
     }
 
-    /* Fargene og symbolene på kortene: se cards.css og suits.js */
+    /* Symbolene: se suits.js. Sterkere rødt og helt svart gir best kontrast på filten. */
+    .card.suit-h, .card.suit-d { color: #D0101E !important; }
+    .card.suit-s, .card.suit-c { color: #000000 !important; }
 
     .card-corner {
       position: absolute;
@@ -147,7 +139,7 @@
     .card-corner.bottom-right { bottom: 8px; right: 8px; transform: rotate(180deg); }
 
     /* Store hjørnetegn – lettere å lese på bordet */
-    .card-corner .val { font-size: 1.8rem; font-weight: bold; }
+    .card-corner .val { font-size: 1.8rem; font-weight: 800; }
     .card-corner .suit { font-size: 1.3rem; margin-top: 2px; line-height: 0; }
 
     .card-center-graphic {
@@ -211,7 +203,7 @@
     }
   </style>
 </head>
-<body class="felt">
+<body>
 
   <!-- Innstillinger: skjult til man klikker på skjermen -->
   <div id="zoom-controls" class="zoom-controls">
@@ -220,8 +212,6 @@
     <span id="zoom-val">100%</span>
     <button class="zoom-btn" onclick="adjustZoom(0.1)">+</button>
     <button class="zoom-btn" style="width: auto; padding: 0 8px; border-radius: 10px; font-size: 0.75rem;" onclick="resetZoom()">Nullstill</button>
-    <span style="margin-left: 8px;">Bakgrunn:</span>
-    <button id="bg-toggle" class="zoom-btn" style="width: auto; padding: 0 8px; border-radius: 10px; font-size: 0.75rem;" onclick="toggleBackground()">Filt</button>
     <button id="fs-toggle" class="zoom-btn" style="width: auto; padding: 0 8px; border-radius: 10px; font-size: 0.75rem; margin-left: 8px;" onclick="toggleFullscreen()">⛶ Fullskjerm</button>
   </div>
 
@@ -238,71 +228,42 @@
     const socket = io();
 
     // ============================================================
-    // 🎉 Feiring ved monsterhånd (celebrate_win)
+    // Omgangen er avgjort (celebrate_win): konfetti over hele bildet i 6 sek.
+    // Kun konfetti – ingen tekst på bordet. Ren CSS, virker uten internett.
     // ============================================================
-    (function setupCelebration() {
-      // Last inn canvas-confetti via CDN
-      const confettiScript = document.createElement('script');
-      confettiScript.src = 'https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js';
-      document.head.appendChild(confettiScript);
-
+    (function setupKonfetti() {
       const style = document.createElement('style');
       style.textContent = `
-        .celebration-overlay {
-          position: fixed; inset: 0;
-          background: radial-gradient(circle at center, rgba(255,215,0,0.25), rgba(0,0,0,0.8));
-          display: flex; align-items: center; justify-content: center;
-          z-index: 9999; opacity: 0; pointer-events: none;
-          transition: opacity 0.4s ease;
+        .konfetti-lag { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 50; }
+        .konfetti { position: absolute; top: -40px; width: 1.1vw; height: 1.9vw; border-radius: 2px;
+                    animation: konfetti-fall linear 1 both; }
+        @keyframes konfetti-fall {
+          from { transform: translate3d(0, 0, 0) rotate(0deg); }
+          to { transform: translate3d(var(--drift), 110vh, 0) rotate(720deg); }
         }
-        .celebration-overlay.active { opacity: 1; }
-        .celebration-content {
-          text-align: center; color: #fff;
-          background: rgba(0,0,0,0.55);
-          border: 2px solid rgba(255,215,0,0.7); border-radius: 20px;
-          padding: 40px 60px;
-          box-shadow: 0 0 60px rgba(255,215,0,0.4);
-          transform: scale(0.5);
-          transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-        .celebration-overlay.active .celebration-content { transform: scale(1); }
-        .celebration-icon { font-size: 4rem; animation: celebrate-bounce 0.8s ease infinite alternate; }
-        .celebration-player { font-size: 2rem; margin: 10px 0 4px; color: #ffd700; }
-        .celebration-hand { font-size: 1.2rem; margin: 0; text-transform: uppercase; letter-spacing: 2px; }
-        @keyframes celebrate-bounce { from { transform: translateY(0); } to { transform: translateY(-14px); } }
       `;
       document.head.appendChild(style);
 
-      const overlay = document.createElement('div');
-      overlay.className = 'celebration-overlay';
-      overlay.innerHTML =
-        '<div class="celebration-content">' +
-        '<div class="celebration-icon">🎉</div>' +
-        '<h2 class="celebration-player"></h2>' +
-        '<p class="celebration-hand"></p>' +
-        '</div>';
-      document.body.appendChild(overlay);
-
-      let hideTimer = null;
-      function triggerCelebration(data) {
-        overlay.querySelector('.celebration-player').innerText = (data && data.playerName) || '';
-        overlay.querySelector('.celebration-hand').innerText = (data && data.handDescription) || '';
-        overlay.classList.add('active');
-
-        if (typeof window.confetti === 'function') {
-          const end = Date.now() + 2500;
-          (function frame() {
-            window.confetti({ particleCount: 4, angle: 60, spread: 70, origin: { x: 0, y: 0.7 } });
-            window.confetti({ particleCount: 4, angle: 120, spread: 70, origin: { x: 1, y: 0.7 } });
-            if (Date.now() < end) requestAnimationFrame(frame);
-          })();
+      const FARGER = ['#D4A84B', '#E9C77A', '#F7F3EA', '#B3202A', '#2F6FB0'];
+      let lag = null;
+      function konfetti() {
+        if (lag) lag.remove();
+        lag = document.createElement('div');
+        lag.className = 'konfetti-lag';
+        let html = '';
+        for (let i = 0; i < 70; i++) {
+          html += `<i class="konfetti" style="left: ${(Math.random() * 100).toFixed(1)}vw; ` +
+                  `background: ${FARGER[i % FARGER.length]}; --drift: ${Math.round(Math.random() * 16 - 8)}vw; ` +
+                  `animation-duration: ${(2.8 + Math.random() * 2.2).toFixed(2)}s; ` +
+                  `animation-delay: ${(Math.random() * 1.2).toFixed(2)}s"></i>`;
         }
-
-        clearTimeout(hideTimer);
-        hideTimer = setTimeout(() => overlay.classList.remove('active'), 5000);
+        lag.innerHTML = html;
+        document.body.appendChild(lag);
+        const dette = lag;
+        setTimeout(() => { dette.remove(); if (lag === dette) lag = null; }, 6500);
       }
 
-      socket.on('celebrate_win', triggerCelebration);
+      socket.on('celebrate_win', konfetti);
     })();
 
 
@@ -326,24 +287,6 @@
     }
 
     applyZoom();
-
-    // Bakgrunn: grønn filt, eller svart (best når projektoren lyser på et ekte filtbord –
-    // svart gir ikke lys, så bare kortene vises). Valget huskes i denne nettleseren.
-    let blackBackground = false;
-    try { blackBackground = localStorage.getItem('board_bg') === 'black'; } catch (e) { /* ignorer */ }
-
-    function applyBackground() {
-      document.body.classList.toggle('projector-black', blackBackground);
-      document.getElementById('bg-toggle').innerText = blackBackground ? 'Svart' : 'Filt';
-    }
-
-    function toggleBackground() {
-      blackBackground = !blackBackground;
-      try { localStorage.setItem('board_bg', blackBackground ? 'black' : 'felt'); } catch (e) { /* ignorer */ }
-      applyBackground();
-    }
-
-    applyBackground();
 
     // ------------------------------------------------------------
     // Projektorvisning: kun kortene skal synes.
@@ -409,7 +352,7 @@
     });
     document.addEventListener('mousemove', wakeCursor);
 
-    // Tastatur: F = fullskjerm, + / - = størrelse, 0 = nullstill, B = bakgrunn
+    // Tastatur: F = fullskjerm, + / - = størrelse, 0 = nullstill
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
@@ -417,7 +360,6 @@
       else if (k === '+' || k === '=') { adjustZoom(0.1); showControls(); }
       else if (k === '-') { adjustZoom(-0.1); showControls(); }
       else if (k === '0') { resetZoom(); showControls(); }
-      else if (k === 'b') { toggleBackground(); showControls(); }
     });
 
     // Ved åpning: hint og innstillinger vises en kort stund
