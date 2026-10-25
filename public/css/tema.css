@@ -1,0 +1,140 @@
+/* ============================================================
+   Felles designsystem for statustavle (index.html) og projektor
+   (board.html) – senere også mobilen.
+   Farger som variabler, lokale fonter (virker uten internett),
+   kort, tomme kortplasser og dealer-/blindmarkører.
+   ============================================================ */
+
+/* Fonter lastes fra public/fonts (SIL Open Font License, se OFL-*.txt).
+   Variable fonter: én fil dekker alle vektene. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin-wght.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Cinzel';
+  font-style: normal;
+  font-weight: 400 900;
+  font-display: swap;
+  src: url('/fonts/cinzel-latin-wght.woff2') format('woff2');
+}
+
+:root {
+  /* Rommet og bordet */
+  --bakgrunn: #0A1410;
+  --filt: #1F5C41;          /* midten av bordflaten */
+  --filt-mork: #0E3524;     /* ytterkant av bordflaten */
+  --treramme: #5B3A1E;
+  --treramme-ytre: #3A2412;
+
+  /* Paneler og knapper */
+  --flate: #0F211A;
+  --flate-knapp: #183126;
+  --linje: #2E4A3D;
+
+  /* Gull: hovedknapp, aktiv fase, dealer, logo */
+  --gull: #D4A84B;
+  --gull-lys: #E9C77A;
+  --gull-svak: rgba(212, 168, 75, 0.32);
+
+  /* Tekst */
+  --tekst: #F3EEE2;
+  --tekst-dempet: #B9C8BF;
+  --tekst-svak: #7E8E86;
+
+  /* Varsler */
+  --varsel: #F2B544;
+  --varsel-bakgrunn: #2A1E08;
+  --fare: #9A3030;
+
+  /* Kort */
+  --kort: #F7F3EA;
+  --kort-rod: #B3202A;
+  --kort-svart: #141414;
+
+  /* Blindmarkører */
+  --sb: #2F6FB0;
+  --bb: #A8641A;
+
+  --font-tittel: 'Cinzel', Georgia, serif;
+  --font-tekst: 'Inter', system-ui, sans-serif;
+}
+
+/* ------------------------------------------------------------
+   Kort: verdi og farge stort og sentrert over hverandre.
+   Størrelsen settes der kortet brukes (width/height + font-size);
+   verdi og symbol skalerer med font-size.
+   ------------------------------------------------------------ */
+.kort {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.04em;
+  background: var(--kort);
+  border-radius: 12px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.45), 0 1px 2px rgba(0, 0, 0, 0.35);
+  font-family: var(--font-tekst);
+  font-weight: 800;
+  line-height: 1;
+  color: var(--kort-svart);
+  user-select: none;
+}
+.kort.rod { color: var(--kort-rod); }
+.kort .kort-verdi { font-size: 1em; letter-spacing: -0.03em; }
+.kort .kort-farge { font-size: 0.9em; display: flex; }
+.kort .suit-icon { width: 1em; height: 1em; fill: currentColor; }
+
+/* Plass for et kort som ikke er delt ennå */
+.kort-plass {
+  display: inline-block;
+  border-radius: 12px;
+  border: 2px dashed var(--gull-svak);
+}
+
+/* Nytt kort snus inn */
+.kort.snu { animation: kort-snu 0.45s ease-out both; }
+@keyframes kort-snu {
+  from { transform: perspective(900px) rotateY(85deg); opacity: 0.4; }
+  to   { transform: perspective(900px) rotateY(0deg); opacity: 1; }
+}
+
+/* ------------------------------------------------------------
+   Markører som sjetonger på filten
+   ------------------------------------------------------------ */
+.markor {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-family: var(--font-tekst);
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+/* Dealerknappen: kremhvit brikke med gullkant */
+.markor-d {
+  width: 58px;
+  height: 58px;
+  font-size: 28px;
+  background: var(--kort);
+  color: var(--kort-svart);
+  border: 3px solid var(--gull);
+}
+/* Lilleblind og storeblind: mindre, fargede brikker med stiplet hvit kant */
+.markor-sb, .markor-bb {
+  width: 46px;
+  height: 46px;
+  font-size: 16px;
+  color: #fff;
+  border: 3px dashed rgba(255, 255, 255, 0.85);
+}
+.markor-sb { background: var(--sb); }
+.markor-bb { background: var(--bb); }
+
+@media (prefers-reduced-motion: reduce) {
+  .kort.snu { animation: none; }
+}

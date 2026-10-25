@@ -921,3 +921,19 @@ Testet: to nye tester (niende spiller avvises, frakoblet slipper inn
 igjen med UUID og med navn; håndnummer, omgangsnummer, vinnere og
 håndnavn kun ved showdown) og utvidet omstart-test (håndnummer og
 omgangsnummer huskes, likt med dashboardet). npm test 29/29.
+
+------------------------------------------------------------
+2026-10-25 – Nytt design, steg 2: felles designsystem og lokale fonter
+------------------------------------------------------------
+- Ny fil public/css/tema.css: alle farger som CSS-variabler på :root
+  (bakgrunn, filt, treramme, flater, gull, tekst, varsel, fare, kort,
+  SB/BB), felles kort (.kort, verdi og farge sentrert over hverandre),
+  tom kortplass med stiplet gullkant (.kort-plass), snu-animasjon for
+  nye kort (rotateY 85° -> 0°, 0,45 s) og markører (dealer «D» 58 px,
+  SB/BB 46 px som sjetonger).
+- Lokale fonter i public/fonts/ (ingen Google Fonts): Inter og Cinzel
+  som variable woff2-filer (latin, dekker æøå), fra Fontsource via
+  jsDelivr. Lisens: SIL Open Font License (OFL-Inter.txt, OFL-Cinzel.txt).
+  Fallback: system-ui / Georgia.
+- Ikke tatt i bruk ennå – index.html og board.html bygges om i neste steg.
+Testet: filene serveres (200, riktig content-type). npm test 29/29.
