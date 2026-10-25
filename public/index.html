@@ -269,6 +269,116 @@
     }
 
     /* ------------------------------------------------------------
+       Fullskjermvisninger: showdown, alle kastet seg, omgang avgjort, lobby.
+       Dekker scenen, men holder de nederste 130 px fri til kontrollinjen.
+       ------------------------------------------------------------ */
+    .visning {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1920px;
+      height: 1080px;
+      padding-bottom: 130px;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      background: rgba(6, 12, 9, 0.95);
+      backdrop-filter: blur(8px);
+      z-index: 5;
+    }
+    .visning.vis { display: flex; animation: visning-inn 0.35s ease-out both; }
+    @keyframes visning-inn {
+      from { opacity: 0; transform: scale(0.96); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    .visning-over { font-size: 24px; font-weight: 700; letter-spacing: 4px; text-transform: uppercase; color: var(--gull); }
+    .visning-navn {
+      font-family: var(--font-tittel);
+      font-weight: 700;
+      font-size: 104px;
+      line-height: 1.1;
+      margin: 12px 0 8px;
+      max-width: 1800px;
+    }
+    .visning-navn.lang { font-size: 72px; }
+    .visning-hand { font-size: 40px; font-weight: 600; color: var(--gull-lys); }
+    .visning-dempet { font-size: 36px; color: var(--tekst-dempet); }
+
+    .vinnerkort { display: flex; gap: 20px; margin: 34px 0 30px; }
+    .vinnerkort .kort {
+      width: 150px;
+      height: 210px;
+      font-size: 78px;
+      border-radius: 14px;
+      box-shadow: 0 0 0 4px var(--gull), 0 14px 30px rgba(0, 0, 0, 0.6);
+    }
+    .andre-hender { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; max-width: 1800px; }
+    .annen-hand { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .annen-navn { font-size: 24px; font-weight: 700; }
+    .annen-beskr { font-size: 19px; color: var(--tekst-dempet); }
+    .smakort { display: flex; gap: 6px; margin-top: 8px; }
+    .smakort .kort { width: 60px; height: 84px; font-size: 30px; border-radius: 8px; }
+
+    /* Omgangen er avgjort: ligger over showdown-visningen */
+    #visning-omgang { z-index: 6; overflow: hidden; }
+    .omgang-navn { font-family: var(--font-tittel); font-weight: 700; font-size: 150px; line-height: 1.1; color: var(--gull-lys); margin: 16px 0 6px; }
+    .omgang-navn.lang { font-size: 104px; }
+    .omgang-tekst { font-size: 44px; font-weight: 600; }
+    .konfetti {
+      position: absolute;
+      top: -40px;
+      width: 14px;
+      height: 24px;
+      border-radius: 2px;
+      animation: konfetti-fall linear 3 both;
+      pointer-events: none;
+    }
+    @keyframes konfetti-fall {
+      from { transform: translate3d(0, 0, 0) rotate(0deg); }
+      to { transform: translate3d(var(--drift), 1020px, 0) rotate(720deg); }
+    }
+
+    /* Lobby: stor QR-kode og hvem som har logget inn (topplinjen synes) */
+    #visning-lobby {
+      top: 112px;
+      height: 968px;
+      flex-direction: row;
+      gap: 90px;
+      text-align: left;
+    }
+    .qr-stor {
+      flex: 0 0 auto;
+      width: 400px;
+      height: 400px;
+      padding: 18px;
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 0 0 6px var(--gull), 0 18px 50px rgba(0, 0, 0, 0.6);
+    }
+    .lobby-tekst { max-width: 900px; }
+    .lobby-tittel { font-family: var(--font-tittel); font-weight: 700; font-size: 88px; color: var(--gull); line-height: 1.05; }
+    .lobby-forklaring { font-size: 36px; margin: 18px 0 10px; }
+    .lobby-adresse { font-size: 24px; color: var(--tekst-dempet); }
+    .lobby-status { font-size: 26px; font-weight: 600; color: var(--gull); margin-top: 26px; }
+    .lobby-spillere { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 22px; }
+    .lobby-spiller {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 18px 8px 8px;
+      border-radius: 999px;
+      background: var(--flate);
+      border: 2px solid var(--linje);
+      font-size: 24px;
+      font-weight: 600;
+    }
+    .lobby-spiller .avatar { flex-basis: 40px; width: 40px; height: 40px; font-size: 17px; }
+    .lobby-spiller.frakoblet-chip { opacity: 0.5; border-style: dashed; }
+    body.lobby .omgang-info { visibility: hidden; }
+
+    /* ------------------------------------------------------------
        Dealerens kontroller: vises bare når musa er i bruk.
        Uten musebevegelse i 5 sek skjules kontrollene og pekeren.
        ------------------------------------------------------------ */
@@ -279,11 +389,15 @@
     }
 
     .kontroller {
+      position: absolute;
+      inset: 0;
+      z-index: 10; /* over fullskjermvisningene */
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.25s ease;
     }
-    body.mus-aktiv .kontroller { opacity: 1; pointer-events: auto; }
+    body.mus-aktiv .kontroller { opacity: 1; }
+    body.mus-aktiv .kontroller > * { pointer-events: auto; }
 
     .kontrollinje {
       position: absolute;
@@ -428,6 +542,21 @@
     <div class="markorer" id="markorer"></div>
     <div id="seter"></div>
 
+    <!-- Fullskjermvisninger -->
+    <section class="visning" id="visning-showdown" aria-live="polite"></section>
+    <section class="visning" id="visning-kastet" aria-live="polite"></section>
+    <section class="visning" id="visning-omgang" aria-live="polite"></section>
+    <section class="visning" id="visning-lobby">
+      <div class="qr-stor qr-bilde" id="qr-stor"></div>
+      <div class="lobby-tekst">
+        <div class="lobby-tittel">Bli med</div>
+        <div class="lobby-forklaring">Skann koden med mobilen for å få kortene dine.</div>
+        <div class="lobby-adresse" id="lobby-adresse"></div>
+        <div class="lobby-status" id="lobby-status"></div>
+        <div class="lobby-spillere" id="lobby-spillere"></div>
+      </div>
+    </section>
+
     <!-- Dealerens kontroller (vises bare når musa er i bruk) -->
     <div class="kontroller">
       <div class="kontrollinje">
@@ -530,6 +659,7 @@
     }
 
     const AKTIVE_FASER = ['PREFLOP', 'FLOP', 'TURN', 'RIVER'];
+    const MAKS_SPILLERE = 8; // samme som MAX_PLAYERS på serveren
     function erVinner(state, p) {
       const winners = (state.winnerInfo && state.winnerInfo.winners) || [];
       return ['SHOWDOWN', 'FINISHED'].includes(state.phase) && winners.includes(p.name);
@@ -554,7 +684,11 @@
     }
     mobilAdresse().then(url => {
       // Tegnes i høy oppløsning og skaleres ned med CSS, så koden blir skarp
-      if (typeof QRCode === 'function') new QRCode(document.getElementById('qr-liten'), { text: url, width: 256, height: 256 });
+      if (typeof QRCode === 'function') {
+        new QRCode(document.getElementById('qr-liten'), { text: url, width: 256, height: 256 });
+        new QRCode(document.getElementById('qr-stor'), { text: url, width: 512, height: 512 });
+      }
+      document.getElementById('lobby-adresse').innerText = url.replace(/^https?:\/\//, '');
     });
 
     // ============================================================
@@ -660,6 +794,110 @@
       // Pynteteksten under kortene skjules når en markør ville havnet oppå den
       const midtMarkor = plasser.some(pl => pl.markor[0] === 970);
       document.getElementById('bord-pynt').classList.toggle('skjult', midtMarkor);
+    }
+
+    // ============================================================
+    // Fullskjermvisninger
+    // ============================================================
+    // Viser/skjuler en visning; innholdet tegnes bare på nytt når det har endret seg,
+    // så inntoningen og konfettien ikke starter på nytt ved hver oppdatering
+    function settVisning(id, html) {
+      const el = document.getElementById(id);
+      const synlig = html !== null;
+      if (synlig && el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
+      if (!synlig) delete el.dataset.html;
+      el.classList.toggle('vis', synlig);
+    }
+
+    const kortKode = c => (c && c.value && c.suit) ? c.value + c.suit : String(c);
+    const navneliste = navn => navn.length > 1 ? navn.slice(0, -1).join(', ') + ' og ' + navn[navn.length - 1] : (navn[0] || '');
+
+    function showdownHtml(state) {
+      if (state.phase !== 'SHOWDOWN' || !state.winnerInfo || state.winnerInfo.foldedWin) return null;
+      const info = state.winnerInfo;
+      const winners = info.winners || [];
+      const navn = navneliste(winners);
+      // Vinnerkortene fra serveren; ellers vinnerens hullkort (kun kort serveren har sendt)
+      let kort = (info.rawCards || []).map(kortKode);
+      if (kort.length === 0) {
+        const v = state.players.find(p => p.name === winners[0]);
+        kort = v ? v.cards : [];
+      }
+      const andre = state.players
+        .filter(p => p.cards && p.cards.length > 0 && !winners.includes(p.name))
+        .sort((a, b) => (b.handRank || 0) - (a.handRank || 0));
+      return `
+        <div class="visning-over">Vinner av hånd ${Number(state.handNumber) || ''}</div>
+        <div class="visning-navn ${navn.length > 22 ? 'lang' : ''}">${escapeHtml(navn)}</div>
+        <div class="visning-hand">${escapeHtml(info.descr)}</div>
+        <div class="vinnerkort">${kort.map(c => kortHtml(c)).join('')}</div>
+        <div class="andre-hender">${andre.map(p => `
+          <div class="annen-hand">
+            <div class="annen-navn">${escapeHtml(p.name)}</div>
+            <div class="annen-beskr">${escapeHtml(p.handDescr || '')}</div>
+            <div class="smakort">${p.cards.map(c => kortHtml(c)).join('')}</div>
+          </div>`).join('')}
+        </div>`;
+    }
+
+    // Alle andre kastet seg: ingen kort vises
+    function kastetHtml(state) {
+      if (state.phase !== 'FINISHED' || !state.winnerInfo) return null;
+      const winners = state.winnerInfo.winners || [];
+      return `
+        <div class="visning-over">Hånd ${Number(state.handNumber) || ''} er avgjort</div>
+        <div class="visning-navn">${escapeHtml(navneliste(winners) || state.winnerInfo.winnerName)}</div>
+        <div class="visning-dempet">${escapeHtml(state.winnerInfo.descr)}</div>`;
+    }
+
+    // Konfetti med CSS (virker uten internett): ca. 70 fallende rektangler
+    const KONFETTIFARGER = ['#D4A84B', '#E9C77A', '#F7F3EA', '#B3202A', '#2F6FB0'];
+    function konfettiHtml() {
+      let html = '';
+      for (let i = 0; i < 70; i++) {
+        const left = Math.round(Math.random() * 1920);
+        const forsinkelse = (Math.random() * 3).toFixed(2);
+        const varighet = (3.2 + Math.random() * 2.6).toFixed(2);
+        const drift = Math.round(Math.random() * 240 - 120);
+        const farge = KONFETTIFARGER[i % KONFETTIFARGER.length];
+        html += `<i class="konfetti" style="left: ${left}px; background: ${farge}; --drift: ${drift}px; ` +
+                `animation-duration: ${varighet}s; animation-delay: ${forsinkelse}s"></i>`;
+      }
+      return html;
+    }
+
+    let omgangKonfetti = null; // samme konfetti så lenge samme vinner vises
+    function omgangHtml(state) {
+      if (!state.roundWinner) { omgangKonfetti = null; return null; }
+      if (!omgangKonfetti || omgangKonfetti.navn !== state.roundWinner) omgangKonfetti = { navn: state.roundWinner, html: konfettiHtml() };
+      return `
+        ${omgangKonfetti.html}
+        <div class="visning-over" style="font-size: 28px">Omgang ${Number(state.roundNumber) || ''} er avgjort</div>
+        <div class="omgang-navn ${state.roundWinner.length > 10 ? 'lang' : ''}">${escapeHtml(state.roundWinner)}</div>
+        <div class="omgang-tekst">vinner omgangen</div>`;
+    }
+
+    function tegnLobby(state) {
+      const lobby = !state.gameMode || state.players.length === 0;
+      document.body.classList.toggle('lobby', lobby);
+      document.getElementById('visning-lobby').classList.toggle('vis', lobby);
+      if (!lobby) return;
+      const n = state.players.length;
+      document.getElementById('lobby-status').innerText =
+        `Plass til ${MAKS_SPILLERE} spillere · ` + (n === 0 ? 'venter på spillere …' : `${n} har logget inn`);
+      const alleNavn = state.players.map(p => p.name);
+      document.getElementById('lobby-spillere').innerHTML = state.players.map(p => `
+        <div class="lobby-spiller ${p.connected ? '' : 'frakoblet-chip'}">
+          <div class="avatar" style="background: ${avatarFarge(p.name, alleNavn)}">${escapeHtml(initialer(p.name))}</div>
+          ${escapeHtml(p.name)}
+        </div>`).join('');
+    }
+
+    function tegnVisninger(state) {
+      settVisning('visning-showdown', showdownHtml(state));
+      settVisning('visning-kastet', kastetHtml(state));
+      settVisning('visning-omgang', omgangHtml(state));
+      tegnLobby(state);
     }
 
     // ============================================================
@@ -900,6 +1138,7 @@
       tegnOmgang(state);
       tegnFellesskort(state);
       tegnSeter(state);
+      tegnVisninger(state);
       tegnKontroller(state);
     });
   </script>

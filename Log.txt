@@ -999,3 +999,30 @@ hånd -> Del flop … Vis vinner -> Start ny hånd), kontroller skjules etter
 flytt (menyen blir), marker ute -> omgang avgjort -> Start ny omgang
 (omgang 2, hånd 1, ingen ute), Angre ute, Nytt spill med bekreftelse.
 npm test 29/29.
+
+------------------------------------------------------------
+2026-10-25 – Nytt design, steg 5: fullskjermvisninger (index.html)
+------------------------------------------------------------
+Fire visninger over hele scenen (nesten svart bakgrunn med litt
+uskarphet, toner inn med kort skalering), nederste 130 px holdes fri
+til kontrollinjen, som ligger over visningene.
+- Showdown: «Vinner av hånd N», vinnerens navn (Cinzel 104 px, flere
+  vinnere med «og»), håndnavn på norsk, de fem vinnerkortene med
+  gullkant (winnerInfo.rawCards, ellers vinnerens hullkort), og de
+  andre som var med til showdown sortert etter styrke med håndnavn og
+  hullkort. Kun kort serveren har sendt (cards ved showdown).
+- Alle andre kastet seg (FINISHED): «Hånd N er avgjort», navn og
+  «Alle andre kastet seg». Ingen kort.
+- Omgangen er avgjort (roundWinner): «Omgang N er avgjort», navn i
+  Cinzel 150 px, «vinner omgangen», konfetti med ca. 70 CSS-animerte
+  rektangler (gull, krem, rødt, blått) – virker uten internett.
+  Ligger over showdown-visningen. Konfettibiblioteket fra CDN brukes
+  ikke lenger på statusskjermen.
+- Lobby (ingen spilletype eller ingen spillere): stor QR-kode med
+  gullramme, «Bli med», adressen, «Plass til 8 spillere · …» og navnene
+  til de som har logget inn (avtalt med brukeren). Den lille QR-koden
+  i topplinjen skjules i lobbyen.
+Testet i headless Chromium (DevTools): lobby tom og med 5 spillere,
+showdown med og uten kontroller, alle kastet seg, omgang avgjort med
+konfetti. «Send musa til X» stemte med faktisk dealer over 6 hender,
+også når dealer/neste dealer ble markert ute. npm test 29/29.
