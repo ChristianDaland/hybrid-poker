@@ -280,6 +280,81 @@ app.post('/api/reset-db', adminOnly, async (req, res) => {
   }
 });
 
+// Sletter all data fra én dag (standard: i dag, norsk tid) – f.eks. testing på dagen før
+// turneringen om kvelden. Hender, omganger og sesjoner fra dagen slettes, og hendene trekkes
+// fra spillerstatistikken. Etterpå starter neste hånd omgang 1 (ingen er ute).
+app.post('/api/reset-day', adminOnly, async (req, res) => {
+  if (!db) return res.status(503).json({ error: 'Database ikke tilkoblet.' });
+  if (isHandInProgress()) return res.status(409).json({ error: 'En hånd pågår – vent til den er ferdig.' });
+  const date = parseDateParam(req.query.date) || parseDateParam(localDateString(new Date().toISOString()));
+  if (!date) return res.status(400).json({ error: 'Ugyldig dato.' });
+  try {
+    const range = localDayRange(date);
+    const hands = await db.execute({
+      sql: `SELECT id, player_uuid, winning_cards, deltakere FROM winning_hands
+            WHERE ${CREATED_AT_ISO} >= ? AND ${CREATED_AT_ISO} < ?`,
+      args: [range.start, range.end]
+    });
+
+    // Hvor mange hender hver spiller skal trekkes for (spilt / vunnet)
+    const played = {}, won = {};
+    const add = (map, uuid) => { if (uuid && uuid !== 'ukjent-uuid') map[uuid] = (map[uuid] || 0) + 1; };
+    for (const h of hands.rows) {
+      const winnerUuids = String(h.player_uuid || '').split(',').map(u => u.trim()).filter(Boolean);
+      winnerUuids.forEach(u => add(won, u));
+      let participants = null;
+      try { participants = JSON.parse(h.deltakere || 'null'); } catch (e) { participants = null; }
+      if (!Array.isArray(participants)) {
+        // Eldre rader uten deltakerliste: vinnerne og de som viste kort ved showdown
+        let shown = [];
+        try { shown = (JSON.parse(h.winning_cards || '{}').cards || []).map(c => c.uuid); } catch (e) { shown = []; }
+        participants = [...new Set([...winnerUuids, ...shown])];
+      }
+      participants.forEach(u => add(played, u));
+    }
+    for (const uuid of new Set([...Object.keys(played), ...Object.keys(won)])) {
+      await db.execute({
+        sql: `UPDATE player_stats SET hands_played = MAX(0, hands_played - ?), hands_won = MAX(0, hands_won - ?) WHERE uuid = ?`,
+        args: [played[uuid] || 0, won[uuid] || 0, uuid]
+      });
+    }
+
+    const delHands = await db.execute({
+      sql: `DELETE FROM winning_hands WHERE ${CREATED_AT_ISO} >= ? AND ${CREATED_AT_ISO} < ?`,
+      args: [range.start, range.end]
+    });
+    const delRounds = await db.execute({
+      sql: "DELETE FROM omganger WHERE started_at >= ? AND started_at < ?",
+      args: [range.start, range.end]
+    });
+    await db.execute({
+      sql: "DELETE FROM poker_sessions WHERE REPLACE(started_at, ' ', 'T') >= ? AND REPLACE(started_at, ' ', 'T') < ?",
+      args: [range.start, range.end]
+    });
+    // Spillere uten noen hender igjen (f.eks. testnavn) fjernes fra statistikken
+    await db.execute("DELETE FROM player_stats WHERE hands_played <= 0 AND hands_won <= 0");
+
+    // Pågående omgang og sesjon er slettet: neste hånd starter omgang 1, alle er med
+    if (currentSessionId) {
+      const s = await db.execute({ sql: "SELECT id FROM poker_sessions WHERE id = ?", args: [Number(currentSessionId)] });
+      if (s.rows.length === 0) currentSessionId = null;
+    }
+    Object.values(players).forEach(p => { p.out = false; });
+    startNewRound();
+    updateAll();
+
+    console.log(`[DB] Slettet dagens data: ${delHands.rowsAffected} hender, ${delRounds.rowsAffected} omganger.`);
+    res.json({
+      message: `Slettet ${delHands.rowsAffected} hender og ${delRounds.rowsAffected} omganger.`,
+      hands: delHands.rowsAffected,
+      rounds: delRounds.rowsAffected
+    });
+  } catch (err) {
+    console.error('[DB Error /api/reset-day]:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const SUITS = ['c', 'd', 'h', 's'];
 const VALUES = ['2', '3', '4', '5', '6', '7', '8', '9', 'T', 'J', 'Q', 'K', 'A'];
 
@@ -600,6 +675,13 @@ async function ensureTables() {
     console.log('[DB] La til kolonnen omgang_id i winning_hands.');
   }
 
+  // Migrering: hvem som fikk kort i hånden (UUID-er) – trengs for å kunne trekke
+  // hender fra statistikken når dagens testdata slettes
+  if (!cols.rows.some(c => c.name === 'deltakere')) {
+    await db.execute("ALTER TABLE winning_hands ADD COLUMN deltakere TEXT");
+    console.log('[DB] La til kolonnen deltakere i winning_hands.');
+  }
+
   // Migrering: «ute»-markeringer lagres per omgang, så de overlever en omstart
   const roundCols = await db.execute("PRAGMA table_info(omganger)");
   if (!roundCols.rows.some(c => c.name === 'out_uuids')) {
@@ -900,9 +982,11 @@ async function persistHandResult() {
       }))
     });
 
+    const deltakere = activePlayersList.filter(p => p.uuid && p.cards.length > 0).map(p => String(p.uuid));
+
     const res = await db.execute({
-      sql: `INSERT INTO winning_hands (session_id, omgang_id, player_uuid, player_name, hand_description, winning_cards, hand_rank, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT INTO winning_hands (session_id, omgang_id, player_uuid, player_name, hand_description, winning_cards, hand_rank, created_at, deltakere)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       args: [
         Number(currentSessionId),
         roundId ? Number(roundId) : null,
@@ -911,7 +995,8 @@ async function persistHandResult() {
         String(rawDescr),
         jsonPayload,
         Number(rankVal),
-        nowIso
+        nowIso,
+        JSON.stringify(deltakere)
       ]
     });
 

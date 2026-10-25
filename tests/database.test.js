@@ -299,3 +299,55 @@ test('Omgangsnummeret starter på 1 på en ny dato', async (t) => {
   assert.strictEqual(nextRoundNumberWithoutDb('2026-10-25T18:00:00Z'), 1, 'ny dato: omgang 1');
   assert.strictEqual(nextRoundNumberWithoutDb('2026-10-25T19:00:00Z'), 2);
 });
+
+test('Slett dagens data: dagens hender/omganger fjernes, statistikk justeres, omgang 1 igjen', async (t) => {
+  const dbFile = tempDbFile();
+  let srv = await startServer({ dbFile });
+  await srv.stop();
+
+  // Data fra i går (skal bli liggende)
+  const db = createClient({ url: 'file:' + dbFile });
+  const igaar = new Date(Date.now() - 24 * 3600e3).toISOString();
+  await db.execute({ sql: "INSERT INTO player_stats (uuid, name, hands_played, hands_won) VALUES ('u-a', 'Anne', 5, 2)", args: [] });
+  await db.execute({ sql: 'INSERT INTO omganger (session_id, started_at, ended_at) VALUES (1, ?, ?)', args: [igaar, igaar] });
+  await db.execute({ sql: "INSERT INTO winning_hands (player_uuid, player_name, hand_description, hand_rank, created_at) VALUES ('u-a', 'Anne', 'Ett par', 5, ?)", args: [igaar] });
+
+  srv = await startServer({ dbFile });
+  t.after(() => { db.close(); return srv.stop(); });
+  const host = srv.host();
+  const P = n => findPlayer(host.state, n);
+  const A = srv.player('Anne', 'u-a'), B = srv.player('Bjørn', 'u-b'); srv.player('Cato', 'u-c');
+  await wait(300);
+  host.emit('set_game_mode', 'TEXAS'); await wait(100);
+  for (let i = 0; i < 2; i++) {
+    host.emit('start_new_hand'); await wait(150);
+    A.emit('player_fold'); await wait(80); B.emit('player_fold'); await wait(250);
+  }
+  host.emit('host_set_out', { seat: P('Bjørn').seat, out: true }); await wait(300);
+  assert.strictEqual(host.state.handNumber, 2);
+
+  // Ikke lov midt i en hånd
+  host.emit('start_new_hand'); await wait(150);
+  assert.strictEqual((await fetch(srv.url + '/api/reset-day', { method: 'POST' })).status, 409);
+  A.emit('player_fold'); await wait(250);
+
+  const res = await fetch(srv.url + '/api/reset-day', { method: 'POST' });
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual((await res.json()).hands, 3);
+  await wait(200);
+
+  const d = await srv.getJson('/api/debug-db');
+  assert.strictEqual(d.winning_hands.length, 1, 'bare gårsdagens hånd igjen');
+  assert.strictEqual(d.omganger.length, 1, 'bare gårsdagens omgang igjen');
+  const st = Object.fromEntries(d.player_stats.map(r => [r.name, r]));
+  assert.strictEqual(st.Anne.hands_played, 5, 'Anne tilbake til gårsdagens tall');
+  assert.strictEqual(st.Anne.hands_won, 2);
+  assert.ok(!st.Cato && !st['Bjørn'], 'spillere med bare dagens hender er fjernet fra statistikken');
+
+  assert.strictEqual(host.state.handNumber, 0);
+  assert.ok(host.state.players.every(p => !p.out), 'ingen er ute');
+  assert.strictEqual(host.state.players.length, 3, 'spillerne sitter fortsatt ved bordet');
+  host.emit('start_new_hand'); await wait(200);
+  assert.strictEqual(host.state.roundNumber, 1, 'neste hånd er omgang 1');
+  assert.strictEqual(host.state.handNumber, 1);
+});

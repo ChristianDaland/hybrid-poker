@@ -65,6 +65,8 @@
     .reset-btn:hover {
       background-color: #b71c1c;
     }
+    .day-btn { background-color: #f9a825; }
+    .day-btn:hover { background-color: #fbc02d; }
   </style>
 </head>
 <body>
@@ -72,7 +74,8 @@
   <h1>🔍 Turso Database Inspector</h1>
   <div>
     <button class="btn" onclick="fetchData()">🔄 Oppdater nå</button>
-    <button class="btn reset-btn" onclick="resetDb()">⚠️ Tøm databasen for testdata</button>
+    <button class="btn day-btn" onclick="resetDay()">🗓️ Slett dagens data</button>
+    <button class="btn reset-btn" onclick="resetDb()">⚠️ Tøm hele databasen</button>
   </div>
 
   <h2>1. Tabell: <code>winning_hands</code> <span id="count-hands" class="badge">0 rader</span></h2>
@@ -173,8 +176,29 @@
       }
     }
 
+    // Sletter hender, omganger og statistikk fra i dag (f.eks. testing før turneringen)
+    async function resetDay() {
+      const idag = new Date().toLocaleDateString('no-NO', { day: 'numeric', month: 'long', year: 'numeric' });
+      if (!confirm(`Slette alle hender, omganger og statistikk fra i dag (${idag})?\n\n` +
+                   'Data fra tidligere dager beholdes. Spillerne blir sittende ved bordet, ' +
+                   'og neste hånd starter omgang 1.')) return;
+      try {
+        const res = await adminFetch('/api/reset-day', { method: 'POST' });
+        const body = await res.json().catch(() => ({}));
+        if (res.ok) {
+          alert(body.message || 'Dagens data er slettet.');
+          fetchData();
+        } else {
+          alert('Kunne ikke slette dagens data: ' + (body.error || res.status));
+        }
+      } catch (err) {
+        console.error('Feil ved sletting av dagens data:', err);
+        alert('Kunne ikke slette dagens data: ' + err.message);
+      }
+    }
+
     async function resetDb() {
-      if (confirm('Er du sikker på at du vil slette all historikk og nullstille databasen?')) {
+      if (confirm('Er du sikker på at du vil slette ALL historikk (alle dager) og nullstille databasen?')) {
         try {
           const res = await adminFetch('/api/reset-db', { method: 'POST' });
           if (res.ok) {

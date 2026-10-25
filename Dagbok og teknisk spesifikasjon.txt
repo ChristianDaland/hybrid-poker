@@ -209,7 +209,10 @@ Tabeller (opprettes/migreres automatisk ved oppstart, ensureTables):
                   game_mode, winner_uuid, winner_name, out_uuids)
   player_stats   (id, uuid, name, hands_played, hands_won, total_chips)
   winning_hands  (id, session_id, omgang_id, player_uuid, player_name,
-                  hand_description, winning_cards, hand_rank, created_at)
+                  hand_description, winning_cards, hand_rank, created_at,
+                  deltakere)
+- deltakere: JSON-liste med UUID-ene som fikk kort i hånden (brukes når
+  dagens data slettes, så «hender spilt» kan trekkes riktig ned).
 - Tidspunkter lagres som ISO/UTC. «Dag» regnes i Node (norsk tid),
   fordi Turso kjører i UTC.
 - winning_cards (JSON, "v":2): board, winningCards, cards (kun
@@ -228,7 +231,12 @@ API:
   GET  /api/server-info               LAN-adresser (for QR-koden)
   GET  /api/debug-db                  rådata  – kun fra servermaskinen
   POST /api/reset-db                  tøm DB  – kun fra servermaskinen
-  (ALLOW_REMOTE_ADMIN=1 åpner de to siste for nettet.)
+  POST /api/reset-day[?date=]         slett dagens data (hender, omganger,
+                                      sesjoner; trekkes fra statistikken)
+                                      – admin. Ikke midt i en hånd (409).
+                                      Etterpå: ingen ute, neste hånd = omgang 1.
+  (De tre siste krever admin: servermaskinen eller ADMIN_PASSWORD;
+   ALLOW_REMOTE_ADMIN=1 åpner dem for nettet.)
 
 ============================================================
 8. MILJØVARIABLER

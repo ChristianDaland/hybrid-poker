@@ -1241,3 +1241,29 @@ uten database nullstilles telleren ved ny dato. npm test 31/31.
   Databaseinspektøren krever admin-passord på Render, som før.
 - veiledning.html oppdatert.
 Testet: skjermbilde av «Flere valg». npm test 31/31.
+
+------------------------------------------------------------
+2026-10-25 – Slett dagens data (testing før turneringen)
+------------------------------------------------------------
+Brukerønske: Testes det på dagen, skal testdataene kunne slettes før
+turneringen om kvelden, og kvelden skal starte på omgang 1.
+server.js:
+- POST /api/reset-day[?date=] (admin, som reset-db): sletter dagens
+  (norsk tid) hender, omganger og sesjoner, og trekker hendene fra
+  player_stats (spilt/vunnet). Spillere uten hender igjen fjernes fra
+  statistikken. Avvises midt i en hånd (409). Etterpå: ingen er ute,
+  pågående omgang nullstilles – neste hånd = omgang 1, hånd 1.
+  Spillerne blir sittende ved bordet.
+- Ny kolonne winning_hands.deltakere (JSON med UUID-ene som fikk kort),
+  migreres automatisk. Trengs for å trekke «hender spilt» riktig. Eldre
+  rader uten listen: vinnerne og de som viste kort ved showdown.
+database.html: ny knapp «🗓️ Slett dagens data» (med bekreftelse og
+melding om hva som ble slettet). «Tøm databasen» heter nå «Tøm hele
+databasen».
+Veiledning og spesifikasjon oppdatert.
+Testet: ny test (gårsdagens data blir liggende, dagens slettes,
+statistikk tilbake til gårsdagens tall, testspillere fjernet, 409 midt i
+hånd, neste hånd omgang 1). Knappen testet i headless Chromium mot
+SQLite. npm test 32/32.
+Merk: Hender spilt i dag FØR denne versjonen mangler deltakerlisten;
+der trekkes bare vinnere og de som viste kort fra «hender spilt».
