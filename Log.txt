@@ -882,3 +882,15 @@ angre kast, liggende, mistet kontakt), Kortene, Fasene, For dealeren
 (fullskjerm, innstillinger, tastatur), Omganger og statistikk.
 Dagbok og teknisk spesifikasjon.txt: omganger/omstart og nye
 miljøvariabler.
+
+------------------------------------------------------------
+2026-10-25 – npm test virker igjen (Node 24)
+------------------------------------------------------------
+Årsak: «node --test tests/» tolkes som en modul i nyere Node
+(Cannot find module .../tests), så npm test feilet før noen test
+ble kjørt.
+Fiks: package.json bruker «node --test "tests/*.test.js"». Mønsteret
+står i anførselstegn, så Node selv utvider det (virker også i
+Windows sitt cmd).
+Spesifikasjonen: antall tester rettet fra 25 til 27.
+Testet: npm test 27/27.

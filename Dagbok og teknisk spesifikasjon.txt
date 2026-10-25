@@ -11,7 +11,7 @@ Eldre versjon av dette dokumentet: se git-historikken.
 - Arbeidsform: bli enige om hva og rekkefølge FØR endringer.
   Logg hver endring i Log.txt. Commit etter hvert ferdige steg.
 - Kjør testene før og etter endringer:   npm test
-  (25 tester, ca. 15 sek, egen server + midlertidig SQLite-fil per
+  (27 tester, ca. 20 sek, egen server + midlertidig SQLite-fil per
   test – den ekte Turso-databasen røres aldri.)
 - Start serveren:   npm start   (port 3000, eller PORT=...)
 - Kommentarer og tekster på norsk. Vanilla JS, ingen rammeverk.
