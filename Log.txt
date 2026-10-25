@@ -1217,3 +1217,18 @@ Brukerønske: «Bordet» i vinnervisningen får samme ramme som spillerne
 på sidene (flate, kantlinje, avrundede hjørner, «Bordet» som overskrift
 i samme stil som navnene).
 Testet: skjermbilde Omaha med 5 spillere. npm test 30/30.
+
+------------------------------------------------------------
+2026-10-25 – Omgangsnummeret starter på 1 på en ny dato
+------------------------------------------------------------
+Brukerønske: «Omgang N» skal begynne på 1 når første omgang startes
+på en ny dato.
+- Med database (Render/Turso) var det allerede slik: nummeret er antall
+  omganger som startet tidligere samme dag (norsk tid) + 1, som i
+  dashboardet.
+- Uten database talte serveren omganger siden serverstart. Nå telles de
+  per dato (nextRoundNumberWithoutDb), så telleren nullstilles ved ny dato.
+- En omgang som pågår over midnatt beholder nummeret sitt (regnes ut fra
+  startdatoen).
+Testet: ny test – med database teller ikke gårsdagens omgang (omgang 1),
+uten database nullstilles telleren ved ny dato. npm test 31/31.

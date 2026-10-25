@@ -273,3 +273,29 @@ test('Omgang fortsetter etter omstart; ute huskes; forlatte omganger avsluttes',
   const r = d.omganger.find(o => o.omgang_id === roundId);
   assert.ok(r.ended_at && r.winner_name === null, 'avbrutt omgang har slutt-tid men ingen vinner');
 });
+
+test('Omgangsnummeret starter på 1 på en ny dato', async (t) => {
+  // Med database: en omgang som startet i går teller ikke med i dag
+  const dbFile = tempDbFile();
+  let srv = await startServer({ dbFile });
+  await srv.stop();
+  const db = createClient({ url: 'file:' + dbFile });
+  const igaar = new Date(Date.now() - 24 * 3600e3).toISOString();
+  await db.execute({ sql: 'INSERT INTO omganger (session_id, started_at, ended_at) VALUES (1, ?, ?)', args: [igaar, igaar] });
+  db.close();
+
+  srv = await startServer({ dbFile });
+  t.after(() => srv.stop());
+  const host = srv.host();
+  srv.player('Anne'); srv.player('Bjørn'); await wait(300);
+  host.emit('set_game_mode', 'TEXAS'); await wait(100);
+  host.emit('start_new_hand'); await wait(200);
+  assert.strictEqual(host.state.roundNumber, 1, 'gårsdagens omgang teller ikke');
+
+  // Uten database: telleren nullstilles når datoen skifter
+  const { nextRoundNumberWithoutDb } = require('../server.js');
+  assert.strictEqual(nextRoundNumberWithoutDb('2026-10-24T18:00:00Z'), 1);
+  assert.strictEqual(nextRoundNumberWithoutDb('2026-10-24T20:00:00Z'), 2);
+  assert.strictEqual(nextRoundNumberWithoutDb('2026-10-25T18:00:00Z'), 1, 'ny dato: omgang 1');
+  assert.strictEqual(nextRoundNumberWithoutDb('2026-10-25T19:00:00Z'), 2);
+});

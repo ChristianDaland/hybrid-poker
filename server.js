@@ -780,8 +780,13 @@ function startNewRound() {
   restoredOutUuids = new Set();
 }
 
-// Omganger startet siden serverstart – brukes til «Omgang N» når det ikke er noen database
-let roundsWithoutDb = 0;
+// Uten database: omganger startet per dag (norsk tid) – «Omgang N» starter på 1 hver dag
+const roundsWithoutDb = { date: null, count: 0 };
+function nextRoundNumberWithoutDb(startedAtIso) {
+  const day = localDateString(startedAtIso);
+  if (roundsWithoutDb.date !== day) { roundsWithoutDb.date = day; roundsWithoutDb.count = 0; }
+  return ++roundsWithoutDb.count;
+}
 
 // Gir pågående omgang et nummer: antall omganger som startet tidligere samme dag + 1.
 // Samme regel som dashboardet (getRoundNumbers), så numrene stemmer overens.
@@ -801,7 +806,7 @@ async function assignRoundNumber() {
       console.error('[DB] Feil ved nummerering av omgang:', err.message);
     }
   }
-  gameState.roundNumber = number || ++roundsWithoutDb;
+  gameState.roundNumber = number || nextRoundNumberWithoutDb(gameState.roundStartedAt);
 }
 
 async function ensurePlayerStats(uuid, name) {
@@ -1522,4 +1527,4 @@ if (require.main === module) {
   server.listen(PORT, () => console.log(`Server kjører på port ${PORT}`));
 }
 
-module.exports = { translateHandDescription, retranslateStoredDescription, evaluatePlayerHand, calculateHandScore };
+module.exports = { translateHandDescription, retranslateStoredDescription, evaluatePlayerHand, calculateHandScore, nextRoundNumberWithoutDb };
