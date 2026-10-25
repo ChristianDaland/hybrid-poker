@@ -1232,3 +1232,12 @@ på en ny dato.
   startdatoen).
 Testet: ny test – med database teller ikke gårsdagens omgang (omgang 1),
 uten database nullstilles telleren ved ny dato. npm test 31/31.
+
+------------------------------------------------------------
+2026-10-25 – Snarvei til databaseinspektøren
+------------------------------------------------------------
+- index.html: «Database» (database.html) under tannhjulet sammen med
+  Bordvisning, Dashboard og Veiledning; lenkene står nå to og to.
+  Databaseinspektøren krever admin-passord på Render, som før.
+- veiledning.html oppdatert.
+Testet: skjermbilde av «Flere valg». npm test 31/31.

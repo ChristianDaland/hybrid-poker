@@ -545,8 +545,8 @@
       font-size: 24px;
     }
     .valg .undertekst { font-size: 17px; font-weight: 500; color: var(--tekst-dempet); }
-    .valg-lenker { display: flex; gap: 10px; }
-    .valg-lenker .knapp { flex: 1; min-height: 56px; font-size: 19px; }
+    .valg-lenker { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .valg-lenker .knapp { min-height: 56px; font-size: 19px; }
     .skillelinje { height: 2px; background: var(--linje); margin: 8px 0; }
     .valg.fare { border-color: var(--fare); }
     .valg.fare:hover:not(:disabled) { border-color: #c44; }
@@ -1271,6 +1271,7 @@
               <button class="knapp" onclick="aapneVindu('/board.html', 'PokerBoard')">Bordvisning</button>
               <button class="knapp" onclick="aapneVindu('/dashboard.html', 'PokerDashboard')">Dashboard</button>
               <button class="knapp" onclick="aapneVindu('/veiledning.html', 'PokerVeiledning', 750)">Veiledning</button>
+              <button class="knapp" onclick="aapneVindu('/database.html', 'PokerDatabase')">Database</button>
             </div>
             <div class="skillelinje"></div>
             ${valgHtml('Nytt spill – kast ut alle', 'Alle må logge inn på nytt', null, "spørBekreftelse('kast-ut')", 'fare')}
