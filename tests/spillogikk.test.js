@@ -106,6 +106,40 @@ test('Ute-markering, omgangsvinner og ny omgang', async (t) => {
   assert.ok(host.state.players.every(p => !p.out), 'ny omgang: alle inn igjen');
 });
 
+test('Ny omgang med trekning av nye plasser', async (t) => {
+  const srv = await startServer();
+  t.after(() => srv.stop());
+  const host = srv.host();
+  const S = {};
+  for (const n of ['Anne', 'Bjørn', 'Cato', 'Dina', 'Eva']) { S[n] = srv.player(n); await wait(40); }
+  await wait(200);
+  host.emit('set_game_mode', 'TEXAS'); await wait(100);
+  const rekkefolge = () => host.state.players.map(p => p.name).join(',');
+
+  const for1 = rekkefolge();
+  host.emit('host_reset_out'); await wait(150);
+  assert.strictEqual(rekkefolge(), for1, 'uten trekning beholdes plassene');
+
+  let endret = false;
+  for (let i = 0; i < 6 && !endret; i++) {
+    const for2 = rekkefolge();
+    host.emit('host_reset_out', { drawSeats: true }); await wait(150);
+    assert.deepStrictEqual(host.state.players.map(p => p.seat), [1, 2, 3, 4, 5], 'setene er 1..n');
+    endret = rekkefolge() !== for2;
+  }
+  assert.ok(endret, 'trekningen gir ny rekkefølge');
+  host.emit('start_new_hand'); await wait(150);
+  assert.ok(host.state.players.find(p => p.seat === 1).role.startsWith('Dealer'), 'første dealer etter trekning er sete 1');
+  for (const p of host.state.players.slice(1)) S[p.name].emit('player_fold'), await wait(50);
+  await wait(150);
+  host.emit('host_reset_out', { drawSeats: true }); await wait(150);
+  assert.ok(host.state.players.every(p => p.role === ''), 'rollene fjernes ved trekning');
+
+  host.emit('start_new_hand'); await wait(150);
+  host.emit('host_reset_out', { drawSeats: true }); await wait(150);
+  assert.strictEqual(host.state.phase, 'PREFLOP', 'ingen trekning midt i en hånd');
+});
+
 test('Plassering: flytte med piler, kun mellom hender, trekning kun én gang', async (t) => {
   const srv = await startServer();
   t.after(() => srv.stop());

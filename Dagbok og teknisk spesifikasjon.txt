@@ -122,6 +122,10 @@ Det spilles 3–8 omganger per kveld. En omgang varer til alle unntatt
   sendes (konfetti på statusskjerm og projektor). Ny hånd sperres.
 - Angres en ute-markering, gjenåpnes omgangen.
 - «Ny omgang» (host_reset_out): alle inn igjen, neste hånd = ny omgang.
+  host_reset_out {drawSeats: true} trekker også nye plasser (vanlig
+  mellom omgangene): dealerknappen starter på sete 1 og rollene fjernes.
+  Statustavlen spør «Trekk nye plasser / Behold plassene». Med trekning
+  startes hånden ikke automatisk (spillerne bytter plass først).
   En omgang som ikke var avgjort, avsluttes uten vinner («avbrutt»).
   Det samme ved «Nytt spill».
 - Omstart av serveren (deploy, Render-dvale): den nyeste åpne omgangen
@@ -171,7 +175,7 @@ Klient -> server (spiller):
 Klient -> server (statusskjerm/dealer):
   set_game_mode 'TEXAS'|'OMAHA'|null   start_new_hand   next_phase
   host_fold_player seat            host_set_out {seat, out}
-  host_reset_out                   host_move_player {seat, direction}
+  host_reset_out {drawSeats?}      host_move_player {seat, direction}
   host_kick_all
 Server -> alle:
   state_update {gameMode, phase, board, winnerInfo, roundWinner,

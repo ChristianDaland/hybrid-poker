@@ -463,7 +463,9 @@
 
     socket.on('state_update', (state) => {
       const boardContainer = document.getElementById('board-cards');
-      const newBoard = state.board || [];
+      // Ny omgang startet (håndtellingen nullstilt): forrige hånds kort skal ikke ligge på bordet
+      const aktiv = ['PREFLOP', 'FLOP', 'TURN', 'RIVER'].includes(state.phase);
+      const newBoard = (!aktiv && !state.handNumber) ? [] : (state.board || []);
 
       if (newBoard.length === 0) {
         boardContainer.innerHTML = '';

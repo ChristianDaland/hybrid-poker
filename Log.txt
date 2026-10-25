@@ -1162,3 +1162,30 @@ andre spillerne på sidene er trukket ut i sdRamme().
 Testet: tavledata-testen sjekker winnerHands (navn = vinnerne, 5 kort,
 i Omaha 2 fra hånden + 3 fra bordet). Skjermbilde med brukerens kort
 (sendt inn som tilstand i nettleseren). npm test 29/29.
+
+------------------------------------------------------------
+2026-10-25 – Trekke nye plasser ved ny omgang
+------------------------------------------------------------
+Brukerønske: Mellom omgangene trekkes alltid nye plasser, så man ikke
+sitter på samme sted hele kvelden.
+server.js: host_reset_out {drawSeats: true} trekker nye plasser
+(randomizePlayerSeats: dealerknappen starter på sete 1) og fjerner
+rollene fra forrige hånd. Uten flagget som før.
+index.html:
+- «Start ny omgang» (gullknappen når omgangen er avgjort) åpner et panel
+  over knappen: «Trekk nye plasser» (hånden startes ikke automatisk –
+  spillerne bytter plass, så Start ny hånd) / «Behold plassene» (ny hånd
+  med en gang, som før) / Avbryt. «Ny omgang» under tannhjulet har de
+  samme valgene.
+- Etter at ny omgang er startet og før første hånd vises bordet «rent»:
+  alle «Klar», ingen gamle bordkort, fasespor eller brikker, og pillen
+  viser hvem som blir dealer (sete 1 etter trekning).
+- Rettet: nøkkelen for bortklikkede visninger brukte hånd-/omgangsnummer,
+  som nullstilles ved ny omgang, så vinnervisningen dukket opp igjen.
+  Nå: fase + bordkort + vinner.
+board.html: viser ikke forrige hånds kort etter at ny omgang er startet.
+Testet: ny test (uten trekning samme plasser; med trekning seter 1..n
+og ny rekkefølge; dealer = sete 1; roller fjernet; ingen trekning midt i
+hånd). I headless Chromium: omgang avgjort -> Trekk nye plasser -> nye
+plasser, «Send musa til» = faktisk dealer; Behold plassene -> ny hånd
+med samme plasser. npm test 30/30.

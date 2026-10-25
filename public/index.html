@@ -517,6 +517,7 @@
     .panel[hidden] { display: none; }
     .setemeny { left: 670px; top: 250px; width: 600px; }
     .flere-valg { right: 48px; bottom: 132px; width: 520px; }
+    .ny-omgang-valg { left: 660px; bottom: 132px; width: 600px; }
 
     .panel-topp { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
     .panel-topp .avatar { flex-basis: 64px; width: 64px; height: 64px; font-size: 24px; }
@@ -617,6 +618,7 @@
 
       <div class="panel setemeny skjules" id="setemeny" role="dialog" aria-label="Setemeny" hidden></div>
       <div class="panel flere-valg skjules" id="flere-valg" role="dialog" aria-label="Flere valg" hidden></div>
+      <div class="panel ny-omgang-valg skjules" id="ny-omgang-valg" role="dialog" aria-label="Ny omgang" hidden></div>
     </div>
   </div>
 
@@ -701,10 +703,14 @@
     }
 
     const AKTIVE_FASER = ['PREFLOP', 'FLOP', 'TURN', 'RIVER'];
+    // Før første hånd: ved oppstart (VENTING) og etter at en ny omgang er startet
+    // (håndtellingen er nullstilt) – da gjelder ikke forrige hånds statuser, kort og brikker
+    const forForsteHand = state => state.phase === 'VENTING' ||
+      (!AKTIVE_FASER.includes(state.phase) && !state.handNumber);
     const MAKS_SPILLERE = 8; // samme som MAX_PLAYERS på serveren
     function erVinner(state, p) {
       const winners = (state.winnerInfo && state.winnerInfo.winners) || [];
-      return ['SHOWDOWN', 'FINISHED'].includes(state.phase) && winners.includes(p.name);
+      return ['SHOWDOWN', 'FINISHED'].includes(state.phase) && !forForsteHand(state) && winners.includes(p.name);
     }
 
     // ============================================================
@@ -743,7 +749,10 @@
       let aktiv = FASER.indexOf(state.phase);
       let navn = FASENAVN.slice();
       let passertTil = aktiv - 1;
-      if (state.phase === 'FINISHED') {
+      if (forForsteHand(state)) {
+        aktiv = -1;
+        passertTil = -1;
+      } else if (state.phase === 'FINISHED') {
         // Avgjort før showdown: fasene fram til siste åpnede kort er passert
         navn[4] = 'Avgjort';
         aktiv = 4;
@@ -763,7 +772,7 @@
 
     let forrigeBord = [];
     function tegnFellesskort(state) {
-      const board = state.board || [];
+      const board = forForsteHand(state) ? [] : (state.board || []);
       const html = [];
       for (let i = 0; i < 5; i++) {
         if (board[i]) html.push(kortHtml(board[i], forrigeBord[i] !== board[i]));
@@ -781,7 +790,7 @@
       if (p.out) return { klasse: 'ute', tekst: 'Ute' };
       if (p.waiting) return { klasse: 'venter', tekst: 'Med fra neste hånd' };
       if (erVinner(state, p)) return { klasse: 'vinner', tekst: 'Vinner' };
-      if (state.phase === 'VENTING') return { klasse: '', tekst: 'Klar' };
+      if (forForsteHand(state)) return { klasse: '', tekst: 'Klar' };
       if (p.folded) return { klasse: 'kastet', tekst: 'Kastet' };
       return { klasse: 'i-hand', tekst: 'I hånden' };
     }
@@ -818,7 +827,7 @@
       const markorer = [];
       spillere.forEach((p, i) => {
         const plass = plasser[i];
-        if (!plass || !p.role) return;
+        if (!plass || !p.role || forForsteHand(state)) return;
         const [x, y] = plass.markor;
         if (p.role === 'Dealer / Lilleblind') {
           markorer.push(`<div class="markor markor-d" style="left: ${x - 34}px; top: ${y}px">D</div>`);
@@ -847,9 +856,11 @@
     const skjulteVisninger = new Set();
     const visningsNokler = {};
     function visningsNokkel(id, state) {
-      // Omgangsvisningen følger vinneren; de andre følger hånden og fasen
-      const del = id === 'visning-omgang' ? [state.roundWinner] : [state.handNumber, state.phase];
-      return [id, state.roundNumber, ...del].join('|');
+      // Omgangsvisningen følger omgangen og vinneren. De andre følger hånden (fase, bordkort,
+      // vinner) – ikke hånd-/omgangsnummeret, som nullstilles når ny omgang startes.
+      if (id === 'visning-omgang') return [id, state.roundNumber, state.roundWinner].join('|');
+      const vinner = state.winnerInfo ? state.winnerInfo.winnerName : '';
+      return [id, state.phase, (state.board || []).join(','), vinner].join('|');
     }
 
     function settVisning(id, html) {
@@ -1013,9 +1024,11 @@
     let musTimer = null;
     let aapentSete = null;        // navnet på spilleren i setemenyen (følger spilleren når hen flyttes)
     let flereValgAapen = false;
+    let nyOmgangAapen = false;    // valget «trekk nye plasser / behold plassene» over hovedknappen
     let bekreftelse = null;       // 'kast-ut' | 'ny-omgang' | null
     let sisteUteNavn = null;      // sist markerte «ute» – for «Angre ute» når omgangen er avgjort
     let sisteDealerSete = 0;      // dealerens sete i forrige hånd (rollen fjernes hvis dealeren blir ute)
+    let dealerFraStart = false;   // nye plasser er trukket: serveren starter dealerknappen på sete 1
     // «Start ny omgang»: ny hånd sendes først når serveren har bekreftet den nye omgangen,
     // ellers kan host_reset_out (som venter på databasen) bli ferdig etter at hånden er delt ut
     let ventPaNyOmgang = false;
@@ -1028,7 +1041,7 @@
     }
     function skjulKontroller() {
       // Ikke skjul mens en meny er åpen
-      if (aapentSete || flereValgAapen) { musTimer = setTimeout(skjulKontroller, 5000); return; }
+      if (aapentSete || flereValgAapen || nyOmgangAapen) { musTimer = setTimeout(skjulKontroller, 5000); return; }
       document.body.classList.remove('mus-aktiv');
     }
     ['mousemove', 'mousedown', 'wheel', 'touchstart'].forEach(ev =>
@@ -1043,14 +1056,15 @@
     function nesteDealer(state) {
       const aktive = state.players.filter(p => !p.out);
       if (aktive.length === 0) return null;
-      return aktive.find(p => p.seat > sisteDealerSete) || aktive[0];
+      const fra = dealerFraStart ? 0 : sisteDealerSete;
+      return aktive.find(p => p.seat > fra) || aktive[0];
     }
 
     function hovedSteg(state) {
       // Ny hånd startes først fra bordet, ikke fra vinnervisningen
       const visning = aapenResultatvisning();
       if (visning) return { tekst: 'Tilbake til bordet', handling: () => tilbakeTilBordet(visning) };
-      if (state.roundWinner) return { tekst: 'Start ny omgang', handling: () => { ventPaNyOmgang = true; socket.emit('host_reset_out'); } };
+      if (state.roundWinner) return { tekst: 'Start ny omgang', handling: () => { nyOmgangAapen = true; aapentSete = null; flereValgAapen = false; tegnKontroller(state); } };
       switch (state.phase) {
         case 'PREFLOP': return { tekst: 'Del flop', handling: () => socket.emit('next_phase') };
         case 'FLOP': return { tekst: 'Del turn', handling: () => socket.emit('next_phase') };
@@ -1075,13 +1089,15 @@
 
     function tegnKontroller(state) {
       const dealer = state.players.find(p => (p.role || '').startsWith('Dealer'));
-      if (dealer) sisteDealerSete = dealer.seat;
+      if (erAktivHand(state)) dealerFraStart = false;
+      if (dealer && !dealerFraStart) sisteDealerSete = dealer.seat;
 
       let musTekst;
       if (!state.gameMode || state.players.length === 0) musTekst = 'Venter på spillere';
       else if (state.roundWinner) musTekst = 'Omgangen er avgjort';
       else if (erAktivHand(state) && dealer) musTekst = `Dealer: ${dealer.name}`;
       else if (state.phase === 'SHOWDOWN' || state.phase === 'FINISHED') {
+        // Etter forrige hånd, eller etter at ny omgang er startet: hvem blir dealer
         const neste = nesteDealer(state);
         musTekst = neste ? `Send musa til ${neste.name}` : 'Venter på spillere';
       } else musTekst = 'Klar til første hånd';
@@ -1097,6 +1113,39 @@
 
       tegnSetemeny(state);
       tegnFlereValg(state);
+      tegnNyOmgangValg(state);
+    }
+
+    // ---------------- Ny omgang: trekk nye plasser eller behold dem ----------------
+    // Med trekning startes ikke hånden automatisk, så spillerne rekker å bytte plass.
+    function nyOmgang(trekk) {
+      if (!trekk && lastState && lastState.roundWinner) ventPaNyOmgang = true; // ny hånd med en gang
+      if (trekk) dealerFraStart = true;
+      socket.emit('host_reset_out', { drawSeats: !!trekk });
+      nyOmgangAapen = false;
+      flereValgAapen = false;
+      bekreftelse = null;
+      tegnKontroller(lastState);
+    }
+    function lukkNyOmgang() { nyOmgangAapen = false; tegnKontroller(lastState); }
+
+    function nyOmgangKnapper(avbryt) {
+      return `
+        <div class="valg-liste">
+          ${valgHtml('Trekk nye plasser', 'Alle får ny plass – start hånden når dere har byttet', null, 'nyOmgang(true)')}
+          ${valgHtml('Behold plassene', 'Ny omgang med de samme plassene', null, 'nyOmgang(false)')}
+          <button class="knapp valg" onclick="${avbryt}">Avbryt</button>
+        </div>`;
+    }
+
+    function tegnNyOmgangValg(state) {
+      const panel = document.getElementById('ny-omgang-valg');
+      if (!nyOmgangAapen || !state.roundWinner) { nyOmgangAapen = false; panel.hidden = true; return; }
+      panel.innerHTML = `
+        <div class="bekreft-tekst">Start ny omgang</div>
+        <div class="bekreft-forklaring">Alle blir med igjen. Vil dere trekke nye plasser?</div>
+        ${nyOmgangKnapper('lukkNyOmgang()')}`;
+      panel.hidden = false;
     }
 
     // Et valg i en meny: tilgjengelig, eller nedtonet med grunnen som undertekst
@@ -1112,6 +1161,7 @@
       if (!p) return;
       aapentSete = p.name;
       flereValgAapen = false;
+      nyOmgangAapen = false;
       bekreftelse = null;
       visKontroller();
       tegnKontroller(lastState);
@@ -1173,12 +1223,11 @@
     function toggleFlereValg() {
       flereValgAapen = !flereValgAapen;
       bekreftelse = null;
-      if (flereValgAapen) aapentSete = null;
+      if (flereValgAapen) { aapentSete = null; nyOmgangAapen = false; }
       tegnKontroller(lastState);
     }
     function velgSpilletype(mode) { socket.emit('set_game_mode', mode); flereValgAapen = false; tegnKontroller(lastState); }
     function spørBekreftelse(hva) { bekreftelse = hva; tegnKontroller(lastState); }
-    function nyOmgang() { socket.emit('host_reset_out'); bekreftelse = null; flereValgAapen = false; tegnKontroller(lastState); }
     function kastUtAlle() { socket.emit('host_kick_all'); bekreftelse = null; flereValgAapen = false; tegnKontroller(lastState); }
     function aapneVindu(url, navn, w) { window.open(url, navn, `width=${w || 1200},height=800`); }
 
@@ -1198,10 +1247,7 @@
         panel.innerHTML = `
           <div class="bekreft-tekst">Starte ny omgang?</div>
           <div class="bekreft-forklaring">Alle blir med igjen. ${state.roundWinner ? '' : 'Omgangen som pågår, er ikke avgjort og avsluttes uten vinner.'}</div>
-          <div class="valg-rad">
-            <button class="knapp valg" onclick="spørBekreftelse(null)">Avbryt</button>
-            <button class="knapp valg" onclick="nyOmgang()">Ja, ny omgang</button>
-          </div>`;
+          ${nyOmgangKnapper('spørBekreftelse(null)')}`;
       } else {
         const aktiv = erAktivHand(state);
         const spilletype = state.gameMode === 'OMAHA' ? 'Omaha' : state.gameMode === 'TEXAS' ? "Texas Hold'em" : null;

@@ -1310,10 +1310,16 @@ io.on('connection', (socket) => {
     }
   }));
 
-  // Ny omgang: alle er med igjen, og neste hånd hører til en ny omgang
-  socket.on('host_reset_out', safeHandler('host_reset_out', async () => {
+  // Ny omgang: alle er med igjen, og neste hånd hører til en ny omgang.
+  // {drawSeats: true} trekker nye plasser (pleier å gjøres mellom omgangene).
+  socket.on('host_reset_out', safeHandler('host_reset_out', async (data) => {
     if (isHandInProgress()) return;
     Object.values(players).forEach(p => { p.out = false; });
+    if (data && data.drawSeats) {
+      // Nye plasser: dealerknappen starter på nytt (sete 1), rollene fra forrige hånd gjelder ikke
+      randomizePlayerSeats();
+      Object.values(players).forEach(p => { p.role = ''; });
+    }
     await closeUnfinishedRound();
     startNewRound();
     updateAll();
