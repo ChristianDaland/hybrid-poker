@@ -306,7 +306,7 @@
     .visning-hand { font-size: 40px; font-weight: 600; color: var(--gull-lys); }
     .visning-dempet { font-size: 36px; color: var(--tekst-dempet); }
 
-    .vinnerkort { display: flex; gap: 20px; margin: 34px 0 30px; }
+    .vinnerkort { display: flex; gap: 20px; margin: 30px 0 26px; }
     .vinnerkort .kort {
       width: 150px;
       height: 210px;
@@ -314,12 +314,46 @@
       border-radius: 14px;
       box-shadow: 0 0 0 4px var(--gull), 0 14px 30px rgba(0, 0, 0, 0.6);
     }
-    .andre-hender { display: flex; gap: 40px; justify-content: center; flex-wrap: wrap; max-width: 1800px; }
-    .annen-hand { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-    .annen-navn { font-size: 24px; font-weight: 700; }
-    .annen-beskr { font-size: 19px; color: var(--tekst-dempet); }
-    .smakort { display: flex; gap: 6px; margin-top: 8px; }
-    .smakort .kort { width: 60px; height: 84px; font-size: 30px; border-radius: 8px; }
+
+    /* Showdown: vinneren i midten, de andre spillerne i kolonner på sidene */
+    .sd {
+      display: grid;
+      grid-template-columns: 480px 1fr 480px;
+      align-items: center;
+      gap: 20px;
+      width: 1920px;
+      padding: 0 36px;
+    }
+    .sd-midt { display: flex; flex-direction: column; align-items: center; min-width: 0; }
+    .sd-midt .visning-navn { font-size: 96px; max-width: 100%; }
+    .sd-midt .visning-navn.lang { font-size: 68px; }
+    .sd-side { display: flex; flex-direction: column; gap: 22px; }
+    .sd-side.venstre { align-items: flex-start; text-align: left; }
+    .sd-side.hoyre { align-items: flex-end; text-align: right; }
+
+    .sd-paa-handen { display: flex; gap: 34px; justify-content: center; }
+    .sd-gruppe { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .sd-etikett { font-size: 16px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--tekst-dempet); }
+    .hullkort { display: flex; gap: 8px; }
+    .hullkort .kort { width: 80px; height: 112px; font-size: 40px; border-radius: 10px; }
+
+    .sd-spiller {
+      padding: 14px 18px;
+      border-radius: 18px;
+      background: var(--flate);
+      border: 2px solid var(--linje);
+      max-width: 480px;
+    }
+    .sd-spiller-navn { font-size: 24px; font-weight: 700; }
+    .sd-spiller-beskr { font-size: 19px; color: var(--tekst-dempet); margin-bottom: 10px; }
+    .sd-rad { display: flex; gap: 14px; align-items: flex-end; }
+    .sd-side.hoyre .sd-rad { justify-content: flex-end; }
+    .sd-rad .sd-gruppe { align-items: flex-start; gap: 4px; }
+    .sd-rad .sd-etikett { font-size: 13px; letter-spacing: 1px; }
+    .smakort { display: flex; gap: 5px; }
+    .smakort .kort { width: 42px; height: 60px; font-size: 22px; border-radius: 6px; }
+    /* Kortene fra hånden som er med i den beste kombinasjonen */
+    .kort.brukt { box-shadow: 0 0 0 3px var(--gull), 0 4px 10px rgba(0, 0, 0, 0.5); }
 
     /* Omgangen er avgjort: ligger over showdown-visningen */
     #visning-omgang { z-index: 6; overflow: hidden; }
@@ -834,26 +868,47 @@
       const info = state.winnerInfo;
       const winners = info.winners || [];
       const navn = navneliste(winners);
-      // Vinnerkortene fra serveren; ellers vinnerens hullkort (kun kort serveren har sendt)
+      const vinnere = state.players.filter(p => winners.includes(p.name));
+      // Vinnerkortene fra serveren; ellers første vinners beste fem (kun kort serveren har sendt)
       let kort = (info.rawCards || []).map(kortKode);
-      if (kort.length === 0) {
-        const v = state.players.find(p => p.name === winners[0]);
-        kort = v ? v.cards : [];
-      }
+      if (kort.length === 0 && vinnere[0]) kort = vinnere[0].bestCards || [];
+
+      // Kortene på hånden; de som er med i den beste kombinasjonen, får gullkant
+      const handHtml = (p, klasse) => `<div class="${klasse}">${(p.cards || []).map(c =>
+        kortHtml(c).replace('class="kort', `class="kort ${(p.bestCards || []).includes(c) ? 'brukt' : ''}`)).join('')}</div>`;
+
+      const paaHanden = vinnere.map(p => `
+        <div class="sd-gruppe">
+          <div class="sd-etikett">${vinnere.length > 1 ? escapeHtml(p.name) + ' – ' : ''}På hånden</div>
+          ${handHtml(p, 'hullkort')}
+        </div>`).join('');
+
+      // De andre som var med til showdown, sortert etter styrke, fordelt venstre/høyre
       const andre = state.players
         .filter(p => p.cards && p.cards.length > 0 && !winners.includes(p.name))
         .sort((a, b) => (b.handRank || 0) - (a.handRank || 0));
+      const spillerHtml = p => `
+        <div class="sd-spiller">
+          <div class="sd-spiller-navn">${escapeHtml(p.name)}</div>
+          <div class="sd-spiller-beskr">${escapeHtml(p.handDescr || '')}</div>
+          <div class="sd-rad">
+            <div class="sd-gruppe"><div class="sd-etikett">Beste hånd</div>
+              <div class="smakort">${(p.bestCards || []).map(c => kortHtml(c)).join('')}</div></div>
+            <div class="sd-gruppe"><div class="sd-etikett">På hånden</div>${handHtml(p, 'smakort')}</div>
+          </div>
+        </div>`;
+
       return `
-        <div class="visning-over">Vinner av hånd ${Number(state.handNumber) || ''}</div>
-        <div class="visning-navn ${navn.length > 22 ? 'lang' : ''}">${escapeHtml(navn)}</div>
-        <div class="visning-hand">${escapeHtml(info.descr)}</div>
-        <div class="vinnerkort">${kort.map(c => kortHtml(c)).join('')}</div>
-        <div class="andre-hender">${andre.map(p => `
-          <div class="annen-hand">
-            <div class="annen-navn">${escapeHtml(p.name)}</div>
-            <div class="annen-beskr">${escapeHtml(p.handDescr || '')}</div>
-            <div class="smakort">${p.cards.map(c => kortHtml(c)).join('')}</div>
-          </div>`).join('')}
+        <div class="sd">
+          <div class="sd-side venstre">${andre.filter((_, i) => i % 2 === 0).map(spillerHtml).join('')}</div>
+          <div class="sd-midt">
+            <div class="visning-over">Vinner av hånd ${Number(state.handNumber) || ''}</div>
+            <div class="visning-navn ${navn.length > 12 ? 'lang' : ''}">${escapeHtml(navn)}</div>
+            <div class="visning-hand">${escapeHtml(info.descr)}</div>
+            <div class="vinnerkort">${kort.map(c => kortHtml(c)).join('')}</div>
+            <div class="sd-paa-handen">${paaHanden}</div>
+          </div>
+          <div class="sd-side hoyre">${andre.filter((_, i) => i % 2 === 1).map(spillerHtml).join('')}</div>
         </div>`;
     }
 

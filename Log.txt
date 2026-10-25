@@ -1115,3 +1115,23 @@ Testet i headless Chromium: showdown -> Tilbake til bordet -> Start ny
 hånd; marker to ute -> omgang avgjort -> Tilbake til bordet -> Start ny
 omgang (omgang 2, hånd 1); alle kastet seg -> Tilbake til bordet.
 npm test 29/29.
+
+------------------------------------------------------------
+2026-10-25 – Showdown viser også kortene på hånden
+------------------------------------------------------------
+Brukerønske: Vinnervisningen viste beste kombinasjon for vinneren, men
+ikke hvilke kort spillerne faktisk hadde på hånden. Begge deler skal
+vises, de andre spillerne listet på sidene.
+server.js: nytt felt players[].bestCards (beste fem kort) ved showdown,
+kun for spillere som ikke kastet seg (består bare av hånden deres og
+bordet – kort som vises uansett). Nullstilles ved ny hånd.
+index.html (showdown):
+- Midten: vinner, håndnavn, de fem vinnerkortene og «På hånden» med
+  vinnerens kort (ved delt pott for hver vinner).
+- Sidene: de andre som var med til showdown, sortert etter styrke og
+  fordelt venstre/høyre (plass til 7): navn, håndnavn, «Beste hånd» og
+  «På hånden». Kortene fra hånden som er med i beste hånd, har gullkant.
+Testet: tavledata-testen sjekker bestCards (5 kort, i Omaha nøyaktig 2
+fra hånden + 3 fra bordet, tomt for den som kastet seg og før showdown).
+Skjermbilder: Omaha med 5 og 8 spillere, Texas med delt pott på tre.
+npm test 29/29.

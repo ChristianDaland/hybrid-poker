@@ -215,14 +215,20 @@ test('Tavledata: håndnummer, omgangsnummer, vinnere og håndnavn kun ved showdo
   assert.strictEqual(host.state.handNumber, 2);
   A.emit('player_fold'); await wait(100);
   for (let i = 0; i < 3; i++) {
-    assert.ok(host.state.players.every(p => p.handDescr === null), 'ingen håndnavn før showdown');
+    assert.ok(host.state.players.every(p => p.handDescr === null && p.bestCards.length === 0), 'ingen håndnavn før showdown');
     host.emit('next_phase'); await wait(120);
   }
   host.emit('next_phase'); await wait(200);
   assert.strictEqual(host.state.phase, 'SHOWDOWN');
   assert.strictEqual(P('Anne').handDescr, null, 'ingen håndnavn for den som kastet seg');
+  assert.deepStrictEqual(P('Anne').bestCards, [], 'ingen beste kort for den som kastet seg');
   for (const n of ['Bjørn', 'Cato']) {
     assert.ok(P(n).handDescr && P(n).handRank > 0, `${n} har håndnavn og styrke`);
+    // Omaha: beste fem = nøyaktig 2 fra hånden + 3 fra bordet
+    const best = P(n).bestCards;
+    assert.strictEqual(best.length, 5);
+    assert.strictEqual(best.filter(c => P(n).cards.includes(c)).length, 2, `${n}: 2 fra hånden`);
+    assert.strictEqual(best.filter(c => host.state.board.includes(c)).length, 3, `${n}: 3 fra bordet`);
   }
   const best = Math.max(P('Bjørn').handRank, P('Cato').handRank);
   const expected = ['Bjørn', 'Cato'].filter(n => P(n).handRank === best);
