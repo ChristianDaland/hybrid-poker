@@ -165,3 +165,71 @@ test('Nytt spill: alle kastes ut, sovende telefon logges ikke stille inn igjen',
   c2.emit('join_game', { name: 'Cato', uuid: 'u-cato' }); await wait(200);
   assert.strictEqual(host.state.players.length, 1);
 });
+
+test('Maks 8 spillere: den niende avvises, frakoblet spiller slipper inn igjen', async (t) => {
+  const srv = await startServer();
+  t.after(() => srv.stop());
+  const host = srv.host();
+  const S = [];
+  for (let i = 1; i <= 8; i++) { S.push(srv.player('Spiller' + i, 'u-' + i)); await wait(40); }
+  await wait(200);
+  assert.strictEqual(host.state.players.length, 8);
+
+  const niende = srv.player('Niende'); await wait(200);
+  assert.match(niende.joinFailed && niende.joinFailed.reason, /fullt.*8/, 'den niende avvises');
+  assert.strictEqual(host.state.players.length, 8);
+
+  S[2].disconnect(); await wait(150);
+  const sammeUuid = srv.player('Spiller3', 'u-3'); await wait(200);
+  assert.ok(sammeUuid.joinedData && !sammeUuid.joinFailed, 'samme UUID slipper inn ved fullt bord');
+
+  S[3].disconnect(); await wait(150);
+  const nyTelefon = srv.player('Spiller4'); await wait(200);
+  assert.strictEqual(nyTelefon.uuid, 'u-4', 'samme navn tar over frakoblet plass ved fullt bord');
+  assert.strictEqual(host.state.players.length, 8);
+});
+
+test('Tavledata: håndnummer, omgangsnummer, vinnere og håndnavn kun ved showdown', async (t) => {
+  const srv = await startServer();
+  t.after(() => srv.stop());
+  const host = srv.host();
+  const P = n => findPlayer(host.state, n);
+  const A = srv.player('Anne'), B = srv.player('Bjørn'); srv.player('Cato'); await wait(300);
+  host.emit('set_game_mode', 'OMAHA'); await wait(100);
+  assert.strictEqual(host.state.handNumber, 0);
+  assert.strictEqual(host.state.roundNumber, null, 'ingen omgang før første hånd');
+
+  host.emit('start_new_hand'); await wait(150);
+  assert.strictEqual(host.state.handNumber, 1);
+  assert.strictEqual(host.state.roundNumber, 1);
+
+  // Alle andre kastet seg: én vinner, ingen håndnavn
+  A.emit('player_fold'); await wait(60); B.emit('player_fold'); await wait(200);
+  assert.deepStrictEqual(host.state.winnerInfo.winners, ['Cato']);
+  assert.ok(host.state.players.every(p => p.handDescr === null && p.handRank === null));
+
+  // Showdown: håndnavn for de som ble med, ikke for den som kastet seg
+  host.emit('next_phase'); await wait(150);
+  assert.strictEqual(host.state.handNumber, 2);
+  A.emit('player_fold'); await wait(100);
+  for (let i = 0; i < 3; i++) {
+    assert.ok(host.state.players.every(p => p.handDescr === null), 'ingen håndnavn før showdown');
+    host.emit('next_phase'); await wait(120);
+  }
+  host.emit('next_phase'); await wait(200);
+  assert.strictEqual(host.state.phase, 'SHOWDOWN');
+  assert.strictEqual(P('Anne').handDescr, null, 'ingen håndnavn for den som kastet seg');
+  for (const n of ['Bjørn', 'Cato']) {
+    assert.ok(P(n).handDescr && P(n).handRank > 0, `${n} har håndnavn og styrke`);
+  }
+  const best = Math.max(P('Bjørn').handRank, P('Cato').handRank);
+  const expected = ['Bjørn', 'Cato'].filter(n => P(n).handRank === best);
+  assert.deepStrictEqual([...host.state.winnerInfo.winners].sort(), expected);
+
+  // Ny omgang: nytt omgangsnummer, håndtellingen starter på nytt
+  host.emit('host_reset_out'); await wait(100);
+  host.emit('start_new_hand'); await wait(150);
+  assert.strictEqual(host.state.roundNumber, 2);
+  assert.strictEqual(host.state.handNumber, 1);
+  assert.ok(host.state.players.every(p => p.handDescr === null), 'håndnavn nullstilles ved ny hånd');
+});

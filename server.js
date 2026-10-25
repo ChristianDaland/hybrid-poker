@@ -425,7 +425,9 @@ let gameState = {
   roundFinished: false,  // Omgangen er avgjort (vinner funnet)
   winnerUuids: [], // Kun på serveren – UUID gir tilgang til kortene og må ikke sendes ut
   dealerSeat: 0, // Setenummeret til forrige dealer (0 = ingen ennå)
-  seatsDrawn: false // Plassene er trukket – bytte av spilletype trekker ikke på nytt
+  seatsDrawn: false, // Plassene er trukket – bytte av spilletype trekker ikke på nytt
+  handNumber: 0,     // «Hånd N» i pågående omgang (vises på statusskjermen)
+  roundNumber: null  // «Omgang N» = N-te omgang som startet denne dagen (som i dashboardet)
 };
 
 let players = {};
@@ -438,6 +440,8 @@ const kickedUuids = new Set();
 // Hvor lenge en frakoblet spiller beholder plassen sin (telefoner som låser seg kobler fra)
 const DISCONNECT_GRACE_MS = Number(process.env.DISCONNECT_GRACE_MS) || 5 * 60 * 1000;
 const MAX_NAME_LENGTH = 15;
+// Flere enn 8 får ikke plass rundt bordet på statusskjermen
+const MAX_PLAYERS = Number(process.env.MAX_PLAYERS) || 8;
 const ACTIVE_HAND_PHASES = ['PREFLOP', 'FLOP', 'TURN', 'RIVER'];
 
 function isHandInProgress() {
@@ -624,6 +628,12 @@ async function resumeOrCloseOpenRounds() {
       currentRoundId = Number(r.omgang_id);
       gameState.roundStartedAt = r.started_at;
       try { restoredOutUuids = new Set(JSON.parse(r.out_uuids || '[]')); } catch (e) { restoredOutUuids = new Set(); }
+      const handCount = await db.execute({
+        sql: "SELECT COUNT(*) AS n FROM winning_hands WHERE omgang_id = ?",
+        args: [currentRoundId]
+      });
+      gameState.handNumber = Number(handCount.rows[0].n);
+      await assignRoundNumber();
       console.log(`[DB] Fortsetter omgang ${currentRoundId} etter omstart (${restoredOutUuids.size} ute).`);
     } else {
       await db.execute({
@@ -765,7 +775,33 @@ function startNewRound() {
   currentRoundId = null;
   gameState.roundStartedAt = null;
   gameState.roundFinished = false;
+  gameState.handNumber = 0;
+  gameState.roundNumber = null;
   restoredOutUuids = new Set();
+}
+
+// Omganger startet siden serverstart – brukes til «Omgang N» når det ikke er noen database
+let roundsWithoutDb = 0;
+
+// Gir pågående omgang et nummer: antall omganger som startet tidligere samme dag + 1.
+// Samme regel som dashboardet (getRoundNumbers), så numrene stemmer overens.
+async function assignRoundNumber() {
+  if (gameState.roundNumber || !gameState.roundStartedAt) return;
+  let number = null;
+  if (db) {
+    try {
+      const range = localDayRange(parseDateParam(localDateString(gameState.roundStartedAt)));
+      const res = await db.execute({
+        sql: `SELECT COUNT(*) AS n FROM omganger
+              WHERE started_at >= ? AND started_at < ? AND omgang_id != ?`,
+        args: [range.start, gameState.roundStartedAt, Number(currentRoundId) || -1]
+      });
+      number = Number(res.rows[0].n) + 1;
+    } catch (err) {
+      console.error('[DB] Feil ved nummerering av omgang:', err.message);
+    }
+  }
+  gameState.roundNumber = number || ++roundsWithoutDb;
 }
 
 async function ensurePlayerStats(uuid, name) {
@@ -920,6 +956,10 @@ function startNewHandLogic() {
   if (gameState.roundFinished) startNewRound();
   if (!gameState.roundStartedAt) gameState.roundStartedAt = new Date().toISOString();
 
+  gameState.handNumber++;
+  // Håndnavnene fra forrige showdown gjelder ikke lenger
+  getSeatedPlayers().forEach(p => { p.handDescr = null; p.handRank = null; });
+
   // Spillere som er ute nullstilles og står over
   getSeatedPlayers().filter(p => p.out).forEach(p => {
     p.folded = true;
@@ -975,6 +1015,7 @@ async function finishIfOnlyOneLeft() {
   gameState.winnerUuids = [remaining[0].uuid];
   gameState.winnerInfo = {
     winnerName: remaining[0].name,
+    winners: [remaining[0].name],
     descr: 'Alle andre kastet seg',
     foldedWin: true,
     rawCards: [],
@@ -1057,6 +1098,12 @@ io.on('connection', (socket) => {
       players[socket.id] = playerData;
       await ensurePlayerStats(playerData.uuid, playerData.name);
     } else {
+      // Fullt bord: kun nye spillere avvises – de som tar over sin egen plass slipper alltid inn
+      if (Object.keys(players).length >= MAX_PLAYERS) {
+        socket.emit('join_failed', { reason: `Bordet er fullt (maks ${MAX_PLAYERS} spillere).` });
+        return;
+      }
+
       let playerUuid = clientUuid;
       if (!playerUuid) {
         try {
@@ -1110,14 +1157,16 @@ io.on('connection', (socket) => {
     updateAll();
   }));
 
-  socket.on('start_new_hand', safeHandler('start_new_hand', () => {
+  socket.on('start_new_hand', safeHandler('start_new_hand', async () => {
     startNewHandLogic();
+    await assignRoundNumber();
     updateAll();
   }));
 
   socket.on('next_phase', safeHandler('next_phase', async () => {
     if (gameState.phase === 'FINISHED' || gameState.phase === 'SHOWDOWN') {
       startNewHandLogic();
+      await assignRoundNumber();
       updateAll();
       return;
     }
@@ -1154,6 +1203,7 @@ io.on('connection', (socket) => {
         gameState.phase = 'FINISHED';
         gameState.winnerInfo = {
           winnerName: 'Ingen',
+          winners: [],
           descr: 'Ingen gyldige hender',
           foldedWin: true,
           rawCards: [],
@@ -1162,6 +1212,12 @@ io.on('connection', (socket) => {
         updateAll();
         return;
       }
+
+      // Håndnavn og styrke for alle som var med til showdown (kortene deres vises uansett)
+      solvedHands.forEach(sh => {
+        sh.player.handDescr = translateHandDescription(sh.solved.descr);
+        sh.player.handRank = calculateHandScore(sh.solved);
+      });
 
       const handsOnly = solvedHands.map(sh => sh.solved);
       const winningHands = Hand.winners(handsOnly);
@@ -1182,6 +1238,7 @@ io.on('connection', (socket) => {
       gameState.winnerUuids = winners.map(w => w.player.uuid);
       gameState.winnerInfo = {
         winnerName: winnerText,
+        winners: winners.map(w => w.player.name),
         descr: translateHandDescription(rawDescr),
         foldedWin: false,
         rawCards: winners[0] ? winners[0].solved.cards : [],
@@ -1402,6 +1459,8 @@ function getPublicState() {
     board: gameState.board,
     winnerInfo: gameState.winnerInfo,
     roundWinner: getRoundWinner(),
+    handNumber: gameState.handNumber,
+    roundNumber: gameState.roundNumber,
     players: playerList.map(p => ({
       name: p.name,
       seat: p.seat,
@@ -1410,7 +1469,10 @@ function getPublicState() {
       waiting: !!p.waiting,
       out: !!p.out,
       connected: p.connected,
-      cards: showCardsOnScreen && !p.folded ? p.cards : []
+      cards: showCardsOnScreen && !p.folded ? p.cards : [],
+      // Håndnavn og styrke kun ved showdown, kun for spillere med viste kort
+      handDescr: showCardsOnScreen && !p.folded ? (p.handDescr || null) : null,
+      handRank: showCardsOnScreen && !p.folded ? (p.handRank || null) : null
     }))
   };
 }

@@ -251,9 +251,14 @@ test('Omgang fortsetter etter omstart; ute huskes; forlatte omganger avsluttes',
   A = srv.player('Anne', 'u-a'); B = srv.player('Bjørn', 'u-b'); srv.player('Cato', 'u-c');
   await wait(300);
   assert.strictEqual(P('Anne').out, true, 'Anne er fortsatt ute etter omstart');
+  assert.strictEqual(host.state.handNumber, 1, 'håndnummeret huskes etter omstart');
+  const rounds = await srv.getJson('/api/rounds?date=' + todayString());
+  assert.strictEqual(host.state.roundNumber, rounds.find(r => r.omgang_id === roundId).omgang_nr,
+    'omgangsnummeret er det samme som i dashboardet');
 
   host.emit('set_game_mode', 'TEXAS'); await wait(100);
   host.emit('start_new_hand'); await wait(150);
+  assert.strictEqual(host.state.handNumber, 2);
   B.emit('player_fold'); await wait(300);
   let d = await srv.getJson('/api/debug-db');
   const hands = d.winning_hands.filter(h => h.omgang_id === roundId);

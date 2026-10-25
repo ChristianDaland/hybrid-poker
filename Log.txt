@@ -894,3 +894,30 @@ står i anførselstegn, så Node selv utvider det (virker også i
 Windows sitt cmd).
 Spesifikasjonen: antall tester rettet fra 25 til 27.
 Testet: npm test 27/27.
+
+------------------------------------------------------------
+2026-10-25 – Nytt design, steg 1: maks 8 spillere og tavledata
+------------------------------------------------------------
+Bakgrunn: Ny designinstruks for statustavle, kontrollpanel og
+projektor. Avtalt med brukeren: maks 8 spillere (som før, ikke 5),
+nye felt i state_update er OK, projektoren beholder de tradisjonelle
+bildekortene, lobbyen viser hvem som har logget inn.
+server.js:
+- MAX_PLAYERS = 8 (miljøvariabel). Ny spiller ved fullt bord får
+  join_failed «Bordet er fullt (maks 8 spillere).». Den som tar over
+  sin egen frakoblede plass (samme UUID eller navn) slipper alltid inn.
+- Nye felt i state_update (rene tillegg, ingen eksisterende endret):
+  - handNumber: hånd nr. i pågående omgang. Nullstilles ved ny omgang,
+    hentes fra winning_hands når omgangen fortsetter etter omstart.
+  - roundNumber: «Omgang N» = antall omganger som startet tidligere
+    samme dag + 1 (samme regel som dashboardet). Uten database:
+    teller siden serverstart. null før første hånd i omgangen.
+  - winnerInfo.winners: vinnernavnene som liste (delt pott), så
+    skjermen slipper å tolke teksten i winnerName.
+  - players[].handDescr / handRank: håndnavn på norsk og styrke,
+    KUN ved showdown og kun for spillere som ikke kastet seg (de
+    samme spillerne som får cards). Ingen nye kort vises noe sted.
+Testet: to nye tester (niende spiller avvises, frakoblet slipper inn
+igjen med UUID og med navn; håndnummer, omgangsnummer, vinnere og
+håndnavn kun ved showdown) og utvidet omstart-test (håndnummer og
+omgangsnummer huskes, likt med dashboardet). npm test 29/29.

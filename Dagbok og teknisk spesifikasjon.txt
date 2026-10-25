@@ -11,7 +11,7 @@ Eldre versjon av dette dokumentet: se git-historikken.
 - Arbeidsform: bli enige om hva og rekkefølge FØR endringer.
   Logg hver endring i Log.txt. Commit etter hvert ferdige steg.
 - Kjør testene før og etter endringer:   npm test
-  (27 tester, ca. 20 sek, egen server + midlertidig SQLite-fil per
+  (29 tester, ca. 20 sek, egen server + midlertidig SQLite-fil per
   test – den ekte Turso-databasen røres aldri.)
 - Start serveren:   npm start   (port 3000, eller PORT=...)
 - Kommentarer og tekster på norsk. Vanilla JS, ingen rammeverk.
@@ -85,6 +85,9 @@ Spillerobjekt (players, nøkkel = socket.id):
   TILKOBLET spiller kan ikke tas (join_failed). Plassen til en
   FRAKOBLET spiller kan tas over med samme navn (ny telefon).
   Navn: trimmes, maks 15 tegn, ikke tomt.
+- Maks 8 spillere (MAX_PLAYERS). En ny spiller ved fullt bord får
+  join_failed; den som tar over sin egen plass (UUID/navn) slipper
+  alltid inn.
 - Spiller som kommer midt i en hånd: waiting = true, med fra neste.
 - Frakobling: plassen beholdes i 5 min (DISCONNECT_GRACE_MS).
   Ingen fjernes midt i en hånd (removeAfterHand -> fjernes ved neste
@@ -137,9 +140,15 @@ Klient -> server (statusskjerm/dealer):
   host_kick_all
 Server -> alle:
   state_update {gameMode, phase, board, winnerInfo, roundWinner,
+                handNumber, roundNumber,
                 players:[{name, seat, role, folded, waiting, out,
-                          connected, cards*}]}
-     *cards kun ved showdown, kun for spillere som ikke kastet seg
+                          connected, cards*, handDescr*, handRank*}]}
+     *kun ved showdown, kun for spillere som ikke kastet seg
+     winnerInfo {winnerName, winners:[navn], descr, foldedWin,
+                 rawCards, rankVal}
+     handNumber: «Hånd N» i pågående omgang (huskes etter omstart).
+     roundNumber: N-te omgang som startet denne dagen (samme som
+     dashboardet), null før første hånd i omgangen.
   celebrate_win {playerName, handDescription}
 Server -> én spiller:
   player_state {phase, cards, role, folded, waiting, out, canFold,
@@ -187,6 +196,7 @@ API:
   DISCONNECT_GRACE_MS                   standard 300000 (5 min)
   ALLOW_REMOTE_ADMIN=1                  admin-API fra nettet
   ADMIN_PASSWORD                        passord for databaseinspektøren
+  MAX_PLAYERS                           standard 8 (spillere ved bordet)
   ROUND_RESUME_MINUTES                  standard 180 (omgang fortsetter etter omstart)
   APP_TZ                                standard Europe/Oslo
 
