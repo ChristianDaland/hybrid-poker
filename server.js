@@ -285,9 +285,11 @@ app.post('/api/reset-db', adminOnly, async (req, res) => {
 // fra spillerstatistikken. Etterpå starter neste hånd omgang 1 (ingen er ute).
 app.post('/api/reset-day', adminOnly, async (req, res) => {
   if (!db) return res.status(503).json({ error: 'Database ikke tilkoblet.' });
-  if (isHandInProgress()) return res.status(409).json({ error: 'En hånd pågår – vent til den er ferdig.' });
-  const date = parseDateParam(req.query.date) || parseDateParam(localDateString(new Date().toISOString()));
-  if (!date) return res.status(400).json({ error: 'Ugyldig dato.' });
+  // Ikke midt i en hånd, og ikke mens forrige hånd fortsatt lagres (den ville kommet inn igjen etterpå)
+  if (isHandInProgress() || persistsInFlight > 0) return res.status(409).json({ error: 'En hånd pågår – vent til den er ferdig.' });
+  const given = parseDateParam(req.query.date);
+  if (given === undefined) return res.status(400).json({ error: 'Ugyldig dato.' });
+  const date = given || parseDateParam(localDateString(new Date().toISOString()));
   try {
     const range = localDayRange(date);
     const hands = await db.execute({
@@ -312,42 +314,54 @@ app.post('/api/reset-day', adminOnly, async (req, res) => {
       }
       participants.forEach(u => add(played, u));
     }
-    for (const uuid of new Set([...Object.keys(played), ...Object.keys(won)])) {
-      await db.execute({
+    const affected = [...new Set([...Object.keys(played), ...Object.keys(won)])];
+
+    // Alt i én transaksjon: enten trekkes statistikken og dagens rader slettes, eller ingenting
+    const results = await db.batch([
+      ...affected.map(uuid => ({
         sql: `UPDATE player_stats SET hands_played = MAX(0, hands_played - ?), hands_won = MAX(0, hands_won - ?) WHERE uuid = ?`,
         args: [played[uuid] || 0, won[uuid] || 0, uuid]
-      });
-    }
+      })),
+      // Spillere som ikke har noen hender igjen (f.eks. testnavn) fjernes fra statistikken
+      ...affected.map(uuid => ({
+        sql: "DELETE FROM player_stats WHERE uuid = ? AND hands_played <= 0 AND hands_won <= 0",
+        args: [uuid]
+      })),
+      { sql: `DELETE FROM winning_hands WHERE ${CREATED_AT_ISO} >= ? AND ${CREATED_AT_ISO} < ?`, args: [range.start, range.end] },
+      { sql: "DELETE FROM omganger WHERE started_at >= ? AND started_at < ?", args: [range.start, range.end] },
+      {
+        sql: "DELETE FROM poker_sessions WHERE REPLACE(started_at, ' ', 'T') >= ? AND REPLACE(started_at, ' ', 'T') < ?",
+        args: [range.start, range.end]
+      }
+    ], 'write');
+    const n = affected.length * 2;
+    const deletedHands = results[n].rowsAffected;
+    const deletedRounds = results[n + 1].rowsAffected;
 
-    const delHands = await db.execute({
-      sql: `DELETE FROM winning_hands WHERE ${CREATED_AT_ISO} >= ? AND ${CREATED_AT_ISO} < ?`,
-      args: [range.start, range.end]
-    });
-    const delRounds = await db.execute({
-      sql: "DELETE FROM omganger WHERE started_at >= ? AND started_at < ?",
-      args: [range.start, range.end]
-    });
-    await db.execute({
-      sql: "DELETE FROM poker_sessions WHERE REPLACE(started_at, ' ', 'T') >= ? AND REPLACE(started_at, ' ', 'T') < ?",
-      args: [range.start, range.end]
-    });
-    // Spillere uten noen hender igjen (f.eks. testnavn) fjernes fra statistikken
-    await db.execute("DELETE FROM player_stats WHERE hands_played <= 0 AND hands_won <= 0");
-
-    // Pågående omgang og sesjon er slettet: neste hånd starter omgang 1, alle er med
     if (currentSessionId) {
       const s = await db.execute({ sql: "SELECT id FROM poker_sessions WHERE id = ?", args: [Number(currentSessionId)] });
       if (s.rows.length === 0) currentSessionId = null;
     }
-    Object.values(players).forEach(p => { p.out = false; });
-    startNewRound();
+    // Var pågående omgang fra den slettede dagen, starter neste hånd omgang 1 (alle er med).
+    // En omgang fra en annen dag røres ikke.
+    let roundDeleted = false;
+    if (currentRoundId) {
+      const r = await db.execute({ sql: "SELECT omgang_id FROM omganger WHERE omgang_id = ?", args: [Number(currentRoundId)] });
+      roundDeleted = r.rows.length === 0;
+    } else if (gameState.roundStartedAt) {
+      roundDeleted = gameState.roundStartedAt >= range.start && gameState.roundStartedAt < range.end;
+    }
+    if (roundDeleted) {
+      Object.values(players).forEach(p => { p.out = false; });
+      startNewRound();
+    }
     updateAll();
 
-    console.log(`[DB] Slettet dagens data: ${delHands.rowsAffected} hender, ${delRounds.rowsAffected} omganger.`);
+    console.log(`[DB] Slettet data for ${localDateString(range.start)}: ${deletedHands} hender, ${deletedRounds} omganger.`);
     res.json({
-      message: `Slettet ${delHands.rowsAffected} hender og ${delRounds.rowsAffected} omganger.`,
-      hands: delHands.rowsAffected,
-      rounds: delRounds.rowsAffected
+      message: `Slettet ${deletedHands} hender og ${deletedRounds} omganger.`,
+      hands: deletedHands,
+      rounds: deletedRounds
     });
   } catch (err) {
     console.error('[DB Error /api/reset-day]:', err);
@@ -433,6 +447,13 @@ function retranslateStoredDescription(descr) {
     .replace(/^Ett Par/, 'Pair');
   const translated = translateHandDescription(english);
   return translated === english ? text : translated;
+}
+
+// Kortkode («As», «Td») fra et pokersolver-kort. I en straight A-2-3-4-5 gir pokersolver
+// esset verdien «1» – det skal fortsatt vises og lagres som «A».
+function cardCode(c) {
+  if (!c || typeof c !== 'object') return String(c);
+  return (c.value === '1' ? 'A' : c.value) + c.suit;
 }
 
 function getCardNumericValue(v) {
@@ -905,7 +926,19 @@ async function ensurePlayerStats(uuid, name) {
   }
 }
 
+// Antall hender som lagres akkurat nå (reset-day venter til de er ferdige)
+let persistsInFlight = 0;
+
 async function persistHandResult() {
+  persistsInFlight++;
+  try {
+    await writeHandResult();
+  } finally {
+    persistsInFlight--;
+  }
+}
+
+async function writeHandResult() {
   const { winnerInfo, board, gameMode } = gameState;
   const winnerUuids = [...(gameState.winnerUuids || [])];
   // Øyeblikksbilde før første await – en ny hånd kan starte mens vi skriver til databasen
@@ -967,7 +1000,7 @@ async function persistHandResult() {
     //   Kort fra spillere som kastet seg tidligere lagres ikke.
     const isFoldedWin = !!winnerInfo.foldedWin;
     const cleanWinningCards = (!isFoldedWin && Array.isArray(winnerInfo.rawCards))
-      ? winnerInfo.rawCards.map(c => (c && c.value && c.suit ? c.value + c.suit : String(c)))
+      ? winnerInfo.rawCards.map(cardCode)
       : [];
     const shownPlayers = isFoldedWin ? [] : activePlayersList.filter(isInHand);
 
@@ -1330,10 +1363,10 @@ io.on('connection', (socket) => {
         winnerName: winnerText,
         winners: winners.map(w => w.player.name),
         // Ved delt pott har hver vinner sine egne fem kort (like sterke, men ulike)
-        winnerHands: winners.map(w => ({ name: w.player.name, cards: (w.solved.cards || []).map(c => c.value + c.suit) })),
+        winnerHands: winners.map(w => ({ name: w.player.name, cards: (w.solved.cards || []).map(cardCode) })),
         descr: translateHandDescription(rawDescr),
         foldedWin: false,
-        rawCards: winners[0] ? winners[0].solved.cards : [],
+        rawCards: winners[0] ? winners[0].solved.cards.map(cardCode) : [],
         rankVal: exactRankVal
       };
 
@@ -1612,4 +1645,4 @@ if (require.main === module) {
   server.listen(PORT, () => console.log(`Server kjører på port ${PORT}`));
 }
 
-module.exports = { translateHandDescription, retranslateStoredDescription, evaluatePlayerHand, calculateHandScore, nextRoundNumberWithoutDb };
+module.exports = { translateHandDescription, retranslateStoredDescription, evaluatePlayerHand, calculateHandScore, nextRoundNumberWithoutDb, cardCode };

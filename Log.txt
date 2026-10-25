@@ -1277,3 +1277,37 @@ index.html: håndnavnet (players[].handDescr, finnes allerede ved
 showdown) står under kortene for alle som var med til slutt, i gull for
 vinneren. Ingen tekst for de som kastet seg.
 Testet: skjermbilde Omaha med 8 spillere (får plass). npm test 32/32.
+
+------------------------------------------------------------
+2026-10-25 – Kodegjennomgang: rettede feil
+------------------------------------------------------------
+Gjennomgang av alle endringer siden 15cd390. Rettet:
+1. Esset i straight A-2-3-4-5 ble vist/lagret som «1» (pokersolver gir
+   esset verdien 1 i «hjulet»). Ny cardCode() i server.js brukes for
+   vinnerkort (rawCards), winnerHands og lagrede winning_cards.
+   dashboard.html viser «1» som «A» for eldre rader. Funnet fordi
+   tavledata-testen feilet tilfeldig (ca. 1,4 % av Omaha-hender).
+2. Vinnervisningen kunne utebli: to hender med samme utfall (f.eks. alle
+   kastet seg preflop til samme spiller) fikk samme nøkkel, så hånd 2
+   regnes som «allerede klikket bort». Nå glemmes bortklikkede visninger
+   når neste hånd starter, og nøkkelen har omgang + hånd + fase.
+3. Showdown/«alle kastet seg» ble stående (med «Hånd » uten nummer) når
+   ny omgang ble startet fra tannhjulet. Skjules nå før første hånd.
+4. /api/reset-day:
+   - ugyldig ?date= ga i stedet sletting av I DAG – gir nå 400
+   - pågående omgang nullstilles bare hvis den faktisk ble slettet
+     (sletting av en annen dag rører ikke kveldens spill)
+   - avvises (409) mens en hånd lagres, ellers kunne hånden komme inn
+     igjen etter slettingen (persistsInFlight)
+   - statistikk og sletting i én transaksjon (db.batch), så en
+     nettverksfeil ikke gir halvveis trukket statistikk
+   - fjerner bare 0/0-spillere som fikk hender trukket fra (ikke alle)
+Ikke endret (vurdert): styringshendelsene har fortsatt ingen
+tilgangskontroll (kjent begrensning – «kast for spiller», «ute» og
+«nytt spill» kan sendes av alle tilkoblede); fullt bord teller
+frakoblede i 5-minuttersvinduet (plassen holdes av med vilje);
+konfettien finnes i både index.html og board.html (kun kosmetisk).
+Testet: nye tester (esset i hjulet; reset-day med ugyldig dato og med
+en annen dag), i headless Chromium: samme utfall to hender på rad,
+ny omgang fra tannhjulet under showdown, trekning av plasser.
+npm test 34/34 (kjørt tre ganger).

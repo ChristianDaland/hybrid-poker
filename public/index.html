@@ -861,12 +861,11 @@
     // Visninger dealeren har klikket bort (til neste hånd / ny tilstand)
     const skjulteVisninger = new Set();
     const visningsNokler = {};
+    // Bortklikkede visninger glemmes når neste hånd starter (se state_update), så to
+    // hender med samme utfall ikke blandes sammen
     function visningsNokkel(id, state) {
-      // Omgangsvisningen følger omgangen og vinneren. De andre følger hånden (fase, bordkort,
-      // vinner) – ikke hånd-/omgangsnummeret, som nullstilles når ny omgang startes.
       if (id === 'visning-omgang') return [id, state.roundNumber, state.roundWinner].join('|');
-      const vinner = state.winnerInfo ? state.winnerInfo.winnerName : '';
-      return [id, state.phase, (state.board || []).join(','), vinner].join('|');
+      return [id, state.roundNumber, state.handNumber, state.phase].join('|');
     }
 
     function settVisning(id, html) {
@@ -886,6 +885,7 @@
 
     function showdownHtml(state) {
       if (state.phase !== 'SHOWDOWN' || !state.winnerInfo || state.winnerInfo.foldedWin) return null;
+      if (forForsteHand(state)) return null; // ny omgang er startet – forrige hånd vises ikke lenger
       const info = state.winnerInfo;
       const winners = info.winners || [];
       const navn = navneliste(winners);
@@ -950,7 +950,7 @@
 
     // Alle andre kastet seg: ingen kort vises
     function kastetHtml(state) {
-      if (state.phase !== 'FINISHED' || !state.winnerInfo) return null;
+      if (state.phase !== 'FINISHED' || !state.winnerInfo || forForsteHand(state)) return null;
       const winners = state.winnerInfo.winners || [];
       return `
         <div class="visning-over">Hånd ${Number(state.handNumber) || ''} er avgjort</div>
@@ -1291,6 +1291,7 @@
 
     socket.on('state_update', (state) => {
       lastState = state;
+      if (AKTIVE_FASER.includes(state.phase)) skjulteVisninger.clear();
       if (ventPaNyOmgang && !state.roundWinner && mellomHender(state)) {
         ventPaNyOmgang = false;
         socket.emit('start_new_hand');

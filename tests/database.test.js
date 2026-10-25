@@ -351,3 +351,43 @@ test('Slett dagens data: dagens hender/omganger fjernes, statistikk justeres, om
   assert.strictEqual(host.state.roundNumber, 1, 'neste hånd er omgang 1');
   assert.strictEqual(host.state.handNumber, 1);
 });
+
+test('Slett data: ugyldig dato avvises, en annen dag rører ikke pågående omgang', async (t) => {
+  const dbFile = tempDbFile();
+  let srv = await startServer({ dbFile });
+  await srv.stop();
+  const db = createClient({ url: 'file:' + dbFile });
+  const igaar = new Date(Date.now() - 24 * 3600e3);
+  await db.execute({ sql: 'INSERT INTO omganger (session_id, started_at, ended_at) VALUES (1, ?, ?)', args: [igaar.toISOString(), igaar.toISOString()] });
+  await db.execute({ sql: "INSERT INTO winning_hands (player_uuid, player_name, hand_description, hand_rank, created_at) VALUES ('u-x', 'X', 'Ett par', 5, ?)", args: [igaar.toISOString()] });
+  db.close();
+
+  srv = await startServer({ dbFile });
+  t.after(() => srv.stop());
+  const host = srv.host();
+  const P = n => findPlayer(host.state, n);
+  const A = srv.player('Anne', 'u-a'); srv.player('Bjørn', 'u-b'); srv.player('Cato', 'u-c');
+  await wait(300);
+  host.emit('set_game_mode', 'TEXAS'); await wait(100);
+  host.emit('start_new_hand'); await wait(150);
+  const B = srv.player(); // (ikke brukt)
+  A.emit('player_fold'); await wait(80);
+  host.emit('host_fold_player', P('Bjørn').seat); await wait(300);
+  host.emit('host_set_out', { seat: P('Anne').seat, out: true }); await wait(300);
+
+  assert.strictEqual((await fetch(srv.url + '/api/reset-day?date=2026-1-5', { method: 'POST' })).status, 400, 'ugyldig dato');
+
+  const pad = n => String(n).padStart(2, '0');
+  const dag = `${igaar.getFullYear()}-${pad(igaar.getMonth() + 1)}-${pad(igaar.getDate())}`;
+  const res = await fetch(srv.url + '/api/reset-day?date=' + dag, { method: 'POST' });
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual((await res.json()).hands, 1, 'bare gårsdagens hånd slettet');
+  await wait(200);
+
+  const d = await srv.getJson('/api/debug-db');
+  assert.strictEqual(d.winning_hands.length, 1, 'dagens hånd er urørt');
+  assert.strictEqual(P('Anne').out, true, 'pågående omgang er urørt (Anne fortsatt ute)');
+  assert.strictEqual(host.state.handNumber, 1);
+  assert.strictEqual(host.state.roundNumber, 1);
+  B.disconnect();
+});

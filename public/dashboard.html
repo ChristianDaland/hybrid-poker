@@ -233,6 +233,7 @@
         const code = String(c);
         let val = code.slice(0, -1).toUpperCase();
         if (val === 'T') val = '10';
+        if (val === '1') val = 'A'; // eldre rader: esset i straight A-2-3-4-5 ble lagret som «1»
         const [sym, color] = suits[code.slice(-1).toLowerCase()] || ['?', 'black'];
         return `<span class="mini-card ${color}">${escapeHtml(val)}${suitIcon(code.slice(-1)) || sym}</span>`;
       }).join('');

@@ -48,3 +48,12 @@ test('Eldre lagrede (halvoversatte) beskrivelser oversettes på nytt', () => {
   assert.strictEqual(retranslateStoredDescription('Alle andre kastet seg'), 'Alle andre kastet seg');
   assert.strictEqual(retranslateStoredDescription('Ett par, Damer'), 'Ett par, Damer');
 });
+
+test('Esset i straight A-2-3-4-5 blir «A», ikke «1»', () => {
+  const { cardCode } = require('../server.js');
+  const solved = evaluatePlayerHand(['Ac', '2c', 'Th', '7h'], ['9h', '5d', 'As', '3d', '4h'], 'OMAHA');
+  assert.strictEqual(solved.descr, 'Straight, 5 High');
+  const codes = solved.cards.map(cardCode);
+  assert.ok(!codes.some(c => c.startsWith('1')), 'ingen «1»: ' + codes.join(' '));
+  assert.ok(codes.includes('Ac') || codes.includes('As'));
+});
