@@ -1209,3 +1209,11 @@ tema.css: ny .kort.bakside (vinrødt mønster med krem og gull kant).
 Testet: skjermbilder Omaha med 5 og 8 spillere, og delt pott med én
 som kastet seg og én som er ute (tilstand sendt inn i nettleseren).
 npm test 30/30.
+
+------------------------------------------------------------
+2026-10-25 – Ramme rundt bordkortene i showdown
+------------------------------------------------------------
+Brukerønske: «Bordet» i vinnervisningen får samme ramme som spillerne
+på sidene (flate, kantlinje, avrundede hjørner, «Bordet» som overskrift
+i samme stil som navnene).
+Testet: skjermbilde Omaha med 5 spillere. npm test 30/30.

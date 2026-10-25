@@ -333,7 +333,8 @@
     .sd-side.hoyre { align-items: flex-end; text-align: right; }
 
     .sd-etikett { font-size: 16px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: var(--tekst-dempet); }
-    .sd-bordet { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+    /* Bordkortene i samme ramme som spillerne på sidene */
+    .sd-bordet { padding: 12px 20px 18px; border-radius: 18px; background: var(--flate); border: 2px solid var(--linje); }
     .bordkort { display: flex; gap: 12px; }
     .bordkort .kort { width: 92px; height: 128px; font-size: 48px; border-radius: 10px; }
 
@@ -905,7 +906,7 @@
       }
       const bordHtml = `
         <div class="sd-bordet">
-          <div class="sd-etikett">Bordet</div>
+          <div class="sd-spiller-topp"><span class="sd-spiller-navn">Bordet</span></div>
           <div class="bordkort">${(state.board || []).map(c => kortHtml(c)).join('')}</div>
         </div>`;
 
