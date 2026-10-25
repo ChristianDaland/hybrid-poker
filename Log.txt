@@ -1073,3 +1073,25 @@ klassen «skjules»; hovedknappen har ikke klassen.
 Veiledning og spesifikasjon oppdatert.
 Testet: hel hånd med hovedknappen i headless Chromium; etter 5 sek
 uten mus synes bare hovedknappen. npm test 29/29.
+
+------------------------------------------------------------
+2026-10-25 – Setemenyen kunne i praksis aldri brukes
+------------------------------------------------------------
+Brukeren rapporterte at «Kast kort for spilleren», «Marker som ute» og
+«Flytt» alltid var grå.
+Årsaker:
+1. Ute og flytt er bare lov mellom hender (SHOWDOWN/FINISHED), men da
+   dekket vinnervisningen hele bordet, så setene kunne ikke klikkes.
+   Etter «Start ny hånd» var det PREFLOP igjen.
+2. Serveren tillot bare at dealeren kastet for FRAKOBLEDE spillere.
+Fiks (valgt av brukeren):
+- index.html: et klikk på vinnervisningen (showdown, alle kastet seg,
+  omgang avgjort) skjuler den til neste hånd/ny tilstand. Teksten
+  «Klikk for å se bordet» vises når musa er i bruk.
+- server.js: host_fold_player godtas for alle spillere i hånden
+  (tilkoblet eller ikke), fortsatt ikke for den siste (canFold).
+- Testen for dealerens kast oppdatert (tilkoblet, frakoblet, den siste
+  kan ikke kastes). Veiledning og spesifikasjon oppdatert.
+Testet i headless Chromium: kast for tilkoblet spiller, showdown
+klikket bort, flytt og marker ute mellom hender, ny hånd viser
+visningene igjen. npm test 29/29.

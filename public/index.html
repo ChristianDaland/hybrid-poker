@@ -289,6 +289,18 @@
       z-index: 5;
     }
     .visning.vis { display: flex; animation: visning-inn 0.35s ease-out both; }
+    /* Et klikk skjuler visningen, så dealeren kommer til setene mellom hender */
+    .visning-hint {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 150px;
+      font-size: 20px;
+      color: var(--tekst-dempet);
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+    body.mus-aktiv .visning-hint { opacity: 1; }
     @keyframes visning-inn {
       from { opacity: 0; transform: scale(0.96); }
       to { opacity: 1; transform: scale(1); }
@@ -805,8 +817,20 @@
     // ============================================================
     // Viser/skjuler en visning; innholdet tegnes bare på nytt når det har endret seg,
     // så inntoningen og konfettien ikke starter på nytt ved hver oppdatering
+    // Visninger dealeren har klikket bort (til neste hånd / ny tilstand)
+    const skjulteVisninger = new Set();
+    const visningsNokler = {};
+    function visningsNokkel(id, state) {
+      return [id, state.roundNumber, state.handNumber, state.phase, state.roundWinner || ''].join('|');
+    }
+
     function settVisning(id, html) {
       const el = document.getElementById(id);
+      if (html !== null && lastState) {
+        visningsNokler[id] = visningsNokkel(id, lastState);
+        if (skjulteVisninger.has(visningsNokler[id])) html = null;
+        else html += '<div class="visning-hint">Klikk for å se bordet</div>';
+      }
       const synlig = html !== null;
       if (synlig && el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; }
       if (!synlig) delete el.dataset.html;
@@ -896,6 +920,14 @@
           ${escapeHtml(p.name)}
         </div>`).join('');
     }
+
+    ['visning-showdown', 'visning-kastet', 'visning-omgang'].forEach(id => {
+      document.getElementById(id).addEventListener('click', () => {
+        if (!visningsNokler[id]) return;
+        skjulteVisninger.add(visningsNokler[id]);
+        tegnVisninger(lastState);
+      });
+    });
 
     function tegnVisninger(state) {
       settVisning('visning-showdown', showdownHtml(state));
@@ -1033,7 +1065,6 @@
       else if (p.out) kastGrunn = 'Spilleren er ute';
       else if (p.waiting) kastGrunn = 'Venter på neste hånd';
       else if (p.folded) kastGrunn = 'Spilleren har kastet';
-      else if (p.connected) kastGrunn = 'Spilleren er tilkoblet og kaster selv på mobilen';
       else if (igjen <= 1) kastGrunn = 'Den siste spilleren kan ikke kaste';
 
       const mellom = mellomHender(state);

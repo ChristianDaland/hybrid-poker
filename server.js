@@ -1271,11 +1271,11 @@ io.on('connection', (socket) => {
     updateAll();
   }));
 
-  // Dealeren kaster kortene for en frakoblet spiller (fra statusskjermen),
-  // slik at hånden ikke blir hengende på en telefon som er borte
+  // Dealeren kaster kortene for en spiller fra statusskjermen – f.eks. en telefon
+  // som er borte, eller en spiller som sier «jeg kaster» ved bordet
   socket.on('host_fold_player', safeHandler('host_fold_player', async (seat) => {
     const player = Object.values(players).find(p => p.seat === Number(seat));
-    if (!player || player.connected || !canFold(player)) return;
+    if (!player || !canFold(player)) return;
 
     player.folded = true;
     player.foldedInPhase = gameState.phase;

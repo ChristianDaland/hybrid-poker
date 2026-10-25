@@ -93,7 +93,8 @@ Spillerobjekt (players, nøkkel = socket.id):
 - Spiller som kommer midt i en hånd: waiting = true, med fra neste.
 - Frakobling: plassen beholdes i 5 min (DISCONNECT_GRACE_MS).
   Ingen fjernes midt i en hånd (removeAfterHand -> fjernes ved neste
-  hånd). Frakoblede får kort; dealer kan «Kast kort for spilleren».
+  hånd). Frakoblede får kort; dealer kan «Kast kort for spilleren»
+  (gjelder alle spillere i hånden, unntatt den siste).
 - «Ute» (tom for sjetonger): settes av dealer mellom hender. Får
   ikke kort, hoppes over av dealerknappen.
 
@@ -145,11 +146,12 @@ index.html:
   Ute / Vinner) + «Frakoblet»-merke. D/SB/BB som brikker på filten.
 - Hovedknappen med neste steg synes alltid. Resten vises bare ved
   musebevegelse (skjules etter 5 sek med pekeren, ikke mens en meny
-  er åpen):
-  pille «Dealer: X» / «Send musa til X», setemeny (kast for frakoblet
-  spiller, ute, flytt) og «Flere valg» (spilletype, ny omgang, lenker,
-  nytt spill med bekreftelse). Bare eksisterende hendelser brukes;
+  er åpen): pille «Dealer: X» / «Send musa til X», setemeny (kast
+  for spiller, ute, flytt) og «Flere valg» (spilletype, ny omgang,
+  lenker, nytt spill med bekreftelse). Bare eksisterende hendelser brukes;
   serveren håndhever reglene.
+- Et klikk skjuler showdown-/avgjort-visningen til neste hånd, så
+  dealeren kommer til setene (ute, flytt) mellom hender.
 - Fullskjermvisninger: showdown (vinnerkort + de andres hender
   sortert etter handRank), alle andre kastet seg (ingen kort), omgang
   avgjort (CSS-konfetti), lobby (stor QR + innloggede spillere).

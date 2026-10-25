@@ -13,22 +13,24 @@ test('Heads-up: dealer er også lilleblind', async (t) => {
   assert.deepStrictEqual(host.state.players.map(p => p.role).sort(), ['Dealer / Lilleblind', 'Storeblind']);
 });
 
-test('Dealer kan kaste kort for frakoblet spiller, ikke for tilkoblet', async (t) => {
+test('Dealer kan kaste kort for frakoblet og tilkoblet spiller, ikke for den siste', async (t) => {
   const srv = await startServer();
   t.after(() => srv.stop());
   const host = srv.host();
   const P = n => findPlayer(host.state, n);
-  srv.player('Anne'); const B = srv.player('Bjørn'); const C = srv.player('Cato'); await wait(300);
+  srv.player('Anne'); srv.player('Bjørn'); const C = srv.player('Cato'); srv.player('Dina'); await wait(300);
   host.emit('set_game_mode', 'TEXAS'); await wait(100);
   host.emit('start_new_hand'); await wait(150);
-  host.emit('host_fold_player', P('Anne').seat); await wait(150);
-  assert.strictEqual(P('Anne').folded, false);
+  host.emit('host_fold_player', P('Dina').seat); await wait(150);
+  assert.strictEqual(P('Dina').folded, true, 'tilkoblet spiller');
   C.disconnect(); await wait(200);
   host.emit('host_fold_player', P('Cato').seat); await wait(150);
-  assert.strictEqual(P('Cato').folded, true);
-  B.emit('player_fold'); await wait(200);
+  assert.strictEqual(P('Cato').folded, true, 'frakoblet spiller');
+  host.emit('host_fold_player', P('Bjørn').seat); await wait(200);
   assert.strictEqual(host.state.phase, 'FINISHED');
   assert.strictEqual(host.state.winnerInfo.winnerName, 'Anne');
+  host.emit('host_fold_player', P('Anne').seat); await wait(150);
+  assert.strictEqual(P('Anne').folded, false, 'den siste kan ikke kastes');
 });
 
 test('Angre kast: til neste kort åpnes; to igjen + kast = ferdig uten angre', async (t) => {
