@@ -958,7 +958,7 @@ function startNewHandLogic() {
 
   gameState.handNumber++;
   // Håndnavnene fra forrige showdown gjelder ikke lenger
-  getSeatedPlayers().forEach(p => { p.handDescr = null; p.handRank = null; p.bestCards = []; });
+  getSeatedPlayers().forEach(p => { p.handDescr = null; p.handRank = null; });
 
   // Spillere som er ute nullstilles og står over
   getSeatedPlayers().filter(p => p.out).forEach(p => {
@@ -1213,12 +1213,10 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // Håndnavn, styrke og beste fem kort for alle som var med til showdown
-      // (består bare av hånden deres og bordet – kort som vises uansett)
+      // Håndnavn og styrke for alle som var med til showdown (kortene deres vises uansett)
       solvedHands.forEach(sh => {
         sh.player.handDescr = translateHandDescription(sh.solved.descr);
         sh.player.handRank = calculateHandScore(sh.solved);
-        sh.player.bestCards = (sh.solved.cards || []).map(c => c.value + c.suit);
       });
 
       const handsOnly = solvedHands.map(sh => sh.solved);
@@ -1474,8 +1472,7 @@ function getPublicState() {
       cards: showCardsOnScreen && !p.folded ? p.cards : [],
       // Håndnavn og styrke kun ved showdown, kun for spillere med viste kort
       handDescr: showCardsOnScreen && !p.folded ? (p.handDescr || null) : null,
-      handRank: showCardsOnScreen && !p.folded ? (p.handRank || null) : null,
-      bestCards: showCardsOnScreen && !p.folded ? (p.bestCards || []) : []
+      handRank: showCardsOnScreen && !p.folded ? (p.handRank || null) : null
     }))
   };
 }

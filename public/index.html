@@ -337,23 +337,17 @@
     .hullkort { display: flex; gap: 8px; }
     .hullkort .kort { width: 80px; height: 112px; font-size: 40px; border-radius: 10px; }
 
+    /* De andre spillerne: navn og kortene de hadde på hånden */
     .sd-spiller {
-      padding: 14px 18px;
+      padding: 14px 20px 18px;
       border-radius: 18px;
       background: var(--flate);
       border: 2px solid var(--linje);
-      max-width: 480px;
     }
-    .sd-spiller-navn { font-size: 24px; font-weight: 700; }
-    .sd-spiller-beskr { font-size: 19px; color: var(--tekst-dempet); margin-bottom: 10px; }
-    .sd-rad { display: flex; gap: 14px; align-items: flex-end; }
-    .sd-side.hoyre .sd-rad { justify-content: flex-end; }
-    .sd-rad .sd-gruppe { align-items: flex-start; gap: 4px; }
-    .sd-rad .sd-etikett { font-size: 13px; letter-spacing: 1px; }
-    .smakort { display: flex; gap: 5px; }
-    .smakort .kort { width: 42px; height: 60px; font-size: 22px; border-radius: 6px; }
-    /* Kortene fra hånden som er med i den beste kombinasjonen */
-    .kort.brukt { box-shadow: 0 0 0 3px var(--gull), 0 4px 10px rgba(0, 0, 0, 0.5); }
+    .sd-spiller-navn { font-size: 26px; font-weight: 700; margin-bottom: 10px; }
+    .sd-side.hoyre .smakort { justify-content: flex-end; }
+    .smakort { display: flex; gap: 8px; }
+    .smakort .kort { width: 66px; height: 92px; font-size: 34px; border-radius: 8px; }
 
     /* Omgangen er avgjort: ligger over showdown-visningen */
     #visning-omgang { z-index: 6; overflow: hidden; }
@@ -869,33 +863,24 @@
       const winners = info.winners || [];
       const navn = navneliste(winners);
       const vinnere = state.players.filter(p => winners.includes(p.name));
-      // Vinnerkortene fra serveren; ellers første vinners beste fem (kun kort serveren har sendt)
+      // Vinnerkortene fra serveren; ellers vinnerens hullkort (kun kort serveren har sendt)
       let kort = (info.rawCards || []).map(kortKode);
-      if (kort.length === 0 && vinnere[0]) kort = vinnere[0].bestCards || [];
-
-      // Kortene på hånden; de som er med i den beste kombinasjonen, får gullkant
-      const handHtml = (p, klasse) => `<div class="${klasse}">${(p.cards || []).map(c =>
-        kortHtml(c).replace('class="kort', `class="kort ${(p.bestCards || []).includes(c) ? 'brukt' : ''}`)).join('')}</div>`;
+      if (kort.length === 0 && vinnere[0]) kort = vinnere[0].cards;
 
       const paaHanden = vinnere.map(p => `
         <div class="sd-gruppe">
           <div class="sd-etikett">${vinnere.length > 1 ? escapeHtml(p.name) + ' – ' : ''}På hånden</div>
-          ${handHtml(p, 'hullkort')}
+          <div class="hullkort">${p.cards.map(c => kortHtml(c)).join('')}</div>
         </div>`).join('');
 
-      // De andre som var med til showdown, sortert etter styrke, fordelt venstre/høyre
+      // De andre som var med til showdown: navn og kortene på hånden, sortert etter styrke
       const andre = state.players
         .filter(p => p.cards && p.cards.length > 0 && !winners.includes(p.name))
         .sort((a, b) => (b.handRank || 0) - (a.handRank || 0));
       const spillerHtml = p => `
         <div class="sd-spiller">
           <div class="sd-spiller-navn">${escapeHtml(p.name)}</div>
-          <div class="sd-spiller-beskr">${escapeHtml(p.handDescr || '')}</div>
-          <div class="sd-rad">
-            <div class="sd-gruppe"><div class="sd-etikett">Beste hånd</div>
-              <div class="smakort">${(p.bestCards || []).map(c => kortHtml(c)).join('')}</div></div>
-            <div class="sd-gruppe"><div class="sd-etikett">På hånden</div>${handHtml(p, 'smakort')}</div>
-          </div>
+          <div class="smakort">${p.cards.map(c => kortHtml(c)).join('')}</div>
         </div>`;
 
       return `

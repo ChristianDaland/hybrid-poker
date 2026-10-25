@@ -1135,3 +1135,15 @@ Testet: tavledata-testen sjekker bestCards (5 kort, i Omaha nøyaktig 2
 fra hånden + 3 fra bordet, tomt for den som kastet seg og før showdown).
 Skjermbilder: Omaha med 5 og 8 spillere, Texas med delt pott på tre.
 npm test 29/29.
+
+------------------------------------------------------------
+2026-10-25 – Showdown forenklet: bare kortene på hånden for de andre
+------------------------------------------------------------
+Brukeren syntes beste kombinasjon for alle ble forvirrende.
+- index.html: midten som før (vinner, håndnavn, de fem vinnerkortene,
+  vinnerens kort på hånden). På sidene: de andre som var med til slutt,
+  kun med navn og kortene de hadde på hånden (større kort). Ingen beste
+  hånd, ingen håndnavn og ingen gullkant for brukte kort.
+- server.js: feltet bestCards er fjernet igjen (ikke lenger i bruk).
+  handRank brukes fortsatt til sorteringen.
+Testet: skjermbilder Omaha med 5 og 8 spillere. npm test 29/29.
