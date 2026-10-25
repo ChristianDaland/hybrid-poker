@@ -937,3 +937,32 @@ omgangsnummer huskes, likt med dashboardet). npm test 29/29.
   Fallback: system-ui / Georgia.
 - Ikke tatt i bruk ennå – index.html og board.html bygges om i neste steg.
 Testet: filene serveres (200, riktig content-type). npm test 29/29.
+
+------------------------------------------------------------
+2026-10-25 – Nytt design, steg 3: tavlevisningen (index.html)
+------------------------------------------------------------
+index.html er skrevet om (tema.css, lokale fonter, CRLF beholdt):
+- Fast scene på 1920 x 1080 som skaleres til vinduet (16:9, svarte
+  kanter ved annet format). Ingen rulling.
+- Topplinje: logo i Cinzel, fasespor (Preflop · Flop · Turn · River ·
+  Showdown; passert = gullkant, aktiv = gull; ved FINISHED heter siste
+  «Avgjort»), «Omgang N» + «X av Y med» og liten QR-kode «Bli med».
+- Avlangt bord med filt og treramme; merket «Skjermen» på høyre kortside.
+- Fellesskort: fem plasser (tomme med stiplet gullkant), nye kort snus
+  inn. Under: «Pot-Limit Omaha · Hånd N» og pyntetekst «LØLAND GÅRD».
+- Seter fordelt etter antall spillere (2–8) i én konstant PLASSER:
+  sete 1 nede nærmest skjermen, så med klokka. 5 spillere: 2 på hver
+  langside + 1 på venstre kortside. 7–8 spillere: smalere seter.
+- Setekort: avatar med initialer (fast farge per spiller, ingen
+  dubletter ved bordet), navn (lange navn på to linjer), status.
+  Statuser på lysstyrke: I hånden (gull prikk), Kastet (0,38),
+  Med fra neste hånd (0,6), Ute (0,4 + gråtone + stiplet kant),
+  Vinner (gull). «Frakoblet»-merke over hjørnet, pulserende ikon.
+- Dealer-, SB- og BB-markører som sjetonger på filten foran setet;
+  med to spillere får dealeren både D og SB. Dealerens sete har gullkant.
+- Midlertidig enkel knapperad nederst til de nye kontrollene kommer
+  (steg 4). Ute/flytt/kast for spiller mangler i dette mellomsteget.
+  Konfetti/feiring kommer tilbake i steg 5.
+Testet: skjermbilder i headless Chromium med simulerte telefoner:
+5 spillere (kastet, ute, frakoblet), 6 (venter), 2 (D+SB), 8.
+npm test 29/29.
