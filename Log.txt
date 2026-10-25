@@ -1189,3 +1189,23 @@ og ny rekkefølge; dealer = sete 1; roller fjernet; ingen trekning midt i
 hånd). I headless Chromium: omgang avgjort -> Trekk nye plasser -> nye
 plasser, «Send musa til» = faktisk dealer; Behold plassene -> ny hånd
 med samme plasser. npm test 30/30.
+
+------------------------------------------------------------
+2026-10-25 – Showdown: bordkortene i midten, alle spillere på sidene
+------------------------------------------------------------
+Brukerønske: Vis alle spillerne; de som kastet seg får baksiden av
+kortene, de som var med til slutt viser kortene sine (på sidene). I
+midten vinnerhånden som før, pluss bordkortene, så man kan se hva man
+fikk ved å se bordkort og egne kort samtidig.
+index.html (showdown):
+- Midten: vinner, håndnavn, de fem vinnerkortene (delt pott: én rad per
+  vinner med egne kort) og «Bordet» med de fem bordkortene.
+- Sidene: alle som fikk kort i hånden (ikke ute/venter), fordelt
+  venstre/høyre: vinnerne først (gullkant, «Vinner»), så de andre som
+  var med til slutt (etter styrke) med kortene på hånden, så de som
+  kastet seg (nedtonet, «Kastet», baksiden av kortene – serveren sender
+  aldri kortene deres).
+tema.css: ny .kort.bakside (vinrødt mønster med krem og gull kant).
+Testet: skjermbilder Omaha med 5 og 8 spillere, og delt pott med én
+som kastet seg og én som er ute (tilstand sendt inn i nettleseren).
+npm test 30/30.

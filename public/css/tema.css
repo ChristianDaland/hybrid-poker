@@ -138,3 +138,13 @@
 @media (prefers-reduced-motion: reduce) {
   .kort.snu { animation: none; }
 }
+
+/* Baksiden av et kort (kort som ikke ble vist – f.eks. de som kastet seg) */
+.kort.bakside {
+  background:
+    repeating-linear-gradient(45deg, #7a1622 0 5px, #8f1f2d 5px 10px);
+  box-shadow:
+    inset 0 0 0 4px var(--kort),
+    inset 0 0 0 6px var(--gull),
+    0 4px 10px rgba(0, 0, 0, 0.45);
+}

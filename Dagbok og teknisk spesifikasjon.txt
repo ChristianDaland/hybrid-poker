@@ -158,9 +158,10 @@ index.html:
   vises, er hovedknappen «Tilbake til bordet» (et klikk på visningen
   gjør det samme). Ny hånd / ny omgang startes først fra bordet, så
   dealeren rekker å markere ute / flytte.
-- Fullskjermvisninger: showdown (vinnerkort + vinnerens kort på
-  hånden i midten – ved delt pott én rad per vinner med egne kort; de andre som var med til slutt på sidene, med
-  navn og kortene på hånden, sortert etter handRank), alle andre
+- Fullskjermvisninger: showdown (midten: vinnerkortene – ved delt
+  pott én rad per vinner – og bordkortene; sidene: alle som fikk kort,
+  vinnerne først, så de andre som var med til slutt med kortene på
+  hånden, så de som kastet seg med baksiden av kortene), alle andre
   kastet seg (ingen kort), omgang avgjort (CSS-konfetti), lobby (stor QR + innloggede spillere).
 board.html: helt svart, hvite kort med sterk kontrast, tradisjonelle
   bildekort, samme snu-animasjon, CSS-konfetti ved avgjort omgang.
