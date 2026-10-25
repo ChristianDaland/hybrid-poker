@@ -227,6 +227,14 @@ test('Tavledata: håndnummer, omgangsnummer, vinnere og håndnavn kun ved showdo
   const best = Math.max(P('Bjørn').handRank, P('Cato').handRank);
   const expected = ['Bjørn', 'Cato'].filter(n => P(n).handRank === best);
   assert.deepStrictEqual([...host.state.winnerInfo.winners].sort(), expected);
+  // Hver vinners egne fem kort: i Omaha nøyaktig 2 fra hånden + 3 fra bordet
+  const hands = host.state.winnerInfo.winnerHands;
+  assert.deepStrictEqual(hands.map(h => h.name).sort(), expected);
+  for (const h of hands) {
+    assert.strictEqual(h.cards.length, 5);
+    assert.strictEqual(h.cards.filter(c => P(h.name).cards.includes(c)).length, 2, `${h.name}: 2 fra hånden`);
+    assert.strictEqual(h.cards.filter(c => host.state.board.includes(c)).length, 3, `${h.name}: 3 fra bordet`);
+  }
 
   // Ny omgang: nytt omgangsnummer, håndtellingen starter på nytt
   host.emit('host_reset_out'); await wait(100);

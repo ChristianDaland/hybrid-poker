@@ -1147,3 +1147,18 @@ Brukeren syntes beste kombinasjon for alle ble forvirrende.
 - server.js: feltet bestCards er fjernet igjen (ikke lenger i bruk).
   handRank brukes fortsatt til sorteringen.
 Testet: skjermbilder Omaha med 5 og 8 spillere. npm test 29/29.
+
+------------------------------------------------------------
+2026-10-25 – Delt pott: hver vinner viser sine egne vinnerkort
+------------------------------------------------------------
+Problem: Ved delt pott viste showdown bare den første vinnerens fem kort
+(like sterke hender, men ulike kort – f.eks. Cline 5♦ K♥ og Lykke 5♥ K♣
+med de samme tre bordkortene).
+server.js: winnerInfo.winnerHands = [{name, cards}] ved showdown, hver
+vinners egne fem kort (kun kort som vises uansett).
+index.html: ved delt pott én rad per vinner (navn, egne fem vinnerkort
+med gullkant, «På hånden»). Én vinner: som før. Felles oppsett med de
+andre spillerne på sidene er trukket ut i sdRamme().
+Testet: tavledata-testen sjekker winnerHands (navn = vinnerne, 5 kort,
+i Omaha 2 fra hånden + 3 fra bordet). Skjermbilde med brukerens kort
+(sendt inn som tilstand i nettleseren). npm test 29/29.

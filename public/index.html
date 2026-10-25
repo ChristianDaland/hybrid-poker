@@ -332,6 +332,16 @@
     .sd-side.hoyre { align-items: flex-end; text-align: right; }
 
     .sd-paa-handen { display: flex; gap: 34px; justify-content: center; }
+
+    /* Delt pott: én rad per vinner med egne vinnerkort og kortene på hånden */
+    .sd-delt { display: flex; flex-direction: column; gap: 20px; margin-top: 28px; }
+    .sd-vinnerrad { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+    .sd-vinnerrad-navn { font-size: 24px; font-weight: 700; color: var(--gull-lys); }
+    .sd-vinnerrad-kort { display: flex; align-items: flex-end; gap: 26px; }
+    .sd-vinnerrad .vinnerkort { margin: 0; gap: 10px; }
+    .sd-vinnerrad .vinnerkort .kort { width: 84px; height: 118px; font-size: 44px; border-radius: 10px; box-shadow: 0 0 0 3px var(--gull), 0 8px 18px rgba(0, 0, 0, 0.6); }
+    .sd-vinnerrad .sd-gruppe { align-items: flex-start; gap: 4px; }
+    .sd-vinnerrad .smakort .kort { width: 50px; height: 70px; font-size: 26px; border-radius: 7px; }
     .sd-gruppe { display: flex; flex-direction: column; align-items: center; gap: 8px; }
     .sd-etikett { font-size: 16px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: var(--tekst-dempet); }
     .hullkort { display: flex; gap: 8px; }
@@ -867,13 +877,39 @@
       let kort = (info.rawCards || []).map(kortKode);
       if (kort.length === 0 && vinnere[0]) kort = vinnere[0].cards;
 
+      // Delt pott: hver vinner får sin egen rad med sine egne fem kort
+      const delt = vinnere.length > 1 && Array.isArray(info.winnerHands) && info.winnerHands.length > 1;
+      if (delt) {
+        const rader = vinnere.map(p => {
+          const egne = (info.winnerHands.find(h => h.name === p.name) || {}).cards || [];
+          return `
+            <div class="sd-vinnerrad">
+              <div class="sd-vinnerrad-navn">${escapeHtml(p.name)}</div>
+              <div class="sd-vinnerrad-kort">
+                <div class="vinnerkort">${egne.map(c => kortHtml(c)).join('')}</div>
+                <div class="sd-gruppe"><div class="sd-etikett">På hånden</div>
+                  <div class="smakort">${p.cards.map(c => kortHtml(c)).join('')}</div></div>
+              </div>
+            </div>`;
+        }).join('');
+        return sdRamme(state, navn, info.descr, `<div class="sd-delt">${rader}</div>`);
+      }
+
       const paaHanden = vinnere.map(p => `
         <div class="sd-gruppe">
           <div class="sd-etikett">${vinnere.length > 1 ? escapeHtml(p.name) + ' – ' : ''}På hånden</div>
           <div class="hullkort">${p.cards.map(c => kortHtml(c)).join('')}</div>
         </div>`).join('');
 
-      // De andre som var med til showdown: navn og kortene på hånden, sortert etter styrke
+      return sdRamme(state, navn, info.descr, `
+        <div class="vinnerkort">${kort.map(c => kortHtml(c)).join('')}</div>
+        <div class="sd-paa-handen">${paaHanden}</div>`);
+    }
+
+    // Showdown-oppsettet: vinneren i midten, de andre som var med til slutt på sidene
+    // (navn og kortene på hånden, sortert etter styrke)
+    function sdRamme(state, navn, descr, midtHtml) {
+      const winners = state.winnerInfo.winners || [];
       const andre = state.players
         .filter(p => p.cards && p.cards.length > 0 && !winners.includes(p.name))
         .sort((a, b) => (b.handRank || 0) - (a.handRank || 0));
@@ -882,16 +918,14 @@
           <div class="sd-spiller-navn">${escapeHtml(p.name)}</div>
           <div class="smakort">${p.cards.map(c => kortHtml(c)).join('')}</div>
         </div>`;
-
       return `
         <div class="sd">
           <div class="sd-side venstre">${andre.filter((_, i) => i % 2 === 0).map(spillerHtml).join('')}</div>
           <div class="sd-midt">
             <div class="visning-over">Vinner av hånd ${Number(state.handNumber) || ''}</div>
             <div class="visning-navn ${navn.length > 12 ? 'lang' : ''}">${escapeHtml(navn)}</div>
-            <div class="visning-hand">${escapeHtml(info.descr)}</div>
-            <div class="vinnerkort">${kort.map(c => kortHtml(c)).join('')}</div>
-            <div class="sd-paa-handen">${paaHanden}</div>
+            <div class="visning-hand">${escapeHtml(descr)}</div>
+            ${midtHtml}
           </div>
           <div class="sd-side hoyre">${andre.filter((_, i) => i % 2 === 1).map(spillerHtml).join('')}</div>
         </div>`;

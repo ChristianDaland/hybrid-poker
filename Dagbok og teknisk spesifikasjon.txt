@@ -155,7 +155,7 @@ index.html:
   gjør det samme). Ny hånd / ny omgang startes først fra bordet, så
   dealeren rekker å markere ute / flytte.
 - Fullskjermvisninger: showdown (vinnerkort + vinnerens kort på
-  hånden i midten; de andre som var med til slutt på sidene, med
+  hånden i midten – ved delt pott én rad per vinner med egne kort; de andre som var med til slutt på sidene, med
   navn og kortene på hånden, sortert etter handRank), alle andre
   kastet seg (ingen kort), omgang avgjort (CSS-konfetti), lobby (stor QR + innloggede spillere).
 board.html: helt svart, hvite kort med sterk kontrast, tradisjonelle
@@ -180,7 +180,9 @@ Server -> alle:
                           connected, cards*, handDescr*, handRank*}]}
      *kun ved showdown, kun for spillere som ikke kastet seg
      winnerInfo {winnerName, winners:[navn], descr, foldedWin,
-                 rawCards, rankVal}
+                 rawCards, rankVal, winnerHands*:[{name, cards}]}
+     winnerHands: kun ved showdown – hver vinners egne fem kort
+     (ved delt pott er hendene like sterke, men kortene ulike).
      handNumber: «Hånd N» i pågående omgang (huskes etter omstart).
      roundNumber: N-te omgang som startet denne dagen (samme som
      dashboardet), null før første hånd i omgangen.

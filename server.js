@@ -1239,6 +1239,8 @@ io.on('connection', (socket) => {
       gameState.winnerInfo = {
         winnerName: winnerText,
         winners: winners.map(w => w.player.name),
+        // Ved delt pott har hver vinner sine egne fem kort (like sterke, men ulike)
+        winnerHands: winners.map(w => ({ name: w.player.name, cards: (w.solved.cards || []).map(c => c.value + c.suit) })),
         descr: translateHandDescription(rawDescr),
         foldedWin: false,
         rawCards: winners[0] ? winners[0].solved.cards : [],
