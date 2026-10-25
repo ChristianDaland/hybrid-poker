@@ -966,3 +966,36 @@ index.html er skrevet om (tema.css, lokale fonter, CRLF beholdt):
 Testet: skjermbilder i headless Chromium med simulerte telefoner:
 5 spillere (kastet, ute, frakoblet), 6 (venter), 2 (D+SB), 8.
 npm test 29/29.
+
+------------------------------------------------------------
+2026-10-25 – Nytt design, steg 4: dealerens kontroller (index.html)
+------------------------------------------------------------
+Alle gamle knapper er fjernet fra tavlen. Kontrollene vises bare når
+musa er i bruk og sender de samme Socket.IO-hendelsene som før.
+- Musestyrt visning: bevegelse/klikk viser kontrollene (0,25 s), etter
+  5 sek uten bevegelse skjules kontroller og peker (cursor: none).
+  Ikke mens setemenyen eller «Flere valg» er åpen. Stor peker (48 px).
+- Kontrollinje: pille («Dealer: X» / «Send musa til X» / «Venter på
+  spillere»), stor gull hovedknapp med neste steg (Del flop, Del turn,
+  Del river, Vis vinner, Start ny hånd, Start ny omgang, Velg spilletype)
+  og tannhjul «Flere valg». Neste dealer regnes som på serveren.
+- «Start ny omgang»: host_reset_out, og start_new_hand først når
+  serveren har bekreftet ny omgang (ellers kunne host_reset_out, som
+  venter på databasen, nullstille omgangen etter at hånden var delt ut).
+- «Angre ute» ved siden av hovedknappen når omgangen er avgjort
+  (angrer siste ute-markering gjort fra denne skjermen).
+- Setemeny (klikk på et sete): Kast kort for spilleren, Marker som
+  ute / Angre ute, ◀ Flytt / Flytt ▶. Utilgjengelige valg nedtonet med
+  grunnen. «Kast kort» krever, som før på serveren, at spilleren er
+  frakoblet («Spilleren er tilkoblet og kaster selv på mobilen»).
+  Lukkes etter kast/ute, forblir åpen etter flytting (følger spilleren).
+- Flere valg: spilletype (velg / bytt), Ny omgang (med bekreftelse i
+  panelet), lenker til Bordvisning/Dashboard/Veiledning, og «Nytt spill –
+  kast ut alle» med bekreftelse i panelet.
+Testet i headless Chromium via DevTools-protokollen med ekte museklikk:
+hel hånd kun med hovedknappen (Velg spilletype -> Omaha -> Start ny
+hånd -> Del flop … Vis vinner -> Start ny hånd), kontroller skjules etter
+5 sek, setemeny for tilkoblet/frakoblet spiller, kast for frakoblet,
+flytt (menyen blir), marker ute -> omgang avgjort -> Start ny omgang
+(omgang 2, hånd 1, ingen ute), Angre ute, Nytt spill med bekreftelse.
+npm test 29/29.

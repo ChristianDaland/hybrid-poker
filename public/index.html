@@ -268,27 +268,131 @@
       transform: translate(-50%, -50%);
     }
 
-    /* ---------------- Midlertidig knapperad (erstattes av nye kontroller) ---------------- */
-    .midlertidig {
+    /* ------------------------------------------------------------
+       Dealerens kontroller: vises bare når musa er i bruk.
+       Uten musebevegelse i 5 sek skjules kontrollene og pekeren.
+       ------------------------------------------------------------ */
+    body:not(.mus-aktiv), body:not(.mus-aktiv) * { cursor: none !important; }
+    /* Stor peker – dealeren kan sitte langt fra skjermen */
+    body.mus-aktiv, body.mus-aktiv * {
+      cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='48' viewBox='0 0 48 48'%3E%3Cpath d='M6 3 L6 40 L15 31 L21 45 L28 42 L22 28 L35 28 Z' fill='%23F3EEE2' stroke='%230A1410' stroke-width='2.5' stroke-linejoin='round'/%3E%3C/svg%3E") 6 3, auto !important;
+    }
+
+    .kontroller {
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+    }
+    body.mus-aktiv .kontroller { opacity: 1; pointer-events: auto; }
+
+    .kontrollinje {
       position: absolute;
-      left: 0;
-      right: 0;
-      bottom: 20px;
+      left: 48px;
+      right: 48px;
+      bottom: 28px;
+      height: 88px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+      gap: 24px;
+    }
+    .mus-pille {
+      justify-self: start;
       display: flex;
-      justify-content: center;
+      align-items: center;
       gap: 12px;
-    }
-    .midlertidig button {
-      font: 600 20px var(--font-tekst);
-      padding: 14px 22px;
-      border-radius: 12px;
+      padding: 14px 24px;
+      border-radius: 999px;
+      background: var(--flate);
       border: 2px solid var(--linje);
-      background: var(--flate-knapp);
-      color: var(--tekst);
-      cursor: pointer;
+      font-size: 22px;
+      font-weight: 600;
+      white-space: nowrap;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
-    .midlertidig button.hoved { background: var(--gull); color: var(--bakgrunn); border-color: var(--gull); }
-    .midlertidig button:disabled { opacity: 0.35; cursor: default; }
+    .mus-pille svg { flex: 0 0 26px; width: 26px; height: 26px; stroke: var(--gull); fill: none; stroke-width: 2; }
+
+    .hoved-gruppe { display: flex; align-items: center; gap: 16px; }
+    .knapp {
+      font-family: var(--font-tekst);
+      color: var(--tekst);
+      background: var(--flate-knapp);
+      border: 2px solid var(--linje);
+      border-radius: 18px;
+      font-weight: 700;
+    }
+    .knapp:hover:not(:disabled) { border-color: var(--gull); }
+    .knapp:disabled { opacity: 0.4; }
+    .hovedknapp {
+      min-width: 400px;
+      min-height: 88px;
+      padding: 0 40px;
+      font-size: 32px;
+      font-weight: 800;
+      background: var(--gull);
+      border-color: var(--gull);
+      color: var(--bakgrunn);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    }
+    .hovedknapp:hover:not(:disabled) { background: var(--gull-lys); border-color: var(--gull-lys); }
+    .sekundaerknapp { min-height: 88px; padding: 0 28px; font-size: 24px; }
+    .tannhjul {
+      justify-self: end;
+      width: 88px;
+      height: 88px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .tannhjul svg { width: 42px; height: 42px; stroke: var(--tekst); fill: none; stroke-width: 1.8; }
+    .tannhjul.aapen { border-color: var(--gull); }
+
+    /* Paneler: setemeny og «Flere valg» */
+    .panel {
+      position: absolute;
+      background: var(--flate);
+      border: 2px solid var(--gull);
+      border-radius: 24px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+      padding: 26px 28px;
+    }
+    .panel[hidden] { display: none; }
+    .setemeny { left: 670px; top: 250px; width: 600px; }
+    .flere-valg { right: 48px; bottom: 132px; width: 520px; }
+
+    .panel-topp { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; }
+    .panel-topp .avatar { flex-basis: 64px; width: 64px; height: 64px; font-size: 24px; }
+    .panel-tittel { flex: 1; min-width: 0; }
+    .panel-navn { font-size: 30px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .panel-under { font-size: 19px; color: var(--tekst-dempet); margin-top: 2px; }
+    .lukk { width: 56px; height: 56px; font-size: 30px; line-height: 1; border-radius: 14px; }
+
+    .valg-liste { display: flex; flex-direction: column; gap: 12px; }
+    .valg-rad { display: flex; gap: 12px; }
+    .valg-rad > .valg { flex: 1; }
+    .valg {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      justify-content: center;
+      gap: 4px;
+      min-height: 72px;
+      padding: 12px 22px;
+      text-align: left;
+      font-size: 24px;
+    }
+    .valg .undertekst { font-size: 17px; font-weight: 500; color: var(--tekst-dempet); }
+    .valg-lenker { display: flex; gap: 10px; }
+    .valg-lenker .knapp { flex: 1; min-height: 56px; font-size: 19px; }
+    .skillelinje { height: 2px; background: var(--linje); margin: 8px 0; }
+    .valg.fare { border-color: var(--fare); }
+    .valg.fare:hover:not(:disabled) { border-color: #c44; }
+    .bekreft-tekst { font-size: 26px; font-weight: 700; }
+    .bekreft-forklaring { font-size: 19px; color: var(--tekst-dempet); margin: 6px 0 16px; line-height: 1.4; }
+    .knapp.fare-fylt { background: var(--fare); border-color: var(--fare); }
+    .flere-tittel { font-size: 19px; color: var(--tekst-dempet); margin-bottom: 2px; }
   </style>
 </head>
 <body>
@@ -324,14 +428,24 @@
     <div class="markorer" id="markorer"></div>
     <div id="seter"></div>
 
-    <!-- Midlertidig: dagens knapper til de nye kontrollene er på plass -->
-    <div class="midlertidig">
-      <button onclick="socket.emit('set_game_mode', 'TEXAS')">Texas</button>
-      <button onclick="socket.emit('set_game_mode', 'OMAHA')">Omaha</button>
-      <button id="midl-hoved" class="hoved" onclick="hovedKlikk()">Start ny hånd</button>
-      <button onclick="if (confirm('Ny omgang?')) socket.emit('host_reset_out')">Ny omgang</button>
-      <button onclick="if (confirm('Kaste ut alle?')) socket.emit('host_kick_all')">Nytt spill</button>
-      <button onclick="window.open('/board.html', 'PokerBoard', 'width=1200,height=800')">Bordvisning</button>
+    <!-- Dealerens kontroller (vises bare når musa er i bruk) -->
+    <div class="kontroller">
+      <div class="kontrollinje">
+        <div class="mus-pille">
+          <svg viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="6"/><path d="M12 6.5v4"/></svg>
+          <span id="mus-tekst"></span>
+        </div>
+        <div class="hoved-gruppe">
+          <button class="knapp hovedknapp" id="hovedknapp" onclick="hovedKlikk()"></button>
+          <button class="knapp sekundaerknapp" id="angre-ute" onclick="angreSisteUte()" hidden>Angre ute</button>
+        </div>
+        <button class="knapp tannhjul" id="tannhjul" aria-label="Flere valg" onclick="toggleFlereValg()">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        </button>
+      </div>
+
+      <div class="panel setemeny" id="setemeny" role="dialog" aria-label="Setemeny" hidden></div>
+      <div class="panel flere-valg" id="flere-valg" role="dialog" aria-label="Flere valg" hidden></div>
     </div>
   </div>
 
@@ -548,20 +662,245 @@
       document.getElementById('bord-pynt').classList.toggle('skjult', midtMarkor);
     }
 
-    // Midlertidig hovedknapp (erstattes av de nye kontrollene)
+    // ============================================================
+    // Dealerens kontroller. Alle handlinger sender de samme hendelsene som
+    // før; serveren håndhever reglene, nedtoningen her er bare til hjelp.
+    // ============================================================
+    let musTimer = null;
+    let aapentSete = null;        // navnet på spilleren i setemenyen (følger spilleren når hen flyttes)
+    let flereValgAapen = false;
+    let bekreftelse = null;       // 'kast-ut' | 'ny-omgang' | null
+    let sisteUteNavn = null;      // sist markerte «ute» – for «Angre ute» når omgangen er avgjort
+    let sisteDealerSete = 0;      // dealerens sete i forrige hånd (rollen fjernes hvis dealeren blir ute)
+    // «Start ny omgang»: ny hånd sendes først når serveren har bekreftet den nye omgangen,
+    // ellers kan host_reset_out (som venter på databasen) bli ferdig etter at hånden er delt ut
+    let ventPaNyOmgang = false;
+
+    // Musestyrt visning: bevegelse eller klikk viser kontrollene i 5 sek
+    function visKontroller() {
+      document.body.classList.add('mus-aktiv');
+      clearTimeout(musTimer);
+      musTimer = setTimeout(skjulKontroller, 5000);
+    }
+    function skjulKontroller() {
+      // Ikke skjul mens en meny er åpen
+      if (aapentSete || flereValgAapen) { musTimer = setTimeout(skjulKontroller, 5000); return; }
+      document.body.classList.remove('mus-aktiv');
+    }
+    ['mousemove', 'mousedown', 'wheel', 'touchstart'].forEach(ev =>
+      document.addEventListener(ev, visKontroller, { passive: true }));
+
+    const erAktivHand = state => AKTIVE_FASER.includes(state.phase);
+    const mellomHender = state => !erAktivHand(state);
+    const iHanden = p => !p.folded && !p.waiting && !p.out;
+    const finnSpiller = (state, navn) => state.players.find(p => p.name === navn);
+
+    // Neste dealer: første sete etter dagens dealer som ikke er ute (samme regel som serveren)
+    function nesteDealer(state) {
+      const aktive = state.players.filter(p => !p.out);
+      if (aktive.length === 0) return null;
+      return aktive.find(p => p.seat > sisteDealerSete) || aktive[0];
+    }
+
+    function hovedSteg(state) {
+      if (state.roundWinner) return { tekst: 'Start ny omgang', handling: () => { ventPaNyOmgang = true; socket.emit('host_reset_out'); } };
+      switch (state.phase) {
+        case 'PREFLOP': return { tekst: 'Del flop', handling: () => socket.emit('next_phase') };
+        case 'FLOP': return { tekst: 'Del turn', handling: () => socket.emit('next_phase') };
+        case 'TURN': return { tekst: 'Del river', handling: () => socket.emit('next_phase') };
+        case 'RIVER': return { tekst: 'Vis vinner', handling: () => socket.emit('next_phase') };
+        case 'SHOWDOWN':
+        case 'FINISHED': return { tekst: 'Start ny hånd', handling: () => socket.emit('start_new_hand') };
+      }
+      if (!state.gameMode) return { tekst: 'Velg spilletype', handling: () => { flereValgAapen = true; tegnKontroller(state); } };
+      return { tekst: 'Start ny hånd', handling: () => socket.emit('start_new_hand'), sperret: state.players.filter(p => !p.out).length === 0 };
+    }
+
     function hovedKlikk() {
       if (!lastState) return;
-      if (lastState.phase === 'VENTING' || lastState.phase === 'SHOWDOWN' || lastState.phase === 'FINISHED') socket.emit('start_new_hand');
-      else socket.emit('next_phase');
+      hovedSteg(lastState).handling();
     }
+
+    function angreSisteUte() {
+      const p = lastState && sisteUteNavn && finnSpiller(lastState, sisteUteNavn);
+      if (p) socket.emit('host_set_out', { seat: p.seat, out: false });
+    }
+
+    function tegnKontroller(state) {
+      const dealer = state.players.find(p => (p.role || '').startsWith('Dealer'));
+      if (dealer) sisteDealerSete = dealer.seat;
+
+      let musTekst;
+      if (!state.gameMode || state.players.length === 0) musTekst = 'Venter på spillere';
+      else if (state.roundWinner) musTekst = 'Omgangen er avgjort';
+      else if (erAktivHand(state) && dealer) musTekst = `Dealer: ${dealer.name}`;
+      else if (state.phase === 'SHOWDOWN' || state.phase === 'FINISHED') {
+        const neste = nesteDealer(state);
+        musTekst = neste ? `Send musa til ${neste.name}` : 'Venter på spillere';
+      } else musTekst = 'Klar til første hånd';
+      document.getElementById('mus-tekst').innerText = musTekst;
+
+      const steg = hovedSteg(state);
+      const hoved = document.getElementById('hovedknapp');
+      hoved.innerText = steg.tekst;
+      hoved.disabled = !!steg.sperret;
+
+      document.getElementById('angre-ute').hidden = !(state.roundWinner && sisteUteNavn && finnSpiller(state, sisteUteNavn));
+      document.getElementById('tannhjul').classList.toggle('aapen', flereValgAapen);
+
+      tegnSetemeny(state);
+      tegnFlereValg(state);
+    }
+
+    // Et valg i en meny: tilgjengelig, eller nedtonet med grunnen som undertekst
+    function valgHtml(tekst, undertekst, grunn, onclick, ekstraKlasse) {
+      const sperret = !!grunn;
+      return `<button class="knapp valg ${ekstraKlasse || ''}" ${sperret ? 'disabled' : ''} onclick="${onclick}">
+                ${tekst}<span class="undertekst">${escapeHtml(sperret ? grunn : undertekst)}</span></button>`;
+    }
+
+    // ---------------- Setemeny ----------------
+    function aapneSetemeny(seat) {
+      const p = lastState && lastState.players.find(pl => pl.seat === seat);
+      if (!p) return;
+      aapentSete = p.name;
+      flereValgAapen = false;
+      bekreftelse = null;
+      visKontroller();
+      tegnKontroller(lastState);
+    }
+    function lukkSetemeny() { aapentSete = null; tegnKontroller(lastState); }
+
+    function kastFor(seat) { socket.emit('host_fold_player', seat); lukkSetemeny(); }
+    function settUte(seat, out) {
+      const p = lastState.players.find(pl => pl.seat === seat);
+      if (out && p) sisteUteNavn = p.name;
+      socket.emit('host_set_out', { seat, out });
+      lukkSetemeny();
+    }
+    function flytt(seat, retning) { socket.emit('host_move_player', { seat, direction: retning }); }
+
+    function tegnSetemeny(state) {
+      const meny = document.getElementById('setemeny');
+      const p = aapentSete && finnSpiller(state, aapentSete);
+      if (!p) { aapentSete = null; meny.hidden = true; return; }
+
+      const igjen = state.players.filter(iHanden).length;
+      let kastGrunn = null;
+      if (!erAktivHand(state)) kastGrunn = 'Ingen hånd i gang';
+      else if (p.out) kastGrunn = 'Spilleren er ute';
+      else if (p.waiting) kastGrunn = 'Venter på neste hånd';
+      else if (p.folded) kastGrunn = 'Spilleren har kastet';
+      else if (p.connected) kastGrunn = 'Spilleren er tilkoblet og kaster selv på mobilen';
+      else if (igjen <= 1) kastGrunn = 'Den siste spilleren kan ikke kaste';
+
+      const mellom = mellomHender(state);
+      const uteGrunn = mellom ? null : 'Kan bare endres mellom hender';
+      const idx = state.players.indexOf(p);
+      const forrige = state.players[idx - 1], neste = state.players[idx + 1];
+      const flyttGrunn = mellom ? null : 'Seter kan bare flyttes mellom hender';
+      const seat = Number(p.seat);
+
+      meny.innerHTML = `
+        <div class="panel-topp">
+          <div class="avatar" style="background: ${avatarFarge(p.name, state.players.map(x => x.name))}">${escapeHtml(initialer(p.name))}</div>
+          <div class="panel-tittel">
+            <div class="panel-navn">${escapeHtml(p.name)}</div>
+            <div class="panel-under">Sete ${seat}${!p.connected ? ' · frakoblet' : ''}</div>
+          </div>
+          <button class="knapp lukk" aria-label="Lukk" onclick="lukkSetemeny()">×</button>
+        </div>
+        <div class="valg-liste">
+          ${valgHtml('Kast kort for spilleren', 'Hånden går videre uten spilleren', kastGrunn, `kastFor(${seat})`)}
+          ${p.out
+            ? valgHtml('Angre ute', 'Spilleren er med igjen fra neste hånd', uteGrunn, `settUte(${seat}, false)`)
+            : valgHtml('Marker som ute', 'Tom for sjetonger – får ikke kort', uteGrunn, `settUte(${seat}, true)`)}
+          <div class="valg-rad">
+            ${valgHtml('◀ Flytt', forrige ? `Bytt plass med ${forrige.name}` : '', flyttGrunn || (forrige ? null : 'Sitter allerede først'), `flytt(${seat}, -1)`)}
+            ${valgHtml('Flytt ▶', neste ? `Bytt plass med ${neste.name}` : '', flyttGrunn || (neste ? null : 'Sitter allerede sist'), `flytt(${seat}, 1)`)}
+          </div>
+        </div>`;
+      meny.hidden = false;
+    }
+
+    // ---------------- Flere valg ----------------
+    function toggleFlereValg() {
+      flereValgAapen = !flereValgAapen;
+      bekreftelse = null;
+      if (flereValgAapen) aapentSete = null;
+      tegnKontroller(lastState);
+    }
+    function velgSpilletype(mode) { socket.emit('set_game_mode', mode); flereValgAapen = false; tegnKontroller(lastState); }
+    function spørBekreftelse(hva) { bekreftelse = hva; tegnKontroller(lastState); }
+    function nyOmgang() { socket.emit('host_reset_out'); bekreftelse = null; flereValgAapen = false; tegnKontroller(lastState); }
+    function kastUtAlle() { socket.emit('host_kick_all'); bekreftelse = null; flereValgAapen = false; tegnKontroller(lastState); }
+    function aapneVindu(url, navn, w) { window.open(url, navn, `width=${w || 1200},height=800`); }
+
+    function tegnFlereValg(state) {
+      const panel = document.getElementById('flere-valg');
+      if (!flereValgAapen) { panel.hidden = true; return; }
+
+      if (bekreftelse === 'kast-ut') {
+        panel.innerHTML = `
+          <div class="bekreft-tekst">Kaste ut alle spillerne?</div>
+          <div class="bekreft-forklaring">Alle logges ut og må skanne QR-koden på nytt. En omgang som ikke er avgjort, avsluttes uten vinner.</div>
+          <div class="valg-rad">
+            <button class="knapp valg" onclick="spørBekreftelse(null)">Avbryt</button>
+            <button class="knapp valg fare-fylt" onclick="kastUtAlle()">Ja, kast ut alle</button>
+          </div>`;
+      } else if (bekreftelse === 'ny-omgang') {
+        panel.innerHTML = `
+          <div class="bekreft-tekst">Starte ny omgang?</div>
+          <div class="bekreft-forklaring">Alle blir med igjen. ${state.roundWinner ? '' : 'Omgangen som pågår, er ikke avgjort og avsluttes uten vinner.'}</div>
+          <div class="valg-rad">
+            <button class="knapp valg" onclick="spørBekreftelse(null)">Avbryt</button>
+            <button class="knapp valg" onclick="nyOmgang()">Ja, ny omgang</button>
+          </div>`;
+      } else {
+        const aktiv = erAktivHand(state);
+        const spilletype = state.gameMode === 'OMAHA' ? 'Omaha' : state.gameMode === 'TEXAS' ? "Texas Hold'em" : null;
+        const spilletypeHtml = spilletype
+          ? valgHtml(`Bytt til ${state.gameMode === 'OMAHA' ? "Texas Hold'em" : 'Omaha'}`, `Spilletype nå: ${spilletype}`,
+                     aktiv ? 'Kan bare byttes mellom hender' : null,
+                     `velgSpilletype('${state.gameMode === 'OMAHA' ? 'TEXAS' : 'OMAHA'}')`)
+          : `<div class="flere-tittel">Velg spilletype</div>
+             <div class="valg-rad">
+               ${valgHtml("Texas Hold'em", '2 kort per spiller', null, "velgSpilletype('TEXAS')")}
+               ${valgHtml('Omaha', '4 kort per spiller', null, "velgSpilletype('OMAHA')")}
+             </div>`;
+        panel.innerHTML = `
+          <div class="valg-liste">
+            ${spilletypeHtml}
+            ${valgHtml('Ny omgang – alle inn igjen', 'Alle som er ute, blir med igjen', aktiv ? 'Kan bare startes mellom hender' : null, "spørBekreftelse('ny-omgang')")}
+            <div class="valg-lenker">
+              <button class="knapp" onclick="aapneVindu('/board.html', 'PokerBoard')">Bordvisning</button>
+              <button class="knapp" onclick="aapneVindu('/dashboard.html', 'PokerDashboard')">Dashboard</button>
+              <button class="knapp" onclick="aapneVindu('/veiledning.html', 'PokerVeiledning', 750)">Veiledning</button>
+            </div>
+            <div class="skillelinje"></div>
+            ${valgHtml('Nytt spill – kast ut alle', 'Alle må logge inn på nytt', null, "spørBekreftelse('kast-ut')", 'fare')}
+          </div>`;
+      }
+      panel.hidden = false;
+    }
+
+    // Klikk på et sete åpner setemenyen
+    document.getElementById('seter').addEventListener('click', (e) => {
+      const btn = e.target.closest('.sete');
+      if (btn) aapneSetemeny(Number(btn.dataset.seat));
+    });
 
     socket.on('state_update', (state) => {
       lastState = state;
+      if (ventPaNyOmgang && !state.roundWinner && mellomHender(state)) {
+        ventPaNyOmgang = false;
+        socket.emit('start_new_hand');
+      }
       tegnFasespor(state);
       tegnOmgang(state);
       tegnFellesskort(state);
       tegnSeter(state);
-      document.getElementById('midl-hoved').disabled = !state.gameMode || !!state.roundWinner;
+      tegnKontroller(state);
     });
   </script>
 </body>
