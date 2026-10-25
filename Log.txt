@@ -1060,3 +1060,16 @@ bildekort (hjerter konge), snu-animasjon og konfetti. npm test 29/29.
   brikker, statuser), «For dealeren – musa» (gullknappen, setemenyen,
   tannhjulet, Angre ute), projektoren uten bakgrunnsvalg.
 Testet: npm test 29/29.
+
+------------------------------------------------------------
+2026-10-25 – Hovedknappen synes alltid
+------------------------------------------------------------
+Brukerønske: Den store gullknappen (Start ny hånd, Del flop, Del turn,
+Del river, Vis vinner …) skal være synlig hele tiden. Resten (pillen,
+«Angre ute», tannhjulet, menyene) og pekeren skjules fortsatt etter
+5 sek uten musebevegelse.
+index.html: opasiteten flyttet fra hele kontrollaget til elementene med
+klassen «skjules»; hovedknappen har ikke klassen.
+Veiledning og spesifikasjon oppdatert.
+Testet: hel hånd med hovedknappen i headless Chromium; etter 5 sek
+uten mus synes bare hovedknappen. npm test 29/29.

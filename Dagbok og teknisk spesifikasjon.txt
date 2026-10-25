@@ -143,8 +143,9 @@ index.html:
   kortside tom. Speilvend der om det ikke stemmer med bordet.
 - Statuser på lysstyrke (I hånden / Kastet / Med fra neste hånd /
   Ute / Vinner) + «Frakoblet»-merke. D/SB/BB som brikker på filten.
-- Kontroller vises bare ved musebevegelse (skjules etter 5 sek med
-  pekeren, ikke mens en meny er åpen): hovedknapp med neste steg,
+- Hovedknappen med neste steg synes alltid. Resten vises bare ved
+  musebevegelse (skjules etter 5 sek med pekeren, ikke mens en meny
+  er åpen):
   pille «Dealer: X» / «Send musa til X», setemeny (kast for frakoblet
   spiller, ute, flytt) og «Flere valg» (spilletype, ny omgang, lenker,
   nytt spill med bekreftelse). Bare eksisterende hendelser brukes;

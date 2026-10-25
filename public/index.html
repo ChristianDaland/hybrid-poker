@@ -379,8 +379,8 @@
     body.lobby .omgang-info { visibility: hidden; }
 
     /* ------------------------------------------------------------
-       Dealerens kontroller: vises bare når musa er i bruk.
-       Uten musebevegelse i 5 sek skjules kontrollene og pekeren.
+       Dealerens kontroller: hovedknappen synes alltid, resten bare når
+       musa er i bruk. Uten musebevegelse i 5 sek skjules de og pekeren.
        ------------------------------------------------------------ */
     body:not(.mus-aktiv), body:not(.mus-aktiv) * { cursor: none !important; }
     /* Stor peker – dealeren kan sitte langt fra skjermen */
@@ -392,12 +392,16 @@
       position: absolute;
       inset: 0;
       z-index: 10; /* over fullskjermvisningene */
+      pointer-events: none;
+    }
+    /* Hovedknappen synes alltid; resten bare når musa er i bruk */
+    .kontroller .hovedknapp { pointer-events: auto; }
+    .kontroller .skjules {
       opacity: 0;
       pointer-events: none;
       transition: opacity 0.25s ease;
     }
-    body.mus-aktiv .kontroller { opacity: 1; }
-    body.mus-aktiv .kontroller > * { pointer-events: auto; }
+    body.mus-aktiv .kontroller .skjules { opacity: 1; pointer-events: auto; }
 
     .kontrollinje {
       position: absolute;
@@ -560,21 +564,21 @@
     <!-- Dealerens kontroller (vises bare når musa er i bruk) -->
     <div class="kontroller">
       <div class="kontrollinje">
-        <div class="mus-pille">
+        <div class="mus-pille skjules">
           <svg viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="6"/><path d="M12 6.5v4"/></svg>
           <span id="mus-tekst"></span>
         </div>
         <div class="hoved-gruppe">
           <button class="knapp hovedknapp" id="hovedknapp" onclick="hovedKlikk()"></button>
-          <button class="knapp sekundaerknapp" id="angre-ute" onclick="angreSisteUte()" hidden>Angre ute</button>
+          <button class="knapp sekundaerknapp skjules" id="angre-ute" onclick="angreSisteUte()" hidden>Angre ute</button>
         </div>
-        <button class="knapp tannhjul" id="tannhjul" aria-label="Flere valg" onclick="toggleFlereValg()">
+        <button class="knapp tannhjul skjules" id="tannhjul" aria-label="Flere valg" onclick="toggleFlereValg()">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
         </button>
       </div>
 
-      <div class="panel setemeny" id="setemeny" role="dialog" aria-label="Setemeny" hidden></div>
-      <div class="panel flere-valg" id="flere-valg" role="dialog" aria-label="Flere valg" hidden></div>
+      <div class="panel setemeny skjules" id="setemeny" role="dialog" aria-label="Setemeny" hidden></div>
+      <div class="panel flere-valg skjules" id="flere-valg" role="dialog" aria-label="Flere valg" hidden></div>
     </div>
   </div>
 
