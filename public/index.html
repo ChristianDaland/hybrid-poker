@@ -359,6 +359,8 @@
     .sd-spiller.vinner { border-color: var(--gull); box-shadow: 0 0 24px rgba(212, 168, 75, 0.25); }
     .sd-spiller.vinner .sd-spiller-navn, .sd-spiller.vinner .sd-spiller-status { color: var(--gull-lys); }
     .sd-spiller.kastet { opacity: 0.55; }
+    .sd-spiller-hand { margin-top: 8px; font-size: 19px; color: var(--tekst-dempet); max-width: 360px; }
+    .sd-spiller.vinner .sd-spiller-hand { color: var(--gull-lys); }
     .sd-side.hoyre .smakort { justify-content: flex-end; }
     .smakort { display: flex; gap: 8px; }
     .smakort .kort { width: 70px; height: 98px; font-size: 36px; border-radius: 8px; }
@@ -928,6 +930,7 @@
               ${status ? `<span class="sd-spiller-status">${status}</span>` : ''}
             </div>
             <div class="smakort">${r === 2 ? baksider : p.cards.map(c => kortHtml(c)).join('')}</div>
+            ${r !== 2 && p.handDescr ? `<div class="sd-spiller-hand">${escapeHtml(p.handDescr)}</div>` : ''}
           </div>`;
       };
 

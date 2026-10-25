@@ -1267,3 +1267,13 @@ hånd, neste hånd omgang 1). Knappen testet i headless Chromium mot
 SQLite. npm test 32/32.
 Merk: Hender spilt i dag FØR denne versjonen mangler deltakerlisten;
 der trekkes bare vinnere og de som viste kort fra «hender spilt».
+
+------------------------------------------------------------
+2026-10-25 – Håndnavn under kortene i showdown
+------------------------------------------------------------
+Brukerønske: Vis hva hver spiller fikk (kombinasjon) under kortene i
+rammen til spilleren i vinnervisningen.
+index.html: håndnavnet (players[].handDescr, finnes allerede ved
+showdown) står under kortene for alle som var med til slutt, i gull for
+vinneren. Ingen tekst for de som kastet seg.
+Testet: skjermbilde Omaha med 8 spillere (får plass). npm test 32/32.
